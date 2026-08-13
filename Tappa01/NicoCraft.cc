@@ -1,6 +1,7 @@
 #define GLAD_GL_IMPLEMENTATION
 #include "glad/gl.h"
 #include <SFML/Window.hpp>
+#include <SFML/Graphics/Image.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
@@ -11,10 +12,8 @@
 #include "matrices.hh"
 #include "hotshaders.hh"
 
-// Percorso relativo alle risorse (shader), valido se l'eseguibile viene
-// lanciato dalla cartella di build generata da CMake.
 const std::string dir = "../Tappa01/";
-
+const std::string res = "../Resources/";
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -23,14 +22,14 @@ const std::string dir = "../Tappa01/";
 class Setup
 {
 public:
-    static const int window_width = 800;
-    static const int window_height = 800;
-
+    //Width x Height 
+    static const int window_width = 1920;
+    static const int window_height = 1080;
     sf::Window* window;
 
     Setup ()
     {
-        sf::ContextSettings settings;
+        sf::ContextSettings settings; //SFML Options
         settings.depthBits = 32;
         settings.stencilBits = 8;
         settings.antiAliasingLevel = 4;
@@ -40,9 +39,9 @@ public:
 
         window = new sf::Window (
                                  sf::VideoMode({window_width, window_height}),
-                                 "NicoCraft - Tappa01",
+                                 "NicoCraft - Tappa01", //Title
                                  sf::Style::Default,
-                                 sf::State::Windowed,
+                                 sf::State::Windowed, //Window Type
                                  settings
                                  );
         window->setVerticalSyncEnabled (true);
@@ -66,198 +65,141 @@ public:
     }
 };
 
-
-
 ////////////////////
-// Lights          //
-////////////////////
-
-class Lights
-{
-public:
-    glm::vec3 light_direct_pos_relative = {1.0, 1.0, 1.0}; // xyz (relativa alla camera)
-    glm::vec3 light_direct_pos = {0.0, 0.0, 0.0};           // xyz (assoluta, world space)
-    glm::vec3 light_direct_val = {1.0, 1.0, 1.0};   // rgb
-    glm::vec3 light_ambient_val = {0.2, 0.2, 0.2};  // rgb
-    glm::vec3 material_diffuse = {0.8, 0.7, 0.6};   // rgb
-    glm::vec3 material_ambient = {0.5, 0.5, 0.8};   // rgb
-    glm::vec3 material_specular = {1.0, 1.0, 1.0};  // rgb
-    float material_shininess = 1000.0;
-
-private:
-    GLint light_direct_pos_loc;
-    GLint light_direct_val_loc;
-    GLint light_ambient_val_loc;
-    GLint material_diffuse_loc;
-    GLint material_ambient_loc;
-    GLint material_specular_loc;
-    GLint material_shininess_loc;
-
-public:
-    Lights (fcg::Shaders& shaders)
-    {
-        locations (shaders);
-    }
-
-    void locations (fcg::Shaders& shaders)
-    {
-        light_direct_pos_loc = glGetUniformLocation (shaders.program, "light.direct_pos");
-        light_direct_val_loc = glGetUniformLocation (shaders.program, "light.direct_val");
-        light_ambient_val_loc = glGetUniformLocation (shaders.program, "light.ambient_val");
-        material_diffuse_loc = glGetUniformLocation (shaders.program, "material.diffuse");
-        material_ambient_loc = glGetUniformLocation (shaders.program, "material.ambient");
-        material_specular_loc = glGetUniformLocation (shaders.program, "material.specular");
-        material_shininess_loc = glGetUniformLocation (shaders.program, "material.shininess");
-    }
-
-    void send_parameters ()
-    {
-        glUniform3fv (light_direct_val_loc, 1, &light_direct_val[0]);
-        glUniform3fv (light_ambient_val_loc, 1, &light_ambient_val[0]);
-        glUniform3fv (material_diffuse_loc, 1, &material_diffuse[0]);
-        glUniform3fv (material_ambient_loc, 1, &material_ambient[0]);
-        glUniform3fv (material_specular_loc, 1, &material_specular[0]);
-        glUniform1fv (material_shininess_loc, 1, &material_shininess);
-    }
-
-    void send_position_relative (const glm::mat4& inverse_view_matrix)
-    {
-        glm::vec4 p = glm::vec4 (light_direct_pos_relative, 1.0);
-        p = inverse_view_matrix * p;
-        light_direct_pos = {p.x, p.y, p.z};
-        send_position ();
-    }
-
-    void send_position ()
-    {
-        glUniform3fv (light_direct_pos_loc, 1, &light_direct_pos[0]);
-    }
-};
-
-
-
-////////////////////
-// Camera          //
+// Camera         //
 ////////////////////
 
 class Camera
 {
 public:
     glm::mat4 v;
-    glm::mat4 inv_v;
     glm::mat4 vp;
 
+    
 private:
-    /** Parametri intrinseci **/
-    float fd = 50.0f / 18.0f; // focal distance (lente "normale")
-    float ar = 1.0f;          // aspect ratio
+    float fd = 50.0f / 18.0f;
+    float ar = 1.0f;
 
-    /** Parametri estrinseci **/
-    glm::vec3 camera_pos = {0.0f, 0.0f, 2.5f};
-    GLint camera_pos_loc;
-    float phi_deg = 0.0f;    // yaw (rotazione attorno a Y)
-    float theta_deg = 0.0f;  // pitch (rotazione attorno a X)
+    glm::vec3 cameraPos = {0.0f, 0.0f, 2.5f};
+    float phiDeg = 0.0f;
+    float thetaDeg = 0.0f;
 
-    /** Look-around col mouse (tenuto premuto) **/
+    bool sprinting = false;
     bool looking = false;
-    float last_mouse_x = 0.0f;
-    float last_mouse_y = 0.0f;
-    const float mouse_sensitivity = 0.15f;
+    float lastMouseX = 0.0f;
+    float lastMouseY = 0.0f;
+    const float mouseSensitivity = 0.15f;
+    float moveSpeed = 2.0f;
 
-    /** Movimento WASD **/
-    const float move_speed = 2.0f; // unità al secondo
+    // Ad ogni tasto è correllata una direzione di movimento in coordinate della camera.
+    // Ogni riga corrisponde ad un input di movimento
+    struct MovementBindings
+    {
+        sf::Keyboard::Key key;
+        glm::vec3 direction; // in coordinate locali: x=right, y=up, z=forward
+    };
+
+    const MovementBindings moveBindings[6] = {
+        { sf::Keyboard::Key::W,        { 0.0f, 0.0f,  1.0f} },
+        { sf::Keyboard::Key::S,        { 0.0f, 0.0f, -1.0f} },
+        { sf::Keyboard::Key::D,        { 1.0f, 0.0f,  0.0f} },
+        { sf::Keyboard::Key::A,        {-1.0f, 0.0f,  0.0f} },
+        { sf::Keyboard::Key::Space,    { 0.0f, 1.0f,  0.0f} },
+        { sf::Keyboard::Key::LControl, { 0.0f,-1.0f,  0.0f} },
+    };
+
 
 public:
-    Camera (fcg::Shaders& shaders)
+    Camera ()
     {
-        locations (shaders);
-        set_window_size (Setup::window_width, Setup::window_height);
-        view_projection ();
+        SetWindowSize (Setup::window_width, Setup::window_height);
+        ViewProjection ();
     }
 
-    void locations (fcg::Shaders& shaders)
-    {
-        camera_pos_loc = glGetUniformLocation (shaders.program, "camera_pos");
-    }
-
-    void set_window_size (int w, int h)
+    void SetWindowSize (int w, int h)
     {
         ar = ((float) w) / (float) h;
-        view_projection ();
+        ViewProjection ();
     }
 
-    // da chiamare alla pressione del tasto sinistro del mouse
-    void start_look (float x, float y)
+    void StartLook (float x, float y)
     {
         looking = true;
-        last_mouse_x = x;
-        last_mouse_y = y;
+        lastMouseX = x;
+        lastMouseY = y;
     }
 
-    // da chiamare al rilascio del tasto sinistro del mouse
-    void stop_look ()
+    void StopLook ()
     {
         looking = false;
     }
 
-    // da chiamare ad ogni evento di movimento del mouse
-    void look (float x, float y)
+    void Look (float x, float y)
     {
         if (!looking)
             return;
 
-        float dx = x - last_mouse_x;
-        float dy = y - last_mouse_y;
-        last_mouse_x = x;
-        last_mouse_y = y;
+        float dx = x - lastMouseX;
+        float dy = y - lastMouseY;
+        lastMouseX = x;
+        lastMouseY = y;
 
-        phi_deg += dx * mouse_sensitivity;
-        theta_deg += dy * mouse_sensitivity;
-        theta_deg = theta_deg > 89.0f ? 89.0f : theta_deg;
-        theta_deg = theta_deg < -89.0f ? -89.0f : theta_deg;
+        phiDeg += dx * mouseSensitivity;
+        thetaDeg += dy * mouseSensitivity;
+        thetaDeg = thetaDeg > 89.0f ? 89.0f : thetaDeg;
+        thetaDeg = thetaDeg < -89.0f ? -89.0f : thetaDeg;
 
-        view_projection ();
+        ViewProjection ();
     }
 
-    // da chiamare una volta per frame con il delta time in secondi
-    void move (float dt)
+    void Move (float dt)
     {
-        bool w = sf::Keyboard::isKeyPressed (sf::Keyboard::Key::W);
-        bool s = sf::Keyboard::isKeyPressed (sf::Keyboard::Key::S);
-        bool a = sf::Keyboard::isKeyPressed (sf::Keyboard::Key::A);
-        bool d = sf::Keyboard::isKeyPressed (sf::Keyboard::Key::D);
+        float phiRad = glm::radians (phiDeg);
 
-        if (!w && !s && !a && !d)
+        glm::vec3 forward = { glm::sin (phiRad), 0.0f, -glm::cos (phiRad) };
+        glm::vec3 right   = { glm::cos (phiRad), 0.0f,  glm::sin (phiRad) };
+        glm::vec3 up      = { 0.0f, 1.0f, 0.0f };
+
+        glm::vec3 moveDir = {0.0f, 0.0f, 0.0f};
+
+        for (const auto& keyBinding : moveBindings) {
+            if (sf::Keyboard::isKeyPressed (keyBinding.key)) {
+                moveDir += keyBinding.direction.x * right + keyBinding.direction.y * up + keyBinding.direction.z * forward;
+            }
+        }
+
+        if (glm::length(moveDir) < 0.0001f)
             return;
 
-        float phi_rad = glm::radians (phi_deg);
+        moveDir = glm::normalize (moveDir);
+        cameraPos += moveDir * moveSpeed * dt;
 
-        // movimento sul piano orizzontale: il pitch non influisce (stile Minecraft)
-        glm::vec3 forward = { glm::sin (phi_rad), 0.0f, -glm::cos (phi_rad) };
-        glm::vec3 right   = { glm::cos (phi_rad), 0.0f,  glm::sin (phi_rad) };
-
-        glm::vec3 move_dir = {0.0f, 0.0f, 0.0f};
-        if (w) move_dir += forward;
-        if (s) move_dir -= forward;
-        if (d) move_dir += right;
-        if (a) move_dir -= right;
-
-        if (glm::length (move_dir) > 0.0001f)
-            move_dir = glm::normalize (move_dir);
-
-        camera_pos += move_dir * move_speed * dt;
-
-        view_projection ();
+        ViewProjection ();
     }
 
-    void view_projection ()
+    void startSprint(){
+        if(!sprinting){
+            moveSpeed = 6.0f;
+            sprinting = true;
+            return;
+        }
+    }
+
+    void stopSprint(){
+        if(sprinting){
+            sprinting = false;
+            moveSpeed = 2.0f;
+        }
+    }
+
+    void ViewProjection ()
     {
         float ncp = 0.1f;
         float fcp = 100.0f;
 
-        glm::mat4 ry = fcg::rotation_y (phi_deg);
-        glm::mat4 rx = fcg::rotation_x (theta_deg);
-        glm::mat4 t  = fcg::translation (-camera_pos.x, -camera_pos.y, -camera_pos.z);
+        glm::mat4 ry = fcg::rotation_y (phiDeg);
+        glm::mat4 rx = fcg::rotation_x (thetaDeg);
+        glm::mat4 t  = fcg::translation (-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
         float a = (fcp + ncp) / (ncp - fcp);
         float b = 2.0f * fcp * ncp / (ncp - fcp);
@@ -271,16 +213,11 @@ public:
 
         v = rx * ry * t;
         vp = pr * v;
-        inv_v = glm::inverse (v);
-
-        glUniform3fv (camera_pos_loc, 1, &camera_pos[0]);
     }
 };
 
-
-
 ////////////////////
-// Cube (hard-coded, no mesh loading) //
+// Cube (texture, niente luce dinamica) //
 ////////////////////
 
 class GPUCube
@@ -288,63 +225,63 @@ class GPUCube
 private:
     GLuint vbo;
     GLuint vao;
+    GLuint texture;
 
 public:
-    GPUCube () { load (); }
-    ~GPUCube () { clean (); }
+    GPUCube (const std::string& texture_path) { Load (texture_path); }
+    ~GPUCube () { Clean (); }
 
-    void load ()
+    void Load (const std::string& texture_path)
     {
-        // 6 facce * 2 triangoli * 3 vertici = 36 vertici.
-        // ogni vertice: posizione (3 float) + normale di faccia (3 float)
+        // pos (3) + uv (2) = 5 float per vertice (niente normali: non servono più)
         static const float vertices[] = {
-            // Front (+Z)  normal (0,0,1)
-            -0.5f,-0.5f, 0.5f,  0,0,1,
-             0.5f,-0.5f, 0.5f,  0,0,1,
-             0.5f, 0.5f, 0.5f,  0,0,1,
-             0.5f, 0.5f, 0.5f,  0,0,1,
-            -0.5f, 0.5f, 0.5f,  0,0,1,
-            -0.5f,-0.5f, 0.5f,  0,0,1,
+            // Front (+Z)
+            -0.5f,-0.5f, 0.5f,  0,0,
+             0.5f,-0.5f, 0.5f,  1,0,
+             0.5f, 0.5f, 0.5f,  1,1,
+             0.5f, 0.5f, 0.5f,  1,1,
+            -0.5f, 0.5f, 0.5f,  0,1,
+            -0.5f,-0.5f, 0.5f,  0,0,
 
-            // Back (-Z)  normal (0,0,-1)
-             0.5f,-0.5f,-0.5f,  0,0,-1,
-            -0.5f,-0.5f,-0.5f,  0,0,-1,
-            -0.5f, 0.5f,-0.5f,  0,0,-1,
-            -0.5f, 0.5f,-0.5f,  0,0,-1,
-             0.5f, 0.5f,-0.5f,  0,0,-1,
-             0.5f,-0.5f,-0.5f,  0,0,-1,
+            // Back (-Z)
+             0.5f,-0.5f,-0.5f,  0,0,
+            -0.5f,-0.5f,-0.5f,  1,0,
+            -0.5f, 0.5f,-0.5f,  1,1,
+            -0.5f, 0.5f,-0.5f,  1,1,
+             0.5f, 0.5f,-0.5f,  0,1,
+             0.5f,-0.5f,-0.5f,  0,0,
 
-            // Left (-X)  normal (-1,0,0)
-            -0.5f,-0.5f,-0.5f, -1,0,0,
-            -0.5f,-0.5f, 0.5f, -1,0,0,
-            -0.5f, 0.5f, 0.5f, -1,0,0,
-            -0.5f, 0.5f, 0.5f, -1,0,0,
-            -0.5f, 0.5f,-0.5f, -1,0,0,
-            -0.5f,-0.5f,-0.5f, -1,0,0,
+            // Left (-X)
+            -0.5f,-0.5f,-0.5f,  0,0,
+            -0.5f,-0.5f, 0.5f,  1,0,
+            -0.5f, 0.5f, 0.5f,  1,1,
+            -0.5f, 0.5f, 0.5f,  1,1,
+            -0.5f, 0.5f,-0.5f,  0,1,
+            -0.5f,-0.5f,-0.5f,  0,0,
 
-            // Right (+X)  normal (1,0,0)
-             0.5f,-0.5f, 0.5f,  1,0,0,
-             0.5f,-0.5f,-0.5f,  1,0,0,
-             0.5f, 0.5f,-0.5f,  1,0,0,
-             0.5f, 0.5f,-0.5f,  1,0,0,
-             0.5f, 0.5f, 0.5f,  1,0,0,
-             0.5f,-0.5f, 0.5f,  1,0,0,
+            // Right (+X)
+             0.5f,-0.5f, 0.5f,  0,0,
+             0.5f,-0.5f,-0.5f,  1,0,
+             0.5f, 0.5f,-0.5f,  1,1,
+             0.5f, 0.5f,-0.5f,  1,1,
+             0.5f, 0.5f, 0.5f,  0,1,
+             0.5f,-0.5f, 0.5f,  0,0,
 
-            // Top (+Y)  normal (0,1,0)
-            -0.5f, 0.5f, 0.5f,  0,1,0,
-             0.5f, 0.5f, 0.5f,  0,1,0,
-             0.5f, 0.5f,-0.5f,  0,1,0,
-             0.5f, 0.5f,-0.5f,  0,1,0,
-            -0.5f, 0.5f,-0.5f,  0,1,0,
-            -0.5f, 0.5f, 0.5f,  0,1,0,
+            // Top (+Y)
+            -0.5f, 0.5f, 0.5f,  0,0,
+             0.5f, 0.5f, 0.5f,  1,0,
+             0.5f, 0.5f,-0.5f,  1,1,
+             0.5f, 0.5f,-0.5f,  1,1,
+            -0.5f, 0.5f,-0.5f,  0,1,
+            -0.5f, 0.5f, 0.5f,  0,0,
 
-            // Bottom (-Y)  normal (0,-1,0)
-            -0.5f,-0.5f,-0.5f,  0,-1,0,
-             0.5f,-0.5f,-0.5f,  0,-1,0,
-             0.5f,-0.5f, 0.5f,  0,-1,0,
-             0.5f,-0.5f, 0.5f,  0,-1,0,
-            -0.5f,-0.5f, 0.5f,  0,-1,0,
-            -0.5f,-0.5f,-0.5f,  0,-1,0,
+            // Bottom (-Y)
+            -0.5f,-0.5f,-0.5f,  0,0,
+             0.5f,-0.5f,-0.5f,  1,0,
+             0.5f,-0.5f, 0.5f,  1,1,
+             0.5f,-0.5f, 0.5f,  1,1,
+            -0.5f,-0.5f, 0.5f,  0,1,
+            -0.5f,-0.5f,-0.5f,  0,0,
         };
 
         glGenBuffers (1, &vbo);
@@ -355,22 +292,56 @@ public:
         glBindVertexArray (vao);
 
         // Attribute 0: position (x, y, z)
-        glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) 0);
+        glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof (float), (void*) 0);
         glEnableVertexAttribArray (0);
 
-        // Attribute 1: normal (x, y, z)
-        glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) (3 * sizeof (float)));
+        // Attribute 1: uv (u, v)
+        glVertexAttribPointer (1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof (float), (void*) (3 * sizeof (float)));
         glEnableVertexAttribArray (1);
+
+        LoadTexture (texture_path);
     }
 
-    void clean ()
+    void LoadTexture (const std::string& path){
+        sf::Image image;
+        bool loaded = image.loadFromFile (path);
+
+        if (!loaded) {
+            std::cerr << "Warning: Failed to load texture: " << path
+                    << " — using fallback texture." << std::endl;
+
+            std::string fallbackPath = res + "MissingTextureBlock.png";
+            if (!image.loadFromFile (fallbackPath)) {
+                std::cerr << "Error: Failed to load fallback texture: " << fallbackPath << std::endl;
+                exit (1);
+            }
+        }
+
+        auto size = image.getSize ();
+
+        glGenTextures (1, &texture);
+        glBindTexture (GL_TEXTURE_2D, texture);
+
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0,
+                    GL_RGBA, GL_UNSIGNED_BYTE, image.getPixelsPtr ());
+    }
+
+    void Clean ()
     {
         glDeleteVertexArrays (1, &vao);
         glDeleteBuffers (1, &vbo);
+        glDeleteTextures (1, &texture);
     }
 
-    void draw ()
+    void Draw ()
     {
+        glActiveTexture (GL_TEXTURE0);
+        glBindTexture (GL_TEXTURE_2D, texture);
         glBindVertexArray (vao);
         glDrawArrays (GL_TRIANGLES, 0, 36);
     }
@@ -386,101 +357,70 @@ class Scene
 {
 public:
     Camera camera;
-    Lights lights;
     GPUCube cube;
 
 private:
     GLint model_loc;
     GLint vp_loc;
-    GLint tr_inv_model_loc;
 
 public:
-    Scene (fcg::Shaders& shaders) : camera (shaders), lights (shaders)
+    Scene (fcg::Shaders& shaders) : cube (dir + "block.png")
     {
-        locations (shaders);
-        update_all ();
+        Locations (shaders);
     }
 
-    void locations (fcg::Shaders& shaders)
+    void Locations (fcg::Shaders& shaders)
     {
-        camera.locations (shaders);
-        lights.locations (shaders);
-
         model_loc = glGetUniformLocation (shaders.program, "model");
         vp_loc = glGetUniformLocation (shaders.program, "vp");
-        tr_inv_model_loc = glGetUniformLocation (shaders.program, "tr_inv_model");
     }
 
-    void update_all ()
-    {
-        camera.view_projection ();
-        lights.send_parameters ();
-        lights.send_position_relative (camera.inv_v);
-    }
-
-    void draw ()
+    void Draw ()
     {
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUniformMatrix4fv (vp_loc, 1, GL_FALSE, &camera.vp[0][0]);
 
-        // il cubo sta fermo nell'origine, model matrix identità
         glm::mat4 model = fcg::identity ();
-        glm::mat3 tr_inv_model = fcg::identity3 ();
         glUniformMatrix4fv (model_loc, 1, GL_FALSE, &model[0][0]);
-        glUniformMatrix3fv (tr_inv_model_loc, 1, GL_FALSE, &tr_inv_model[0][0]);
 
-        cube.draw ();
+        cube.Draw ();
     }
 };
 
+////////////////////
+// Game  Bindings //
+////////////////////
 
+struct keyBindings
+{
+    sf::Keyboard::Scancode key;
+    std::function<void()> PressKey;
+    std::function<void()> ReleaseKey = nullptr;
+};
+
+std::vector<keyBindings>ActionsKeyBindings (Scene& scene)
+{
+    return {
+        { sf::Keyboard::Scancode::Escape, [] () { exit (0); } },
+        { 
+            sf::Keyboard::Scancode::LShift, 
+            [&scene]() { scene.camera.startSprint(); },
+            [&scene]() { scene.camera.stopSprint(); }
+        }
+
+    };
+}
 
 ////////////////////
 // SFML Callbacks //
 ////////////////////
 
-void handle (const sf::Event::Resized& resized, Camera& camera)
+void Handle (const sf::Event::Resized& resized, Camera& camera)
 {
     glViewport (0, 0, resized.size.x, resized.size.y);
-    camera.set_window_size (resized.size.x, resized.size.y);
+    camera.SetWindowSize (resized.size.x, resized.size.y);
 }
-
-void handle (const sf::Event::KeyPressed& key, fcg::Shaders& shaders, Scene& scene)
-{
-    switch (key.scancode) {
-    case sf::Keyboard::Scancode::Escape:
-        exit (0);
-    case sf::Keyboard::Scancode::G:
-        shaders.reload (dir + "shader_gouraud.vert", dir + "shader_gouraud.frag");
-        shaders.use ();
-        scene.locations (shaders);
-        scene.update_all ();
-        return;
-    case sf::Keyboard::Scancode::P:
-        shaders.reload (dir + "shader_phong.vert", dir + "shader_phong.frag");
-        shaders.use ();
-        scene.locations (shaders);
-        scene.update_all ();
-        return;
-    case sf::Keyboard::Scancode::F:
-        shaders.reload (dir + "shader_flat.vert", dir + "shader_flat.frag");
-        shaders.use ();
-        scene.locations (shaders);
-        scene.update_all ();
-        return;
-    case sf::Keyboard::Scancode::C:
-        shaders.reload (dir + "shader_normals.vert", dir + "shader_normals.frag");
-        shaders.use ();
-        scene.locations (shaders);
-        scene.update_all ();
-        return;
-    default:
-        return;
-    }
-}
-
-
 
 //////////
 // Main //
@@ -505,7 +445,7 @@ int main ()
 
 
     //// Main Loop ////
-
+    std::vector<keyBindings> bindings = ActionsKeyBindings(scene);
     sf::Clock clock;
     bool running = true;
     while (running)
@@ -515,25 +455,41 @@ int main ()
             if (event->is<sf::Event::Closed> ())
                 running = false;
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
-                handle (*resized, scene.camera);
-            else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
-                handle (*key_pressed, shaders, scene);
+                Handle (*resized, scene.camera);
+            else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed>()) {
+                // Scorriamo tutti i binding che abbiamo definito
+                for (const auto& binding : bindings) {
+                    // Se il tasto premuto coincide con la chiave e c'è una funzione definita
+                    if (key_pressed->scancode == binding.key && binding.PressKey) {
+                        binding.PressKey(); // Esegue ad es. scene.camera.startSprint()
+                    }
+                }
+            }
+            else if (const auto* key_released = event->getIf<sf::Event::KeyReleased>()) {
+                // Scorriamo nuovamente i binding
+                for (const auto& binding : bindings) {
+                    // Se il tasto rilasciato coincide con la chiave e c'è una funzione di rilascio
+                    if (key_released->scancode == binding.key && binding.ReleaseKey) {
+                        binding.ReleaseKey(); // Esegue ad es. scene.camera.stopSprint()
+                    }
+                }
+            }
             else if (const auto* mouse_pressed = event->getIf<sf::Event::MouseButtonPressed> ()) {
                 if (mouse_pressed->button == sf::Mouse::Button::Left)
-                    scene.camera.start_look (mouse_pressed->position.x, mouse_pressed->position.y);
+                    scene.camera.StartLook (mouse_pressed->position.x, mouse_pressed->position.y);
             }
             else if (const auto* mouse_released = event->getIf<sf::Event::MouseButtonReleased> ()) {
                 if (mouse_released->button == sf::Mouse::Button::Left)
-                    scene.camera.stop_look ();
+                    scene.camera.StopLook ();
             }
             else if (const auto* mouse_moved = event->getIf<sf::Event::MouseMoved> ())
-                scene.camera.look (mouse_moved->position.x, mouse_moved->position.y);
+                scene.camera.Look (mouse_moved->position.x, mouse_moved->position.y);
         }
 
         float dt = clock.restart ().asSeconds ();
-        scene.camera.move (dt);
+        scene.camera.Move (dt);
 
-        scene.draw ();
+        scene.Draw ();
         window.display ();
     }
 
