@@ -11,8 +11,7 @@ namespace fcg
 {
 
     // returns a C++ string loaded with the contents of a whole file
-    inline std::string read_file (const std::string filename)
-    {
+    inline std::string read_file (const std::string filename){
         // open file
         std::ifstream file (filename, std::ios::binary);
         if (!file.is_open()) {
@@ -34,7 +33,7 @@ namespace fcg
 
 
     // get OpenGL log errors when compiling or linking shaders
-    using glGetIv_func = void (*) (GLuint, GLenum, GLint*);
+    using glGetIv_func = void (*)(GLuint, GLenum, GLint*);
     using glGetInfoLog_func = void (*) (GLuint, GLsizei, GLsizei*, GLchar*);
     inline std::string getInfoLog(GLuint object, 
                                   glGetIv_func get_iv,

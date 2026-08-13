@@ -43,17 +43,18 @@ if(APPLE)
     find_library(CORE_GRAPHICS_LIB CoreGraphics REQUIRED)
 endif()
 
+
+
 ###############################
 ### Sorgenti e Tappe 1-10   ###
 ###############################
 
 # nome eseguibile, nome file
 add_executable(Tappa01 Tappa01/NicoCraft.cc) 
-target_link_libraries(Tappa01 PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
+target_link_libraries(Tappa01 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
 
-
-#add_executable(Tappa02 Tappa02/00_refactor.cc) 
-#target_link_libraries(Tappa01 PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
+add_executable(Tappa02 Tappa02/NicoCraft.cc)
+target_link_libraries(Tappa02 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
 
 #add_executable(Tappa03 Tappa03/00_refactor.cc) 
 #target_link_libraries(Tappa01 PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
