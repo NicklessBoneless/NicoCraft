@@ -77,7 +77,7 @@ class Camera
 public:
     glm::mat4 v;
     glm::mat4 vp;
-
+    glm::mat4 pr;
     
 private:
     float fd = 50.0f / 18.0f;
@@ -195,7 +195,7 @@ public:
         }
     }
 
-    void ViewProjection ()
+    glm::mat4 ViewProjection ()
     {
         float ncp = 0.1f;
         float fcp = 100.0f;
@@ -204,18 +204,20 @@ public:
         glm::mat4 rx = fcg::rotation_x (thetaDeg);
         glm::mat4 t  = fcg::translation (-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-        float a = (fcp + ncp) / (ncp - fcp);
-        float b = 2.0f * fcp * ncp / (ncp - fcp);
+        v = rx * ry * t; 
 
-        glm::mat4 pr = glm::mat4(
-                                 fd,  0.0,     0.0,  0.0,
-                                 0.0, fd * ar, 0.0,  0.0,
-                                 0.0, 0.0,       a, -1.0,
-                                 0.0, 0.0,       b,  0.0
-                                 );
+        float a = (fcp + ncp) / (ncp - fcp); //
+        float b = 2.0f * fcp * ncp / (ncp - fcp); //
 
-        v = rx * ry * t;
-        vp = pr * v;
+        // Salvala direttamente in 'pr' della classe[cite: 3]
+        pr = glm::mat4(
+            fd,  0.0,     0.0,  0.0,
+            0.0, fd * ar, 0.0,  0.0,
+            0.0, 0.0,       a, -1.0,
+            0.0, 0.0,       b,  0.0
+        ); //[cite: 3]
+
+        return pr * v; //[cite: 3]
     }
 };
 
@@ -313,16 +315,16 @@ public:
             0.5f,  0.5f,  0.5f,  0.0f, 1.0f,  2.0f,
 
             // --- FACCIA SUPERIORE (+Y) -> Layer 1 (Erba Sopra) ---
-            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f,
-             0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  1.0f,
-             0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  1.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,  1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  0.0f,
+             0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  0.0f,
+             0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  0.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,  0.0f,
 
             // --- FACCIA INFERIORE (-Y) -> Layer 2 (Terra Sotto) ---
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,  2.0f,
-             0.5f, -0.5f, -0.5f,  1.0f, 0.0f,  2.0f,
-             0.5f, -0.5f,  0.5f,  1.0f, 1.0f,  2.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  2.0f
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,  0.0f,
+             0.5f, -0.5f, -0.5f,  1.0f, 0.0f,  0.0f,
+             0.5f, -0.5f,  0.5f,  1.0f, 1.0f,  0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  0.0f
         };
 
         // 36 Indici per collegare i 24 vertici
@@ -443,7 +445,8 @@ public:
 
 private:
     GLint model_loc;
-    GLint vp_loc;
+    GLint view_loc;
+    GLint proj_loc;
 
 public:
     Scene (fcg::Shaders& shaders) : cube (dir + "block.png")
@@ -454,15 +457,17 @@ public:
     void Locations (fcg::Shaders& shaders)
     {
         model_loc = glGetUniformLocation (shaders.program, "model");
-        vp_loc = glGetUniformLocation (shaders.program, "vp");
+        view_loc  = glGetUniformLocation (shaders.program, "view");
+        proj_loc  = glGetUniformLocation (shaders.program, "projection");
     }
 
     void Draw ()
     {
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUniformMatrix4fv (vp_loc, 1, GL_FALSE, &camera.vp[0][0]);
+        // Separiamo la matrice View dalla Projection (presenti nella classe Camera)
+        glUniformMatrix4fv (proj_loc, 1, GL_FALSE, &camera.pr[0][0]); // Assicurati che pr sia pubblica in Camera
+        glUniformMatrix4fv (view_loc, 1, GL_FALSE, &camera.v[0][0]);
 
         glm::mat4 model = fcg::identity ();
         glUniformMatrix4fv (model_loc, 1, GL_FALSE, &model[0][0]);
@@ -470,6 +475,7 @@ public:
         cube.Draw ();
     }
 };
+
 
 ////////////////////
 // Game  Bindings //
@@ -524,7 +530,7 @@ int main ()
 
     Scene scene (shaders);
 
-    glEnable (GL_CULL_FACE);
+    glEnable (GL_CULL_FACE); //[cite: 3]
     glCullFace (GL_BACK);
 
     glEnable (GL_DEPTH_TEST);
