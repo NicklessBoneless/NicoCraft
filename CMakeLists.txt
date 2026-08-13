@@ -48,7 +48,7 @@ endif()
 ###############################
 
 # nome eseguibile, nome file
-add_executable(Tappa01 Tappa01/04_first_person_view.cc) 
+add_executable(Tappa01 Tappa01/NicoCraft.cc) 
 target_link_libraries(Tappa01 PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
 
 
