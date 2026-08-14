@@ -28,11 +28,11 @@ Gli eseguibili vengono generati nella cartella `build/`.
 - **Esc**: chiude il programma
 
 ## Struttura del progetto ---
-NicoCraft/
-├── CMakeLists.txt
-├── include/ # header condivisi tra le tappe (matrici, shader loader...)
-├── Tappa01/ # sorgenti e shader della Tappa01
-└── Tappa02/ # sorgenti e shader della Tappa02
+NicoCraft/<br>
+├── CMakeLists.txt<br>
+├── include/ # header condivisi tra le tappe (matrici, shader loader...)<br>
+├── Tappa01/ # sorgenti e shader della Tappa0<br>
+└── Tappa02/ # sorgenti e shader della Tappa02<br>
 ....
 
 ## Dipendenze
