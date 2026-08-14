@@ -34,15 +34,15 @@ namespace Blocks{
         }
     };
 
-    // Mappa (TipoBlocco, Faccia) -> Indice del Layer nella Texture Array
+    // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
     inline uint32_t getTextureIndex(BlockType type, BlockFace face)
     {
         switch (type)
         {
         case BlockType::GRASS:
-            if (face == BlockFace::Top)    return 1; // Layer 1: Erba (Sopra)
-            if (face == BlockFace::Bottom) return 2; // Layer 2: Terra
-            return 3;                           // Layer 3: Lato Erba
+            if (face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
+            if (face == BlockFace::Bottom) return 2; // Index 2: Terra
+            return 3;                           // Index 3: Lato Erba
         
         case BlockType::DIRT:
             return 2; //Texture tutta uguale
@@ -80,8 +80,7 @@ namespace Blocks{
             glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             // Carica ogni singola immagine e la copia nel rispettivo layer z
-            for (GLsizei i = 0; i < textureCount; i++)
-            {
+            for (GLsizei i = 0; i < textureCount; i++){
                 sf::Image img;
                 if (!img.loadFromFile(filepaths[i])) {
                     std::cerr << "Errore nel caricamento della texture: " << filepaths[i] << std::endl;
@@ -91,6 +90,9 @@ namespace Blocks{
                       continue;
                     }
                 }
+
+                //Necessario per non prendere le texture rovesciate
+                img.flipVertically();
 
                 // Copia i pixel dell'immagine nel layer 'i'
                 glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());

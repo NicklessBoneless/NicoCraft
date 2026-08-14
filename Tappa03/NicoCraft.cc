@@ -8,9 +8,10 @@
 #include "Blocks.hh" //Messo per primo per dipendenze
 #include "Chunk.hh"
 
-const std::string dir = "../Tappa02/";
+const std::string dir = "../Tappa03/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa03";
+const int TEXTUREPIXELSIZE = 32;
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -24,8 +25,7 @@ public:
     static const int window_height = 1080;
     sf::Window* window;
 
-    Setup ()
-    {
+    Setup(){
         sf::ContextSettings settings; //SFML Options
         settings.depthBits = 32;
         settings.stencilBits = 8;
@@ -43,7 +43,7 @@ public:
                                  );
         window->setVerticalSyncEnabled (true);
 
-        if (!window->setActive (true)) {
+        if(!window->setActive(true)){
             std::cerr << "Failure: error during SFML OpenGL Activation." << std::endl;
             exit (1);
         }
@@ -56,8 +56,7 @@ public:
         std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
     }
 
-    ~Setup ()
-    {
+    ~Setup (){
         delete window;
     }
 };
@@ -66,20 +65,19 @@ public:
 // Camera         //
 ////////////////////
 
-class Camera
-{
+class Camera{
 public:
     glm::mat4 v;
     glm::mat4 vp;
     glm::mat4 pr;
     
 private:
-    float fd = 50.0f / 18.0f;
+    float FovDegrees = 70.0f;
     float ar = 1.0f;
 
-    glm::vec3 cameraPos = {0.0f, 0.0f, 2.5f};
+    glm::vec3 cameraPos = {8.0f, 8.0f, 20.0f};
     float phiDeg = 0.0f;
-    float thetaDeg = 0.0f;
+    float thetaDeg = 30.0f;
 
     bool sprinting = false;
     bool looking = false;
@@ -177,7 +175,9 @@ public:
     void startSprint(){
         if(!sprinting){
             moveSpeed = 6.0f;
+            FovDegrees += 1;
             sprinting = true;
+            ViewProjection();
             return;
         }
     }
@@ -186,6 +186,8 @@ public:
         if(sprinting){
             sprinting = false;
             moveSpeed = 2.0f;
+            FovDegrees -= 1;
+            ViewProjection();
         }
     }
 
@@ -202,6 +204,8 @@ public:
 
         float a = (fcp + ncp) / (ncp - fcp); //
         float b = 2.0f * fcp * ncp / (ncp - fcp); //
+
+        float fd = 1.0f / glm::tan(glm::radians(FovDegrees / 2.0f));
 
         // Salvala direttamente in 'pr' della classe[cite: 3]
         pr = glm::mat4(
@@ -233,8 +237,7 @@ private:
     GLint proj_loc;
 
 public:
-    Scene (fcg::Shaders& shaders)
-    {
+    Scene (fcg::Shaders& shaders){
         // Chunk di prova
         for (int x = 0; x < 16; x++){
             for (int y = 0; y < 4; y++){
@@ -254,7 +257,8 @@ public:
             res + "grassSide.png",
             res + "stone.png"
         };
-        textureArray.LoadTextures (texture_paths, 16, 16);
+
+        textureArray.LoadTextures (texture_paths, TEXTUREPIXELSIZE, TEXTUREPIXELSIZE);
 
         Locations (shaders);
     }
@@ -319,9 +323,6 @@ void Handle (const sf::Event::Resized& resized, Camera& camera)
     camera.SetWindowSize (resized.size.x, resized.size.y);
 }
 
-
-
-
 //////////
 // Main //
 //////////
@@ -338,7 +339,7 @@ int main ()
 
     Scene scene (shaders);
 
-    glEnable (GL_CULL_FACE); //[cite: 3]
+    glEnable (GL_CULL_FACE);
     glCullFace (GL_BACK);
 
     glEnable (GL_DEPTH_TEST);
