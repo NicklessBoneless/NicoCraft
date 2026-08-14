@@ -1,7 +1,7 @@
-# NicoCraft ---
+# NicoCraft
 Clone "barebones" di Minecraft sviluppato in C++ con SFML 3.0, OpenGL 4.1 e GLM, come progetto d'esame.
 
-## Build ---
+## Build
 Il progetto compila tutte le tappe con un unico comando, dalla root del repository:
 
 ```bash
@@ -18,23 +18,22 @@ Gli eseguibili vengono generati nella cartella `build/`.
 ./build/Tappa01
 ```
 
-## Comandi ---
+## Comandi
 ### Mouse
 - **Tasto sinistro (tenuto premuto) + movimento**: ruota la visuale della camera (look-around)
 
 ### Tastiera
 - **W / A / S / D**: muove la camera in avanti / sinistra / indietro / destra
-- **G**: shader Gouraud
-- **P**: shader Phong
-- **F**: shader Flat (default)
-- **C**: visualizza le normali
+- **LShift**: "Sprinta", aumenta la velocità della camera
 - **Esc**: chiude il programma
 
 ## Struttura del progetto ---
 NicoCraft/
 ├── CMakeLists.txt
 ├── include/ # header condivisi tra le tappe (matrici, shader loader...)
-└── Tappa01/ # sorgenti e shader della Tappa01
+├── Tappa01/ # sorgenti e shader della Tappa01
+└── Tappa02/ # sorgenti e shader della Tappa02
+....
 
 ## Dipendenze
 
