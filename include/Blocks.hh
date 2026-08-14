@@ -69,8 +69,7 @@ namespace Blocks{
         ~TextureArray() { Clean(); }
 
         //Carica una lista di percorsi immagini e le impila nella Texture Array
-        void LoadTextures(const std::vector<std::string>& filepaths, int width = 16, int height = 16)
-        {
+        void LoadTextures(const std::vector<std::string>& filepaths, int width = 32, int height = 32){
             GLsizei textureCount = static_cast<GLsizei>(filepaths.size());
 
             glGenTextures(1, &textureID);

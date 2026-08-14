@@ -1,11 +1,12 @@
 #include "Blocks.hh"
 #include "matrices.hh"
 #include "hotshaders.hh"
+#include <functional>
 
 namespace Blocks
 {
     constexpr int CHUNK_SIZE_X = 16;
-    constexpr int CHUNK_SIZE_Y = 16;
+    constexpr int CHUNK_SIZE_Y = 64;
     constexpr int CHUNK_SIZE_Z = 16;
 
     class Chunk{
@@ -18,7 +19,7 @@ namespace Blocks
             }
 
         public:
-            Chunk () : blocks (CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z, BlockType::AIR) {}
+            Chunk() : blocks (CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z, BlockType::AIR) {}
 
             bool InBounds (int x, int y, int z) const
             {
@@ -74,37 +75,43 @@ namespace Blocks
 
     constexpr float FACE_UV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
 
-    inline MeshData BuildChunkMesh (const Chunk& chunk)
-    {
+    using NeighborSolidFn = std::function<bool(int, int, int)>;
+
+    inline MeshData BuildChunkMesh (const Chunk& chunk, const NeighborSolidFn& isSolidOutside){
         MeshData mesh;
-        for (int z = 0; z < CHUNK_SIZE_Z; ++z)
-        for (int y = 0; y < CHUNK_SIZE_Y; ++y)
-        for (int x = 0; x < CHUNK_SIZE_X; ++x)
-        {
-            BlockType type = chunk.Get (x, y, z);
-            if (type == BlockType::AIR)
-                continue;
+        for(int z = 0; z < CHUNK_SIZE_Z; ++z){
+            for(int y = 0; y < CHUNK_SIZE_Y; ++y){
+                for(int x = 0; x < CHUNK_SIZE_X; ++x){
+                    BlockType type = chunk.Get (x, y, z);
+                    if(type == BlockType::AIR) {
+                        continue;
+                    }
 
-            for (int i = 0; i < 6; i++){
-                BlockFace face = static_cast<BlockFace> (i);
-                int nx = x + FACE_OFFSETS[i][0];
-                int ny = y + FACE_OFFSETS[i][1];
-                int nz = z + FACE_OFFSETS[i][2];
+                    for(int i = 0; i < 6; i++){
+                        BlockFace face = static_cast<BlockFace> (i);
+                        int nx = x + FACE_OFFSETS[i][0];
+                        int ny = y + FACE_OFFSETS[i][1];
+                        int nz = z + FACE_OFFSETS[i][2];
 
-                if (chunk.IsSolid (nx, ny, nz))
-                    continue;
+                        //Se il vicino e' dentro lo stesso chunk usiamo il controllo normale,
+                        //altrimenti chiediamo alla funzione esterna di controllare nel chunk adiacente
+                        bool neighborSolid = chunk.InBounds (nx, ny, nz) ? chunk.IsSolid (nx, ny, nz) : isSolidOutside (nx, ny, nz);
 
-                uint32_t base = static_cast<uint32_t> (mesh.vertices.size ());
-                float layer = static_cast<float> (getTextureIndex (type, face));
+                        if(neighborSolid) {
+                            continue;
+                        }
+                        uint32_t base = static_cast<uint32_t> (mesh.vertices.size ());
+                        float layer = static_cast<float> (getTextureIndex (type, face));
 
-                for (int v = 0; v < 4; ++v)
-                    mesh.vertices.push_back ({
-                        x + FACE_VERTS[i][v][0], y + FACE_VERTS[i][v][1], z + FACE_VERTS[i][v][2],
-                        FACE_UV[v][0], FACE_UV[v][1], layer
-                    });
-
-                mesh.indices.insert (mesh.indices.end (),
-                    { base+0, base+1, base+2, base+2, base+3, base+0 });
+                        for(int v = 0; v < 4; ++v) {
+                            mesh.vertices.push_back ({
+                                x + FACE_VERTS[i][v][0], y + FACE_VERTS[i][v][1], z + FACE_VERTS[i][v][2],
+                                FACE_UV[v][0], FACE_UV[v][1], layer
+                            });
+                        }
+                        mesh.indices.insert (mesh.indices.end (),{ base+0, base+1, base+2, base+2, base+3, base+0 });
+                    }
+                }
             }
         }
         return mesh;
