@@ -229,6 +229,7 @@ class GPUCube
 private:
     GLuint vbo;
     GLuint vao;
+    GLuint ebo;
     Blocks::TextureArray textureArray;
 
 public:
@@ -303,7 +304,6 @@ public:
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
         // 3. Genera e carica l'EBO (indici)
-        GLuint ebo;
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -333,7 +333,7 @@ public:
     {
         glDeleteVertexArrays (1, &vao);
         glDeleteBuffers (1, &vbo);
-        
+        glDeleteBuffers(1,&ebo);
     }
 
     void Draw()
