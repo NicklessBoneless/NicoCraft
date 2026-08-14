@@ -1,26 +1,21 @@
 #ifndef BLOCK_HH
 #define BLOCK_HH
 
-
 #include <SFML/Graphics/Image.hpp>
 #include <glm/vec3.hpp>
-#include <vector>
-#include <string>
-#include <iostream>
-#include <cstdint>
+#include "basicLib.hh"
 
-namespace Blocks
-{
+namespace Blocks{
     enum class BlockType : uint8_t
     {
-        Air = 0,
-        Dirt,
-        Grass,
-        Stone,
-        Wood
+        AIR = 0,
+        DIRT,
+        GRASS,
+        STONE,
+        WOOD
     };
 
-    enum class Face : uint8_t
+    enum class BlockFace : uint8_t
     {
         Front = 0, // +Z
         Back,      // -Z
@@ -32,31 +27,31 @@ namespace Blocks
 
     struct Block
     {
-        BlockType type = BlockType::Air;
+        BlockType type = BlockType::AIR;
 
         bool isSolid() const {
-            return type != BlockType::Air;
+            return type != BlockType::AIR;
         }
     };
 
     // Mappa (TipoBlocco, Faccia) -> Indice del Layer nella Texture Array
-    inline uint32_t getTextureIndex(BlockType type, Face face)
+    inline uint32_t getTextureIndex(BlockType type, BlockFace face)
     {
         switch (type)
         {
-        case BlockType::Grass:
-            if (face == Face::Top)    return 1; // Layer 1: Erba (Sopra)
-            if (face == Face::Bottom) return 2; // Layer 2: Terra
+        case BlockType::GRASS:
+            if (face == BlockFace::Top)    return 1; // Layer 1: Erba (Sopra)
+            if (face == BlockFace::Bottom) return 2; // Layer 2: Terra
             return 3;                           // Layer 3: Lato Erba
         
-        case BlockType::Dirt:
+        case BlockType::DIRT:
             return 2; //Texture tutta uguale
 
-        case BlockType::Stone:
+        case BlockType::STONE:
             return 4; //Tutta uguale
 
-        case BlockType::Wood:
-            if(face == Face::Top || face == Face::Bottom) return 6; //Anelli del Tronco
+        case BlockType::WOOD:
+            if(face == BlockFace::Top || face == BlockFace::Bottom) return 6; //Anelli del Tronco
             return 7;                                               //Corteccia (lati)
 
         default:
@@ -76,29 +71,32 @@ namespace Blocks
         //Carica una lista di percorsi immagini e le impila nella Texture Array
         void LoadTextures(const std::vector<std::string>& filepaths, int width = 16, int height = 16)
         {
-            GLsizei layerCount = static_cast<GLsizei>(filepaths.size());
+            GLsizei textureCount = static_cast<GLsizei>(filepaths.size());
 
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
 
             // Alloca lo spazio GPU per 'layerCount' immagini 2D
-            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, layerCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             // Carica ogni singola immagine e la copia nel rispettivo layer z
-            for (GLsizei i = 0; i < layerCount; ++i)
+            for (GLsizei i = 0; i < textureCount; i++)
             {
                 sf::Image img;
                 if (!img.loadFromFile(filepaths[i])) {
                     std::cerr << "Errore nel caricamento della texture: " << filepaths[i] << std::endl;
                     std::cerr << "Eseguo fallback!\n";
-                    if(!img.loadFromFile(filepaths[0])) continue;
+                    if(!img.loadFromFile(filepaths[0])){
+                      std::cerr << "Fallback fallito :-( !\n";
+                      continue;
+                    }
                 }
 
                 // Copia i pixel dell'immagine nel layer 'i'
                 glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
             }
 
-            // Impostazioni di filtraggio stile pixel-art (Minecraft)
+            //Filtraggio stile pixel-art (Minecraft)
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -124,4 +122,4 @@ namespace Blocks
     };
 }
 
-#endif // BLOCK_HH
+#endif
