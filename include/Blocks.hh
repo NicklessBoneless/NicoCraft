@@ -1,8 +1,7 @@
 #ifndef BLOCK_HH
 #define BLOCK_HH
 
-#define GLAD_GL_IMPLEMENTATION
-#include "glad/gl.h"
+
 #include <SFML/Graphics/Image.hpp>
 #include <glm/vec3.hpp>
 #include <vector>

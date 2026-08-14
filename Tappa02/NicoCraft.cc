@@ -1,4 +1,4 @@
-
+#define GLAD_GL_IMPLEMENTATION
 #include "glad/gl.h"
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
@@ -6,17 +6,16 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
 
-#include <iostream>
-#include <cstdlib>
-
+#include "Blocks.hh" //Messo per primo per dipendenze
 #include "matrices.hh"
 #include "hotshaders.hh"
-#include "Blocks.hh"
+
 
 
 
 const std::string dir = "../Tappa02/";
 const std::string res = "../Resources/";
+const std::string winTitle = "NicoCraft - Tappa02";
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -42,7 +41,7 @@ public:
 
         window = new sf::Window (
                                  sf::VideoMode({window_width, window_height}),
-                                 "NicoCraft - Tappa01", //Title
+                                 winTitle, //Title
                                  sf::Style::Default,
                                  sf::State::Windowed, //Window Type
                                  settings
@@ -230,65 +229,14 @@ class GPUCube
 private:
     GLuint vbo;
     GLuint vao;
-    GLuint texture;
     Blocks::TextureArray textureArray;
+
 public:
     GPUCube (const std::string& texture_path) { Load (texture_path); }
     ~GPUCube () { Clean (); }
 
     void Load (const std::string& texture_path)
     {
-        // pos (3) + uv (2) = 5 float per vertice (niente normali: non servono più)
-        static const float vertices3[] = {
-            //Front (+Z)
-            -0.5f,-0.5f, 0.5f,  0,0,
-             0.5f,-0.5f, 0.5f,  1,0,
-             0.5f, 0.5f, 0.5f,  1,1,
-             0.5f, 0.5f, 0.5f,  1,1,
-            -0.5f, 0.5f, 0.5f,  0,1,
-            -0.5f,-0.5f, 0.5f,  0,0,
-
-            //Back (-Z)
-             0.5f,-0.5f,-0.5f,  0,0,
-            -0.5f,-0.5f,-0.5f,  1,0,
-            -0.5f, 0.5f,-0.5f,  1,1,
-            -0.5f, 0.5f,-0.5f,  1,1,
-             0.5f, 0.5f,-0.5f,  0,1,
-             0.5f,-0.5f,-0.5f,  0,0,
-
-            //Left (-X)
-            -0.5f,-0.5f,-0.5f,  0,0,
-            -0.5f,-0.5f, 0.5f,  1,0,
-            -0.5f, 0.5f, 0.5f,  1,1,
-            -0.5f, 0.5f, 0.5f,  1,1,
-            -0.5f, 0.5f,-0.5f,  0,1,
-            -0.5f,-0.5f,-0.5f,  0,0,
-
-            //Right (+X)
-             0.5f,-0.5f, 0.5f,  0,0,
-             0.5f,-0.5f,-0.5f,  1,0,
-             0.5f, 0.5f,-0.5f,  1,1,
-             0.5f, 0.5f,-0.5f,  1,1,
-             0.5f, 0.5f, 0.5f,  0,1,
-             0.5f,-0.5f, 0.5f,  0,0,
-
-            //Top (+Y)
-            -0.5f, 0.5f, 0.5f,  0,0,
-             0.5f, 0.5f, 0.5f,  1,0,
-             0.5f, 0.5f,-0.5f,  1,1,
-             0.5f, 0.5f,-0.5f,  1,1,
-            -0.5f, 0.5f,-0.5f,  0,1,
-            -0.5f, 0.5f, 0.5f,  0,0,
-
-            //Bottom (-Y)
-            -0.5f,-0.5f,-0.5f,  0,0,
-             0.5f,-0.5f,-0.5f,  1,0,
-             0.5f,-0.5f, 0.5f,  1,1,
-             0.5f,-0.5f, 0.5f,  1,1,
-            -0.5f,-0.5f, 0.5f,  0,1,
-            -0.5f,-0.5f,-0.5f,  0,0,
-        };
-
         float vertices[] = {
             // --- FACCIA FRONTALE (+Z) -> Layer 3 (Lato Erba) ---
             -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  1.0f,
@@ -338,11 +286,11 @@ public:
         };
 
         std::vector<std::string> texture_paths = {
-            res+"MissingTextureBlock.png",
-            res+"grassTop.png",    // Indice 1 -> Erba Sopra
-            res+"dirt.png",         // Indice 2 -> Terra
-            res+"grassSide.png",   // ... 3 -> Lato Erba
-            res+"stone.png"         // .. 4 -> Pietra
+            texture_path+"MissingTextureBlock.png",
+            texture_path+"grassTop.png",    // Indice 1 -> Erba Sopra
+            texture_path+"dirt.png",         // Indice 2 -> Terra
+            texture_path+"grassSide.png",   // ... 3 -> Lato Erba
+            texture_path+"stone.png"         // .. 4 -> Pietra
         };
 
         // 1. Genera e Binda il VAO prima di qualsiasi VBO o EBO
@@ -381,47 +329,18 @@ public:
         textureArray.LoadTextures(texture_paths, 16, 16);
     }
 
-    void LoadTexture (const std::string& path){
-        sf::Image image;
-        bool loaded = image.loadFromFile (path);
-
-        if (!loaded) {
-            std::cerr << "Warning: Failed to load texture: " << path
-                    << " — using fallback texture." << std::endl;
-
-            std::string fallbackPath = res + "MissingTextureBlock.png";
-            if (!image.loadFromFile (fallbackPath)) {
-                std::cerr << "Error: Failed to load fallback texture: " << fallbackPath << std::endl;
-                exit (1);
-            }
-        }
-
-        auto size = image.getSize ();
-
-        glGenTextures (1, &texture);
-        glBindTexture (GL_TEXTURE_2D, texture);
-
-        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, size.x, size.y, 0,
-                    GL_RGBA, GL_UNSIGNED_BYTE, image.getPixelsPtr ());
-    }
-
     void Clean ()
     {
         glDeleteVertexArrays (1, &vao);
         glDeleteBuffers (1, &vbo);
-        glDeleteTextures (1, &texture);
+        
     }
 
     void Draw()
     {
         glBindVertexArray(vao);
         
-        // Binda la TextureArray e imposta lo shader
+        //Bind del TextureArray e imposta la shader
         textureArray.Bind(0); 
 
         // Disegna 36 indici usando i triangoli
@@ -449,7 +368,7 @@ private:
     GLint proj_loc;
 
 public:
-    Scene (fcg::Shaders& shaders) : cube (dir + "block.png")
+    Scene (fcg::Shaders& shaders) : cube (res) //Costruttore per il singolo cubo
     {
         Locations (shaders);
     }
@@ -459,6 +378,9 @@ public:
         model_loc = glGetUniformLocation (shaders.program, "model");
         view_loc  = glGetUniformLocation (shaders.program, "view");
         proj_loc  = glGetUniformLocation (shaders.program, "projection");
+
+        GLint samplerLoc = glGetUniformLocation(shaders.program,"textureArray");
+        glUniform1i(samplerLoc, 0);
     }
 
     void Draw ()
