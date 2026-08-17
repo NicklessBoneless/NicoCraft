@@ -8,9 +8,9 @@
 #include "Blocks.hh" //Messo per primo per dipendenze
 #include "Chunk.hh"
 
-const std::string dir = "../Tappa03/";
+const std::string dir = "../Tappa04/";
 const std::string res = "../Resources/";
-const std::string winTitle = "NicoCraft - Tappa03";
+const std::string winTitle = "NicoCraft - Tappa04";
 const int TEXTUREPIXELSIZE = 32;
 const int WORLDSIZECHUNKSX = 1;
 const int WORLDSIZECHUNKSZ = 12;
