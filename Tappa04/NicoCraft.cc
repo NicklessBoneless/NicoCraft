@@ -13,8 +13,8 @@ const std::string dir = "../Tappa04/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa04";
 const int TEXTUREPIXELSIZE = 32;
-const int WORLDSIZECHUNKSX = 24;
-const int WORLDSIZECHUNKSZ = 24;
+const int WORLDSIZECHUNKSX = 16;
+const int WORLDSIZECHUNKSZ = 1;
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -306,8 +306,9 @@ public:
         glUniform1i(samplerLoc, 0);
     }
 
-    void Draw()
+    void Draw(fcg::Shaders& shaders)
     {
+        shaders.use();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);
@@ -463,8 +464,8 @@ int main(){
             sf::Mouse::setPosition(windowCenter, window);
         }
 
-        shaders.use();
-        scene.Draw();
+        
+        scene.Draw(shaders);
         crosshair.Draw(scene.camera.GetAspectRatio());
         
         window.display();
