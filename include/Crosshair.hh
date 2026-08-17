@@ -62,7 +62,6 @@ namespace fcg{
 
           
             glBindVertexArray(0);
-            
         }
 
         void Draw(float aspectRatio){

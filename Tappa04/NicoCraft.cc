@@ -13,8 +13,8 @@ const std::string dir = "../Tappa04/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa04";
 const int TEXTUREPIXELSIZE = 32;
-const int WORLDSIZECHUNKSX = 1;
-const int WORLDSIZECHUNKSZ = 12;
+const int WORLDSIZECHUNKSX = 24;
+const int WORLDSIZECHUNKSZ = 24;
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -222,7 +222,7 @@ void fillExistingChunks(Blocks::Chunk& chunk){
                 if(y == SURFACE-1){
                     chunk.Set(x, y, z, Blocks::BlockType::GRASS);
                 }
-                if(y < SURFACE * 0.90) chunk.Set(x, y, z, Blocks::BlockType::STONE);
+                else if(y < SURFACE * 0.90) chunk.Set(x, y, z, Blocks::BlockType::STONE);
                 else chunk.Set(x, y, z, Blocks::BlockType::DIRT);
 
                 if(y == SURFACE-1 && rand() % 100 >= 99){
