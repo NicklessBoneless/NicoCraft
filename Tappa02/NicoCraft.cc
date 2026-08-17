@@ -326,7 +326,7 @@ public:
         glBindVertexArray(0);
 
         // 4. Carica la TextureArray passandole il vettore con i percorsi dei file delle texture
-        textureArray.LoadTextures(texture_paths, 16, 16);
+        textureArray.LoadTextures(texture_paths, 32, 32);
     }
 
     void Clean ()
