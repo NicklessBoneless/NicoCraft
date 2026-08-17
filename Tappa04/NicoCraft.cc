@@ -4,17 +4,21 @@
 #include <SFML/Graphics/Image.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
+#include <cmath>
+#include <limits>
 
 #include "Blocks.hh" //Messo per primo per dipendenze
 #include "Chunk.hh"
 #include "Crosshair.hh"
+#include "BlockOutline.hh"
 
 const std::string dir = "../Tappa04/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa04";
 const int TEXTUREPIXELSIZE = 32;
-const int WORLDSIZECHUNKSX = 16;
-const int WORLDSIZECHUNKSZ = 1;
+const int WORLDSIZECHUNKSX = 4;
+const int WORLDSIZECHUNKSZ = 4;
+const float REACH_DISTANCE = 6.0f; //Distanza massima di selezione del blocco
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -131,6 +135,22 @@ public:
         return aspectRatio;
     }
 
+    glm::vec3 GetPosition() const{ //Const => Metodo di sola lettura
+        return cameraPos;
+    }
+
+    glm::vec3 GetForward() const{
+        float yawRad = glm::radians(yawDeg);
+        float pitchRad = glm::radians(pitchDeg);
+
+        //Ricavata invertendo la stessa rotazione Rx*Ry usata in ViewProjection()
+        return glm::vec3(
+            glm::sin(yawRad) * glm::cos(pitchRad),
+            -glm::sin(pitchRad),
+            -glm::cos(yawRad) * glm::cos(pitchRad)
+        );
+    }
+
     void Move(float deltaTime){
         float yawRad = glm::radians(yawDeg);
 
@@ -211,6 +231,14 @@ struct ChunkInstance{
     Blocks::ChunkMesh mesh;
     int chunkX;
     int chunkZ;
+};
+
+//Se colpisce un blocco esso ritorna le coordinate MONDO del blocco 
+struct RaycastHit{
+    bool hit = false;
+    int blockX = 0;
+    int blockY = 0;
+    int blockZ = 0;
 };
 
 //Riempie un chunk con lo stesso terreno di prova usato finora (erba sopra, terra sotto)
@@ -328,6 +356,57 @@ public:
         }
     }
 
+    //Lancia un raggio da 'origin' lungo 'direction' (non serve normalizzata) e restituisce
+    //il primo blocco solido incontrato entro 'maxDistance', con voxel traversal DDA
+    RaycastHit RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance){
+        RaycastHit result;
+
+        int x = (int) std::floor(origin.x);
+        int y = (int) std::floor(origin.y);
+        int z = (int) std::floor(origin.z);
+
+        int stepX = direction.x > 0.0f ? 1 : -1;
+        int stepY = direction.y > 0.0f ? 1 : -1;
+        int stepZ = direction.z > 0.0f ? 1 : -1;
+
+        float tDeltaX = direction.x != 0.0f ? std::abs(1.0f / direction.x) : std::numeric_limits<float>::infinity();
+        float tDeltaY = direction.y != 0.0f ? std::abs(1.0f / direction.y) : std::numeric_limits<float>::infinity();
+        float tDeltaZ = direction.z != 0.0f ? std::abs(1.0f / direction.z) : std::numeric_limits<float>::infinity();
+
+        float tMaxX = NextBoundary(origin.x, x, direction.x, stepX);
+        float tMaxY = NextBoundary(origin.y, y, direction.y, stepY);
+        float tMaxZ = NextBoundary(origin.z, z, direction.z, stepZ);
+
+        float traveled = 0.0f;
+        while(traveled < maxDistance){
+            if(IsSolidAtWorld(x, y, z)){
+                result.hit = true;
+                result.blockX = x;
+                result.blockY = y;
+                result.blockZ = z;
+                return result;
+            }
+
+            if(tMaxX < tMaxY && tMaxX < tMaxZ){
+                x += stepX;
+                traveled = tMaxX;
+                tMaxX += tDeltaX;
+            }
+            else if(tMaxY < tMaxZ){
+                y += stepY;
+                traveled = tMaxY;
+                tMaxY += tDeltaY;
+            }
+            else{
+                z += stepZ;
+                traveled = tMaxZ;
+                tMaxZ += tDeltaZ;
+            }
+        }
+
+        return result; //Niente colpito entro maxDistance
+    }
+
     private:
     //Cerca il chunk alle coordinate di griglia indicate, nullptr se non esiste
     Blocks::Chunk* GetChunkAt(int chunkX, int chunkZ){
@@ -359,6 +438,41 @@ public:
         int wrappedZ = ((localZ % Blocks::CHUNK_SIZE_Z) + Blocks::CHUNK_SIZE_Z) % Blocks::CHUNK_SIZE_Z;
 
         return neighbor->IsSolid(wrappedX, localY, wrappedZ);
+    }
+
+    //Divisione intera "verso il basso" (floor): serve perche' l'operatore % di C++
+    //tronca verso zero, non verso -infinito, e con coordinate negative darebbe risultati sbagliati
+    static int FloorDiv(int a, int b){
+        int d = a / b;
+        int r = a % b;
+        return (r != 0 && ((r < 0) != (b < 0))) ? d - 1 : d;
+    }
+
+    //Distanza (in unita' di t lungo il raggio) dal punto 'originComp' al prossimo confine di voxel
+    static float NextBoundary(float originComp, int voxelComp, float dirComp, int step){
+        if(dirComp == 0.0f) return std::numeric_limits<float>::infinity();
+        float boundary = step > 0 ? (float)(voxelComp + 1) : (float) voxelComp;
+        return (boundary - originComp) / dirComp;
+    }
+
+    //Controlla se e' solido il blocco a coordinate MONDO, individuando da solo il chunk giusto
+    bool IsSolidAtWorld(int worldX, int worldY, int worldZ){
+        if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+            return false;
+        }
+
+        int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+        int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+        Blocks::Chunk* chunk = GetChunkAt(chunkX, chunkZ);
+        if(!chunk){
+            return false;
+        }
+
+        int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+        int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+        return chunk->IsSolid(localX, worldY, localZ);
     }
 };
 
@@ -394,82 +508,105 @@ void Handle(const sf::Event::Resized& resized, Camera& camera){
     camera.SetWindowSize(resized.size.x, resized.size.y);
 }
 
+////////////////////
+// AUX Functions  //
+////////////////////
+
+// Controlla se il tasto premuto o rilasciato è tra i keyBinding e chiama la funzione
+void CheckBinding(sf::Keyboard::Scancode scancode, bool isPressed, const std::vector<keyBindings>& keyBinds) {
+    for(const keyBindings &binding : keyBinds) {
+        if(binding.key != scancode) continue;
+        if(isPressed && binding.PressKey) binding.PressKey();
+        else if(!isPressed && binding.ReleaseKey) binding.ReleaseKey();
+    }
+}
+
+
+void HandleEvents(sf::Window& window, Camera& camera, const std::vector<keyBindings>& keyBinds, bool& running) {
+    while (const std::optional event = window.pollEvent()) {
+        if(event->is<sf::Event::Closed>()) 
+            running = false;
+
+        else if (const auto* resized = event->getIf<sf::Event::Resized>()) 
+            Handle(*resized, camera);
+
+        else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
+            CheckBinding(keyPressed->scancode, true, keyBinds);  // Tasto premuto
+        
+        else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) 
+            CheckBinding(keyReleased->scancode, false, keyBinds); // Tasto rilasciato
+    }
+}
+
+void UpdateMouseInput(sf::Window& window, Camera& camera, const sf::Vector2i& windowCenter){
+    if(window.hasFocus()) {
+        sf::Vector2i curMousePos = sf::Mouse::getPosition(window);
+        sf::Vector2i delta = curMousePos - windowCenter;
+
+        camera.Look((float)delta.x, (float)delta.y);
+        sf::Mouse::setPosition(windowCenter, window);
+    }
+}
+
 //////////
 // Main //
 //////////
 
 int main(){
     //// Startup ////
-
     Setup setup;
     sf::Window& window = *setup.window;
 
+    //Prendiamo e centriamo il cursore per la camera FPS
     window.setMouseCursorVisible(false);
     window.setMouseCursorGrabbed(true);
-
-    //Centra il mouse prima di iniziare, per evitare uno scatto iniziale
     sf::Vector2i windowCenter = { (int) (window.getSize().x / 2), (int) (window.getSize().y / 2) };
     sf::Mouse::setPosition(windowCenter, window);
 
+    //Carichiamo la shader di base del mondo 3D
     fcg::Shaders shaders(dir + "shader_flat.vert", dir + "shader_flat.frag");
     shaders.use();
 
+    //Creo la scena
     Scene scene(shaders);
 
+    //Carichiamo la Crosshair e l'outline dei blocchi
     fcg::Crosshair crosshair(dir + "shader_crosshair.vert", dir + "shader_crosshair.frag");
+    fcg::BlockOutline outline(dir + "shader_outline.vert", dir + "shader_outline.frag");
 
+    //Per migliorare la performance ;-)
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-
     glEnable(GL_DEPTH_TEST);
 
-
     //// Main Loop ////
-    std::vector<keyBindings> bindings = ActionsKeyBindings(scene);
-    sf::Clock clock;
+    std::vector<keyBindings> keyBindings = ActionsKeyBindings(scene);
+    sf::Clock clock; //Utile per il deltaTime
     bool running = true;
     
     while(running){
-        while(const std::optional event = window.pollEvent()){
-            if(event->is<sf::Event::Closed>())
-                running = false;
-            else if(const auto* resized = event->getIf<sf::Event::Resized>())
-                Handle(*resized, scene.camera);
-            else if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
-                for(const auto& binding : bindings){
-                    if(keyPressed->scancode == binding.key && binding.PressKey){
-                        binding.PressKey();
-                    }
-                }
-            }
-            else if(const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()){
-                for(const auto& binding : bindings){
-                    if(keyReleased->scancode == binding.key && binding.ReleaseKey){
-                        binding.ReleaseKey();
-                    }
-                }
-            }
-            
-        }
+        //Controllo input Tastiera
+        HandleEvents(window,scene.camera,keyBindings,running);
 
         float deltaTime = clock.restart().asSeconds();
         scene.camera.Move(deltaTime);
 
-        if(window.hasFocus()){
-            sf::Vector2i windowCenter = { (int) (window.getSize().x / 2), (int) (window.getSize().y / 2) };
-            sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-            sf::Vector2i delta = mousePos - windowCenter;
+        //Mouse Input
+        UpdateMouseInput(window,scene.camera,windowCenter);
 
-            scene.camera.Look((float) delta.x, (float) delta.y);
-            sf::Mouse::setPosition(windowCenter, window);
+        //Disegno il mondo 3D
+        scene.Draw(shaders);
+
+        //RayCast dalla camera
+        RaycastHit target = scene.RaycastBlock(scene.camera.GetPosition(), scene.camera.GetForward(), REACH_DISTANCE);
+        if(target.hit){
+            outline.Draw(target.blockX, target.blockY, target.blockZ, scene.camera.viewMatrix, scene.camera.projMatrix);
         }
 
-        
-        scene.Draw(shaders);
+        //Disegno la Crosshair
         crosshair.Draw(scene.camera.GetAspectRatio());
         
         window.display();
-        
     }
 
     return 0;

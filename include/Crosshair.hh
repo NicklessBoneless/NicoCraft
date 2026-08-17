@@ -8,37 +8,36 @@ namespace fcg{
     private:
         GLuint vao = 0, vbo = 0, ebo = 0;
         Shaders shader;
-        GLint aspectLoc;
+        GLint aspectLoc = -1; //Valore di default in caso di fallimento
 
-        //Dimensioni del mirino in coordinate NDC, prima della correzione di aspect ratio
-        static constexpr float halfLength = 0.018f;
-        static constexpr float halfThickness = 0.0025f;
+        //Dimensioni del mirino in coordinate NDC [-1,1] (Coordinate normalizzate del dispositivo), prima della correzione di aspect ratio
+        static constexpr float lineLength = 0.018f;
+        static constexpr float lineThickness = 0.0025f;
 
     public:
         Crosshair(const std::string vertexFile, const std::string fragmentFile) : shader(vertexFile, fragmentFile){
             aspectLoc = glGetUniformLocation(shader.program, "aspectRatio");
-            Build();
+            BuildCrosshair();
         }
 
         ~Crosshair(){
-            if(vao){ glDeleteVertexArrays(1, &vao); }
-            if(vbo){ glDeleteBuffers(1, &vbo); }
-            if(ebo){ glDeleteBuffers(1, &ebo); }
+            Cleanup();
         }
 
-        void Build(){
+        void BuildCrosshair(){
             //Barra orizzontale + barra verticale: due rettangoli di 4 vertici (x, y) ciascuno
             float vertices[] = {
-                //Barra orizzontale
-                -halfLength, -halfThickness,
-                 halfLength, -halfThickness,
-                 halfLength,  halfThickness,
-                -halfLength,  halfThickness,
-                //Barra verticale
-                -halfThickness, -halfLength,
-                 halfThickness, -halfLength,
-                 halfThickness,  halfLength,
-                -halfThickness,  halfLength
+                // Barra orizzontale
+                -lineLength, -lineThickness,
+                lineLength, -lineThickness,
+                lineLength,  lineThickness,
+                -lineLength,  lineThickness,
+
+                // Barra verticale - (Invertiamo le coordinate)
+                -lineThickness, -lineLength,
+                lineThickness, -lineLength,
+                lineThickness,  lineLength,
+                -lineThickness,  lineLength
             };
 
             uint32_t indices[] = {
@@ -81,6 +80,23 @@ namespace fcg{
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
         }
+
+        private:
+        void Cleanup(){
+            if(vao){ 
+                glDeleteVertexArrays(1, &vao); 
+                vao = 0;
+            }
+            if(vbo){ 
+                glDeleteBuffers(1, &vbo); 
+                vbo = 0;
+            }
+            if(ebo){ 
+                glDeleteBuffers(1, &ebo); 
+                ebo = 0;
+            }
+        }
+        
     };
 }
 
