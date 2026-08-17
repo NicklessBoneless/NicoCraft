@@ -12,7 +12,8 @@ namespace Blocks{
         DIRT,
         GRASS,
         STONE,
-        WOOD
+        WOOD,
+        LEAVES
     };
 
     enum class BlockFace : uint8_t
@@ -29,7 +30,7 @@ namespace Blocks{
     {
         BlockType type = BlockType::AIR;
 
-        bool isSolid() const {
+        bool isSolid() const{
             return type != BlockType::AIR;
         }
     };
@@ -37,11 +38,11 @@ namespace Blocks{
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
     inline uint32_t getTextureIndex(BlockType type, BlockFace face)
     {
-        switch (type)
+        switch(type)
         {
         case BlockType::GRASS:
-            if (face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
-            if (face == BlockFace::Bottom) return 2; // Index 2: Terra
+            if(face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
+            if(face == BlockFace::Bottom) return 2; // Index 2: Terra
             return 3;                           // Index 3: Lato Erba
         
         case BlockType::DIRT:
@@ -51,9 +52,12 @@ namespace Blocks{
             return 4; //Tutta uguale
 
         case BlockType::WOOD:
-            if(face == BlockFace::Top || face == BlockFace::Bottom) return 6; //Anelli del Tronco
-            return 7;                                               //Corteccia (lati)
+            if(face == BlockFace::Top || face == BlockFace::Bottom) return 5; //Anelli del Tronco
+            return 6;                                               //Corteccia (lati)
 
+        case BlockType::LEAVES:
+            return 7;
+            
         default:
             return 0; 
         }
@@ -79,9 +83,9 @@ namespace Blocks{
             glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             // Carica ogni singola immagine e la copia nel rispettivo layer z
-            for (GLsizei i = 0; i < textureCount; i++){
+            for(GLsizei i = 0; i < textureCount; i++){
                 sf::Image img;
-                if (!img.loadFromFile(filepaths[i])) {
+                if(!img.loadFromFile(filepaths[i])){
                     std::cerr << "Errore nel caricamento della texture: " << filepaths[i] << std::endl;
                     std::cerr << "Eseguo fallback!\n";
                     if(!img.loadFromFile(filepaths[0])){
@@ -115,7 +119,7 @@ namespace Blocks{
 
         void Clean()
         {
-            if(textureID != 0) {
+            if(textureID != 0){
                 glDeleteTextures(1, &textureID);
                 textureID = 0;
             }

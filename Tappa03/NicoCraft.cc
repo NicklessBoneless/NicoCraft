@@ -12,6 +12,8 @@ const std::string dir = "../Tappa03/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa03";
 const int TEXTUREPIXELSIZE = 32;
+const int WORLDSIZECHUNKSX = 1;
+const int WORLDSIZECHUNKSZ = 12;
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -33,32 +35,32 @@ public:
         settings.majorVersion = 4;
         settings.minorVersion = 1;
 
-        window = new sf::Window (
+        window = new sf::Window(
                                  sf::VideoMode({window_width, window_height}),
                                  winTitle, //Title
                                  sf::Style::Default,
                                  sf::State::Windowed, //Window Type
                                  settings
                                  );
-        window->setVerticalSyncEnabled (true);
+        window->setVerticalSyncEnabled(true);
 
         if(!window->setActive(true)){
             std::cerr << "Failure: error during SFML OpenGL Activation." << std::endl;
-            exit (1);
+            exit(1);
         }
 
-        int version = gladLoadGL (sf::Context::getFunction);
-        if (!version) {
+        int version = gladLoadGL(sf::Context::getFunction);
+        if(!version){
             std::cerr << "Failure: error during glad loading." << std::endl;
-            exit (1);
+            exit(1);
         }
         std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
 
         //Colore della skybox di OpenGL
-        glClearColor (0.53f, 0.81f, 0.92f, 1.0f);
+        glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     }
 
-    ~Setup (){
+    ~Setup(){
         delete window;
     }
 };
@@ -69,17 +71,17 @@ public:
 
 class Camera{
 public:
-    glm::mat4 v;
-    glm::mat4 vp;
-    glm::mat4 pr;
+    glm::mat4 viewMatrix;
+    glm::mat4 viewProjMatrix;
+    glm::mat4 projMatrix;
     
 private:
-    float FovDegrees = 70.0f;
-    float ar = 1.0f;
+    float fovDegrees = 70.0f;
+    float aspectRatio = 1.0f;
 
-    glm::vec3 cameraPos = {8.0f, 40.0f, 40.0f};
-    float phiDeg = 0.0f;
-    float thetaDeg = 30.0f;
+    glm::vec3 cameraPos = {40.0f, 40.0f, 40.0f};
+    float yawDeg = -45.0f;
+    float pitchDeg = 25.0f;
 
     bool sprinting = false;
     bool looking = false;
@@ -106,71 +108,71 @@ private:
 
 
 public:
-    Camera (){
-        SetWindowSize (Setup::window_width, Setup::window_height);
-        ViewProjection ();
+    Camera(){
+        SetWindowSize(Setup::window_width, Setup::window_height);
+        ViewProjection();
     }
 
-    void SetWindowSize (int w, int h){
-        ar = ((float) w) / (float) h;
-        ViewProjection ();
+    void SetWindowSize(int width, int height){
+        aspectRatio = ((float) width) / (float) height;
+        ViewProjection();
     }
 
-    void StartLook (float x, float y){
+    void StartLook(float mouseX, float mouseY){
         looking = true;
-        lastMouseX = x;
-        lastMouseY = y;
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
     }
 
-    void StopLook (){
+    void StopLook(){
         looking = false;
     }
 
-    void Look (float x, float y){
-        if (!looking)
+    void Look(float mouseX, float mouseY){
+        if(!looking)
             return;
 
-        float dx = x - lastMouseX;
-        float dy = y - lastMouseY;
-        lastMouseX = x;
-        lastMouseY = y;
+        float deltaX = mouseX - lastMouseX;
+        float deltaY = mouseY - lastMouseY;
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
 
-        phiDeg += dx * mouseSensitivity;
-        thetaDeg += dy * mouseSensitivity;
-        thetaDeg = thetaDeg > 89.0f ? 89.0f : thetaDeg;
-        thetaDeg = thetaDeg < -89.0f ? -89.0f : thetaDeg;
+        yawDeg += deltaX * mouseSensitivity;
+        pitchDeg += deltaY * mouseSensitivity;
+        pitchDeg = pitchDeg > 89.0f ? 89.0f : pitchDeg;
+        pitchDeg = pitchDeg < -89.0f ? -89.0f : pitchDeg;
 
-        ViewProjection ();
+        ViewProjection();
     }
 
-    void Move (float dt){
-        float phiRad = glm::radians (phiDeg);
+    void Move(float deltaTime){
+        float yawRad = glm::radians(yawDeg);
 
-        glm::vec3 forward = { glm::sin (phiRad), 0.0f, -glm::cos (phiRad) };
-        glm::vec3 right   = { glm::cos (phiRad), 0.0f,  glm::sin (phiRad) };
+        glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) };
+        glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) };
         glm::vec3 up      = { 0.0f, 1.0f, 0.0f };
 
-        glm::vec3 moveDir = {0.0f, 0.0f, 0.0f};
+        glm::vec3 moveDirection = {0.0f, 0.0f, 0.0f};
 
-        for (const auto& keyBinding : moveBindings){
-            if (sf::Keyboard::isKeyPressed (keyBinding.key)){
-                moveDir += keyBinding.direction.x * right + keyBinding.direction.y * up + keyBinding.direction.z * forward;
+        for(const auto& keyBinding : moveBindings){
+            if(sf::Keyboard::isKeyPressed(keyBinding.key)){
+                moveDirection += keyBinding.direction.x * right + keyBinding.direction.y * up + keyBinding.direction.z * forward;
             }
         }
 
-        if (glm::length(moveDir) < 0.0001f)
+        if(glm::length(moveDirection) < 0.0001f)
             return;
 
-        moveDir = glm::normalize (moveDir);
-        cameraPos += moveDir * moveSpeed * dt;
+        moveDirection = glm::normalize(moveDirection);
+        cameraPos += moveDirection * moveSpeed * deltaTime;
 
-        ViewProjection ();
+        ViewProjection();
     }
 
     void startSprint(){
         if(!sprinting){
             moveSpeed = 6.0f;
-            FovDegrees += 0.5;
+            fovDegrees += 0.5;
             sprinting = true;
             ViewProjection();
             return;
@@ -181,35 +183,35 @@ public:
         if(sprinting){
             sprinting = false;
             moveSpeed = 2.0f;
-            FovDegrees -= 0.5;
+            fovDegrees -= 0.5;
             ViewProjection();
         }
     }
 
     glm::mat4 ViewProjection(){
-        float ncp = 0.1f;
-        float fcp = 100.0f;
+        float nearPlane = 0.1f;
+        float farPlane = 100.0f;
 
-        glm::mat4 ry = fcg::rotation_y (phiDeg);
-        glm::mat4 rx = fcg::rotation_x (thetaDeg);
-        glm::mat4 t  = fcg::translation (-cameraPos.x, -cameraPos.y, -cameraPos.z);
+        glm::mat4 ry = fcg::rotation_y(yawDeg);
+        glm::mat4 rx = fcg::rotation_x(pitchDeg);
+        glm::mat4 t  = fcg::translation(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-        v = rx * ry * t; 
+        viewMatrix = rx * ry * t; 
 
-        float a = (fcp + ncp) / (ncp - fcp); //
-        float b = 2.0f * fcp * ncp / (ncp - fcp); //
+        float perspectiveA = (farPlane + nearPlane) / (nearPlane - farPlane); //
+        float perspectiveB = 2.0f * farPlane * nearPlane / (nearPlane - farPlane); //
 
-        float fd = 1.0f / glm::tan(glm::radians(FovDegrees / 2.0f));
+        float focalDistance = 1.0f / glm::tan(glm::radians(fovDegrees / 2.0f));
 
-        //Salvala direttamente in 'pr' della classe
-        pr = glm::mat4(
-            fd,  0.0,     0.0,  0.0,
-            0.0, fd * ar, 0.0,  0.0,
-            0.0, 0.0,       a, -1.0,
-            0.0, 0.0,       b,  0.0
+        //Salvala direttamente in 'projMatrix' della classe
+        projMatrix = glm::mat4(
+            focalDistance,  0.0,                     0.0,          0.0,
+            0.0,            focalDistance * aspectRatio, 0.0,       0.0,
+            0.0,            0.0,                     perspectiveA, -1.0,
+            0.0,            0.0,                     perspectiveB,  0.0
         ); 
 
-        return pr * v;
+        return projMatrix * viewMatrix;
     }
 };
 
@@ -226,17 +228,28 @@ struct ChunkInstance{
 };
 
 //Riempie un chunk con lo stesso terreno di prova usato finora (erba sopra, terra sotto)
-void FillTestChunk(Blocks::Chunk& chunk){
+void fillExistingChunks(Blocks::Chunk& chunk){
     const int SURFACE = Blocks::CHUNK_SIZE_Y*0.5;
-    for (int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
-        for (int y = 0; y < SURFACE; y++){
-            for (int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
-                if(y == SURFACE-1) chunk.Set (x, y, z, Blocks::BlockType::GRASS);
-                else if(y > SURFACE*0.8) chunk.Set (x, y, z, Blocks::BlockType::DIRT);
-                else chunk.Set (x, y, z, Blocks::BlockType::STONE);
+    for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
+        for(int y = 0; y < SURFACE; y++){
+            for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
+                if(y == SURFACE-1){
+                    chunk.Set(x, y, z, Blocks::BlockType::GRASS);
+                }
+                if(y < SURFACE * 0.90) chunk.Set(x, y, z, Blocks::BlockType::STONE);
+                else chunk.Set(x, y, z, Blocks::BlockType::DIRT);
+
+                if(y == SURFACE-1 && rand() % 100 >= 99){
+                    chunk.Set(x, y+1, z, Blocks::BlockType::WOOD);
+                    chunk.Set(x, y+2, z, Blocks::BlockType::LEAVES);
+                }
+                else if(rand() % 100 >= 66){
+                    chunk.Set(x, y+1, z, Blocks::BlockType::AIR);
+                }
             }
         }
     }
+    
 }
 
 ////////////////////
@@ -254,32 +267,31 @@ private:
     GLint viewLoc;
     GLint projLoc;
 
-    static const int WORLD_CHUNKS_X = 2;
-    static const int WORLD_CHUNKS_Z = 2;
+    
 
 public:
-    Scene (fcg::Shaders& shaders){
-        chunks.reserve (WORLD_CHUNKS_X * WORLD_CHUNKS_Z);
+    Scene(fcg::Shaders& shaders){
+        chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
 
         //Fase 1: genera tutti i chunk (senza ancora costruire le mesh)
-        for(int cz = 0; cz < WORLD_CHUNKS_Z; cz++){
-            for(int cx = 0; cx < WORLD_CHUNKS_X; cx++){
-                chunks.emplace_back ();
-                ChunkInstance& instance = chunks.back ();
-                instance.chunkX = cx;
-                instance.chunkZ = cz;
-                FillTestChunk (instance.chunk);
+        for(int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++){
+            for(int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++){
+                chunks.emplace_back();
+                ChunkInstance& instance = chunks.back();
+                instance.chunkX = chunkX;
+                instance.chunkZ = chunkZ;
+                fillExistingChunks(instance.chunk);
             }
         }
 
         //Fase 2: ora che tutti i chunk esistono, costruisci le mesh
         //potendo controllare correttamente i blocchi dei chunk vicini
         for(auto& instance : chunks){
-            auto isSolidOutside = [this, &instance] (int lx, int ly, int lz) {
-                return IsSolidWorld (instance.chunkX, instance.chunkZ, lx, ly, lz);
+            auto isSolidOutside = [this, &instance](int localX, int localY, int localZ){
+                return IsSolidWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
             };
-            auto meshData = Blocks::BuildChunkMesh (instance.chunk, isSolidOutside);
-            instance.mesh.Upload (meshData);
+            auto meshData = Blocks::BuildChunkMesh(instance.chunk, isSolidOutside);
+            instance.mesh.Upload(meshData);
         }
 
         std::vector<std::string> texturePaths = {
@@ -287,50 +299,53 @@ public:
             res + "grassTop.png",
             res + "dirt.png",
             res + "grassSide.png",
-            res + "stone.png"
+            res + "stone.png",
+            res + "logTop.png",
+            res + "logSide.png",
+            res + "leaves.png" 
         };
 
-        textureArray.LoadTextures (texturePaths, TEXTUREPIXELSIZE, TEXTUREPIXELSIZE);
+        textureArray.LoadTextures(texturePaths, TEXTUREPIXELSIZE, TEXTUREPIXELSIZE);
 
-        Locations (shaders);
+        Locations(shaders);
     }
 
-    void Locations (fcg::Shaders& shaders)
+    void Locations(fcg::Shaders& shaders)
     {
-        modelLoc = glGetUniformLocation (shaders.program, "model");
-        viewLoc  = glGetUniformLocation (shaders.program, "view");
-        projLoc  = glGetUniformLocation (shaders.program, "projection");
+        modelLoc = glGetUniformLocation(shaders.program, "model");
+        viewLoc  = glGetUniformLocation(shaders.program, "view");
+        projLoc  = glGetUniformLocation(shaders.program, "projection");
 
-        GLint samplerLoc = glGetUniformLocation (shaders.program, "textureArray");
-        glUniform1i (samplerLoc, 0);
+        GLint samplerLoc = glGetUniformLocation(shaders.program, "textureArray");
+        glUniform1i(samplerLoc, 0);
     }
 
-    void Draw ()
+    void Draw()
     {
-        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUniformMatrix4fv (projLoc, 1, GL_FALSE, &camera.pr[0][0]);
-        glUniformMatrix4fv (viewLoc, 1, GL_FALSE, &camera.v[0][0]);
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &camera.viewMatrix[0][0]);
 
-        textureArray.Bind (0);
+        textureArray.Bind(0);
 
         //Disegna ogni chunk traslato nella sua posizione di griglia
-        for (const auto& instance : chunks){
-            glm::mat4 model = fcg::translation (
+        for(const auto& instance : chunks){
+            glm::mat4 modelMatrix = fcg::translation(
                 instance.chunkX * Blocks::CHUNK_SIZE_X,
                 0.0f,
                 instance.chunkZ * Blocks::CHUNK_SIZE_Z
             );
-             glUniformMatrix4fv (modelLoc, 1, GL_FALSE, &model[0][0]);
-            instance.mesh.Draw ();
+             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+            instance.mesh.Draw();
         }
     }
 
     private:
     //Cerca il chunk alle coordinate di griglia indicate, nullptr se non esiste
-    Blocks::Chunk* GetChunkAt (int cx, int cz){
+    Blocks::Chunk* GetChunkAt(int chunkX, int chunkZ){
         for(auto& instance : chunks){
-            if(instance.chunkX == cx && instance.chunkZ == cz) {
+            if(instance.chunkX == chunkX && instance.chunkZ == chunkZ){
                 return &instance.chunk;
             }
         }
@@ -339,24 +354,24 @@ public:
 
     //Controlla se e' solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
     //rispetto al chunk (chunkX, chunkZ), guardando nel chunk vicino se necessario
-    bool IsSolidWorld (int chunkX, int chunkZ, int localX, int localY, int localZ){
+    bool IsSolidWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
         //Y non e' suddiviso in chunk: se esce sopra/sotto e' semplicemente aria
-        if(localY < 0 || localY >= Blocks::CHUNK_SIZE_Y) {
+        if(localY < 0 || localY >= Blocks::CHUNK_SIZE_Y){
             return false;
         }
 
         int neighborChunkX = chunkX + (localX < 0 ? -1 : (localX >= Blocks::CHUNK_SIZE_X ? 1 : 0));
         int neighborChunkZ = chunkZ + (localZ < 0 ? -1 : (localZ >= Blocks::CHUNK_SIZE_Z ? 1 : 0));
 
-        Blocks::Chunk* neighbor = GetChunkAt (neighborChunkX, neighborChunkZ);
-        if(!neighbor) {
+        Blocks::Chunk* neighbor = GetChunkAt(neighborChunkX, neighborChunkZ);
+        if(!neighbor){
             return false; //Bordo del mondo: nessun chunk vicino, quindi aria
         }
 
         int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;
         int wrappedZ = ((localZ % Blocks::CHUNK_SIZE_Z) + Blocks::CHUNK_SIZE_Z) % Blocks::CHUNK_SIZE_Z;
 
-        return neighbor->IsSolid (wrappedX, localY, wrappedZ);
+        return neighbor->IsSolid(wrappedX, localY, wrappedZ);
     }
 };
 
@@ -371,13 +386,13 @@ struct keyBindings{
     std::function<void()> ReleaseKey = nullptr;
 };
 
-std::vector<keyBindings>ActionsKeyBindings (Scene& scene){
+std::vector<keyBindings> ActionsKeyBindings(Scene& scene){
     return {
-        { sf::Keyboard::Scancode::Escape, [] () { exit (0); } },
+        { sf::Keyboard::Scancode::Escape, []() { exit(0); } },
         { 
             sf::Keyboard::Scancode::LShift, 
-            [&scene]() { scene.camera.startSprint(); },
-            [&scene]() { scene.camera.stopSprint(); }
+            [&scene](){ scene.camera.startSprint(); },
+            [&scene](){ scene.camera.stopSprint(); }
         }
 
     };
@@ -387,73 +402,73 @@ std::vector<keyBindings>ActionsKeyBindings (Scene& scene){
 // SFML Callbacks //
 ////////////////////
 
-void Handle (const sf::Event::Resized& resized, Camera& camera){
-    glViewport (0, 0, resized.size.x, resized.size.y);
-    camera.SetWindowSize (resized.size.x, resized.size.y);
+void Handle(const sf::Event::Resized& resized, Camera& camera){
+    glViewport(0, 0, resized.size.x, resized.size.y);
+    camera.SetWindowSize(resized.size.x, resized.size.y);
 }
 
 //////////
 // Main //
 //////////
 
-int main (){
+int main(){
     //// Startup ////
 
     Setup setup;
     sf::Window& window = *setup.window;
 
-    fcg::Shaders shaders (dir + "shader_flat.vert", dir + "shader_flat.frag");
-    shaders.use ();
+    fcg::Shaders shaders(dir + "shader_flat.vert", dir + "shader_flat.frag");
+    shaders.use();
 
-    Scene scene (shaders);
+    Scene scene(shaders);
 
-    glEnable (GL_CULL_FACE);
-    glCullFace (GL_BACK);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
-    glEnable (GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
 
 
     //// Main Loop ////
     std::vector<keyBindings> bindings = ActionsKeyBindings(scene);
     sf::Clock clock;
     bool running = true;
-    while (running){
-        while (const std::optional event = window.pollEvent ()){
-            if (event->is<sf::Event::Closed> ())
+    while(running){
+        while(const std::optional event = window.pollEvent()){
+            if(event->is<sf::Event::Closed>())
                 running = false;
-            else if (const auto* resized = event->getIf<sf::Event::Resized> ())
-                Handle (*resized, scene.camera);
-            else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                for (const auto& binding : bindings) {
-                    if (keyPressed->scancode == binding.key && binding.PressKey) {
+            else if(const auto* resized = event->getIf<sf::Event::Resized>())
+                Handle(*resized, scene.camera);
+            else if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
+                for(const auto& binding : bindings){
+                    if(keyPressed->scancode == binding.key && binding.PressKey){
                         binding.PressKey();
                     }
                 }
             }
-            else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
-                for (const auto& binding : bindings) {
-                    if (keyReleased->scancode == binding.key && binding.ReleaseKey) {
+            else if(const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()){
+                for(const auto& binding : bindings){
+                    if(keyReleased->scancode == binding.key && binding.ReleaseKey){
                         binding.ReleaseKey();
                     }
                 }
             }
-            else if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed> ()) {
-                if (mousePressed->button == sf::Mouse::Button::Left)
-                    scene.camera.StartLook (mousePressed->position.x, mousePressed->position.y);
+            else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
+                if(mousePressed->button == sf::Mouse::Button::Left)
+                    scene.camera.StartLook(mousePressed->position.x, mousePressed->position.y);
             }
-            else if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased> ()) {
-                if (mouseReleased->button == sf::Mouse::Button::Left)
-                    scene.camera.StopLook ();
+            else if(const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>()){
+                if(mouseReleased->button == sf::Mouse::Button::Left)
+                    scene.camera.StopLook();
             }
-            else if (const auto* mouseMoved = event->getIf<sf::Event::MouseMoved> ())
-                scene.camera.Look (mouseMoved->position.x, mouseMoved->position.y);
+            else if(const auto* mouseMoved = event->getIf<sf::Event::MouseMoved>())
+                scene.camera.Look(mouseMoved->position.x, mouseMoved->position.y);
         }
 
-        float dt = clock.restart ().asSeconds ();
-        scene.camera.Move (dt);
+        float deltaTime = clock.restart().asSeconds();
+        scene.camera.Move(deltaTime);
 
-        scene.Draw ();
-        window.display ();
+        scene.Draw();
+        window.display();
         
     }
 
