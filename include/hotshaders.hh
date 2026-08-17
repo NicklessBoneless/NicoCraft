@@ -67,12 +67,12 @@ namespace fcg
     public:
         GLuint program;
 
-        Shaders () {
+        Shaders (){
             load ();
         }
 
 
-        Shaders (const std::string vertex_file, const std::string fragment_file) {
+        Shaders (const std::string vertex_file, const std::string fragment_file){
             load (vertex_file, fragment_file);
         }
 
@@ -182,8 +182,7 @@ namespace fcg
             return true;
         }
 
-        void use ()
-        {
+        void use(){
             glUseProgram (program);
         }
 

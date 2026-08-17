@@ -7,6 +7,7 @@
 
 #include "Blocks.hh" //Messo per primo per dipendenze
 #include "Chunk.hh"
+#include "Crosshair.hh"
 
 const std::string dir = "../Tappa04/";
 const std::string res = "../Resources/";
@@ -84,9 +85,8 @@ private:
     float pitchDeg = 25.0f;
 
     bool sprinting = false;
-    bool looking = false;
-    float lastMouseX = 0.0f;
-    float lastMouseY = 0.0f;
+    
+
     const float mouseSensitivity = 0.15f;
     float moveSpeed = 2.0f;
 
@@ -118,31 +118,17 @@ public:
         ViewProjection();
     }
 
-    void StartLook(float mouseX, float mouseY){
-        looking = true;
-        lastMouseX = mouseX;
-        lastMouseY = mouseY;
-    }
-
-    void StopLook(){
-        looking = false;
-    }
-
-    void Look(float mouseX, float mouseY){
-        if(!looking)
-            return;
-
-        float deltaX = mouseX - lastMouseX;
-        float deltaY = mouseY - lastMouseY;
-        lastMouseX = mouseX;
-        lastMouseY = mouseY;
-
+    void Look(float deltaX, float deltaY){
         yawDeg += deltaX * mouseSensitivity;
         pitchDeg += deltaY * mouseSensitivity;
         pitchDeg = pitchDeg > 89.0f ? 89.0f : pitchDeg;
         pitchDeg = pitchDeg < -89.0f ? -89.0f : pitchDeg;
 
         ViewProjection();
+    }
+
+    float GetAspectRatio() const{
+        return aspectRatio;
     }
 
     void Move(float deltaTime){
@@ -336,7 +322,7 @@ public:
                 0.0f,
                 instance.chunkZ * Blocks::CHUNK_SIZE_Z
             );
-             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &modelMatrix[0][0]);
             instance.mesh.Draw();
         }
     }
@@ -417,10 +403,19 @@ int main(){
     Setup setup;
     sf::Window& window = *setup.window;
 
+    window.setMouseCursorVisible(false);
+    window.setMouseCursorGrabbed(true);
+
+    //Centra il mouse prima di iniziare, per evitare uno scatto iniziale
+    sf::Vector2i windowCenter = { (int) (window.getSize().x / 2), (int) (window.getSize().y / 2) };
+    sf::Mouse::setPosition(windowCenter, window);
+
     fcg::Shaders shaders(dir + "shader_flat.vert", dir + "shader_flat.frag");
     shaders.use();
 
     Scene scene(shaders);
+
+    fcg::Crosshair crosshair(dir + "shader_crosshair.vert", dir + "shader_crosshair.frag");
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
@@ -432,6 +427,7 @@ int main(){
     std::vector<keyBindings> bindings = ActionsKeyBindings(scene);
     sf::Clock clock;
     bool running = true;
+    
     while(running){
         while(const std::optional event = window.pollEvent()){
             if(event->is<sf::Event::Closed>())
@@ -452,22 +448,25 @@ int main(){
                     }
                 }
             }
-            else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
-                if(mousePressed->button == sf::Mouse::Button::Left)
-                    scene.camera.StartLook(mousePressed->position.x, mousePressed->position.y);
-            }
-            else if(const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>()){
-                if(mouseReleased->button == sf::Mouse::Button::Left)
-                    scene.camera.StopLook();
-            }
-            else if(const auto* mouseMoved = event->getIf<sf::Event::MouseMoved>())
-                scene.camera.Look(mouseMoved->position.x, mouseMoved->position.y);
+            
         }
 
         float deltaTime = clock.restart().asSeconds();
         scene.camera.Move(deltaTime);
 
+        if(window.hasFocus()){
+            sf::Vector2i windowCenter = { (int) (window.getSize().x / 2), (int) (window.getSize().y / 2) };
+            sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+            sf::Vector2i delta = mousePos - windowCenter;
+
+            scene.camera.Look((float) delta.x, (float) delta.y);
+            sf::Mouse::setPosition(windowCenter, window);
+        }
+
+        shaders.use();
         scene.Draw();
+        crosshair.Draw(scene.camera.GetAspectRatio());
+        
         window.display();
         
     }
