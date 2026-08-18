@@ -62,7 +62,7 @@ private:
 };
 
 ////////////////////
-// Camera         //
+//    Camera      //
 ////////////////////
 
 class Camera{
@@ -79,18 +79,11 @@ private:
     float yawDeg = -45.0f;
     float pitchDeg = 25.0f;
 
-    bool sprinting = false;
-    bool breakBlock = false;
-    
-
     const float mouseSensitivity = 0.15f;
-    float moveSpeed = 4.0f;
 
-    // Ad ogni tasto è correllata una direzione di movimento in coordinate della camera.
-    // Ogni riga corrisponde ad un input di movimento
     struct MovementBindings{
         sf::Keyboard::Key key;
-        glm::vec3 direction; // in coordinate locali: x=right, y=up, z=forward
+        glm::vec3 direction;
     };
 
     const MovementBindings moveBindings[6] = {
@@ -101,7 +94,6 @@ private:
         { sf::Keyboard::Key::Space,    { 0.0f, 1.0f,  0.0f} },
         { sf::Keyboard::Key::LControl, { 0.0f,-1.0f,  0.0f} },
     };
-
 
 public:
     Camera(){
@@ -119,7 +111,6 @@ public:
         pitchDeg += deltaY * mouseSensitivity;
         pitchDeg = pitchDeg > 89.0f ? 89.0f : pitchDeg;
         pitchDeg = pitchDeg < -89.0f ? -89.0f : pitchDeg;
-
         ViewProjection();
     }
 
@@ -127,15 +118,13 @@ public:
         return aspectRatio;
     }
 
-    glm::vec3 GetPosition() const{ //Const => Metodo di sola lettura
+    glm::vec3 GetPosition() const{
         return cameraPos;
     }
 
     glm::vec3 GetForward() const{
         float yawRad = glm::radians(yawDeg);
         float pitchRad = glm::radians(pitchDeg);
-
-        //Ricavata invertendo la stessa rotazione Rx*Ry usata in ViewProjection()
         return glm::vec3(
             glm::sin(yawRad) * glm::cos(pitchRad),
             -glm::sin(pitchRad),
@@ -143,7 +132,8 @@ public:
         );
     }
 
-    void Move(float deltaTime){
+    //La velocita' ora e' un parametro esterno: la Camera non sa cos'e' lo sprint
+    void Move(float deltaTime, float speed){
         float yawRad = glm::radians(yawDeg);
 
         glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) };
@@ -162,38 +152,15 @@ public:
             return;
 
         moveDirection = glm::normalize(moveDirection);
-        cameraPos += moveDirection * moveSpeed * deltaTime;
+        cameraPos += moveDirection * speed * deltaTime;
 
         ViewProjection();
     }
 
-    void startSprint(){
-        if(!sprinting){
-            moveSpeed *= 2;
-            fovDegrees += 0.5;
-            sprinting = true;
-            ViewProjection();
-            return;
-        }
-    }
-
-    void stopSprint(){
-        if(sprinting){
-            sprinting = false;
-            moveSpeed /= 2;
-            fovDegrees -= 0.5;
-            ViewProjection();
-        }
-    }
-
-    void queueBreakBlock(){
-        breakBlock = true;
-    }
-
-    bool consumeBreakBlock(){
-        bool request = breakBlock;
-        breakBlock = false;
-        return request;
+    //Modifica il FOV di un delta (usato per il "kick" visivo durante lo sprint)
+    void AdjustFov(float delta){
+        fovDegrees += delta;
+        ViewProjection();
     }
 
     glm::mat4 ViewProjection(){
@@ -206,12 +173,10 @@ public:
 
         viewMatrix = rx * ry * t; 
 
-        float perspectiveA = (farPlane + nearPlane) / (nearPlane - farPlane); //
-        float perspectiveB = 2.0f * farPlane * nearPlane / (nearPlane - farPlane); //
-
+        float perspectiveA = (farPlane + nearPlane) / (nearPlane - farPlane);
+        float perspectiveB = 2.0f * farPlane * nearPlane / (nearPlane - farPlane);
         float focalDistance = 1.0f / glm::tan(glm::radians(fovDegrees / 2.0f));
 
-        //Salvala direttamente in 'projMatrix' della classe
         projMatrix = glm::mat4(
             focalDistance,  0.0,                     0.0,          0.0,
             0.0,            focalDistance * aspectRatio, 0.0,       0.0,
@@ -220,6 +185,64 @@ public:
         ); 
 
         return projMatrix * viewMatrix;
+    }
+};
+
+////////////////////
+//    Player      //
+////////////////////
+
+//Il giocatore possiede una camera e gestisce lo stato delle azioni:
+//sprint, rottura blocchi, e in futuro altro (piazzamento, vita, inventario...)
+class Player{
+private:
+    Camera camera;
+
+    bool sprinting = false;
+    bool breakBlock = false; //true per un frame quando e' stato richiesto un break
+
+    float moveSpeed = 4.0f;
+    static constexpr float sprintFovKick = 0.5f;
+
+public:
+    Camera& getCamera(){
+        return camera;
+    }
+
+    void Look(float deltaX, float deltaY){
+        camera.Look(deltaX, deltaY);
+    }
+
+    void Move(float deltaTime){
+        camera.Move(deltaTime, moveSpeed);
+    }
+
+    void StartSprint(){
+        if(!sprinting){
+            moveSpeed *= 2;
+            camera.AdjustFov(sprintFovKick);
+            sprinting = true;
+        }
+    }
+
+    void StopSprint(){
+        if(sprinting){
+            sprinting = false;
+            moveSpeed /= 2;
+            camera.AdjustFov(-sprintFovKick);
+        }
+    }
+
+    void QueueBreakBlock(){
+        breakBlock = true;
+    }
+
+    //Restituisce true se un break era stato richiesto, e resetta il flag
+    //(va chiamato una sola volta per frame)
+    bool ConsumeBreakBlock(){
+        bool request = breakBlock;
+        breakBlock = false;
+        return request;
     }
 };
 
@@ -271,7 +294,7 @@ void fillExistingChunks(Blocks::Chunk& chunk){
 
 class Scene{
 public:
-    Camera camera;
+    Player player;
     std::vector<ChunkInstance> chunks;
     Blocks::TextureArray textureArray;
 
@@ -334,8 +357,8 @@ public:
         shaders.use();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &camera.viewMatrix[0][0]);
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &player.getCamera().projMatrix[0][0]);
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &player.getCamera().viewMatrix[0][0]);
 
         textureArray.Bind(0);
 
@@ -543,8 +566,8 @@ std::vector<keyBindings> ActionsKeyBindings(Scene& scene){
         { sf::Keyboard::Scancode::Escape, []() { exit(0); } },
         { 
             sf::Keyboard::Scancode::LShift, 
-            [&scene](){ scene.camera.startSprint(); },
-            [&scene](){ scene.camera.stopSprint(); }
+            [&scene](){ scene.player.StartSprint(); },
+            [&scene](){ scene.player.StopSprint(); }
         }
 
     };
@@ -574,13 +597,13 @@ void CheckBinding(sf::Keyboard::Scancode scancode, bool isPressed, const std::ve
 }
 
 
-void HandleEvents(sf::Window& window, Camera& camera,sf::Vector2i& windowCenter, const std::vector<keyBindings>& keyBinds, bool& ProgramRunning) {
+void HandleEvents(sf::Window& window, Player& player,sf::Vector2i& windowCenter, const std::vector<keyBindings>& keyBinds, bool& ProgramRunning) {
     while (const std::optional event = window.pollEvent()) {
         if(event->is<sf::Event::Closed>()) 
             ProgramRunning = false;
 
         else if (const auto* resized = event->getIf<sf::Event::Resized>()) 
-            Handle(*resized, camera, windowCenter);
+            Handle(*resized, player.getCamera(), windowCenter);
 
         else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
             CheckBinding(keyPressed->scancode, true, keyBinds);  // Tasto premuto
@@ -590,7 +613,7 @@ void HandleEvents(sf::Window& window, Camera& camera,sf::Vector2i& windowCenter,
 
         else if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
             if(mousePressed->button == sf::Mouse::Button::Left){
-                camera.queueBreakBlock();
+                player.QueueBreakBlock();
             }
         }
     }
@@ -644,19 +667,19 @@ int main(){
     
     while(programRunning){
         //Controllo input Tastiera e click del mouse
-        HandleEvents(window,scene.camera,windowCenter,keyBindings,programRunning);
+        HandleEvents(window,scene.player,windowCenter,keyBindings,programRunning);
 
         float deltaTime = clock.restart().asSeconds();
-        scene.camera.Move(deltaTime);
+        scene.player.Move(deltaTime);
 
         //Mouse Input
-        UpdateMouseInput(window,scene.camera,windowCenter);
+        UpdateMouseInput(window,scene.player.getCamera(),windowCenter);
 
         //RayCast dalla camera: individua il blocco puntato PRIMA di disegnare,
         //cosi' un'eventuale rottura e' visibile nello stesso frame
-        RaycastHit target = scene.RaycastBlock(scene.camera.GetPosition(), scene.camera.GetForward(), REACH_DISTANCE);
+        RaycastHit target = scene.RaycastBlock(scene.player.getCamera().GetPosition(), scene.player.getCamera().GetForward(), REACH_DISTANCE);
 
-        if(scene.camera.consumeBreakBlock() && target.hit){
+        if(scene.player.ConsumeBreakBlock() && target.hit){
             scene.BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
             target.hit = false; //Il blocco non c'e' piu': niente outline da disegnare questo frame
         }
@@ -665,11 +688,11 @@ int main(){
         scene.Draw(shaders);
 
         if(target.hit){
-            outline.Draw(target.blockX, target.blockY, target.blockZ, scene.camera.viewMatrix, scene.camera.projMatrix);
+            outline.Draw(target.blockX, target.blockY, target.blockZ, scene.player.getCamera().viewMatrix, scene.player.getCamera().projMatrix);
         }
 
         //Disegno la Crosshair
-        crosshair.Draw(scene.camera.GetAspectRatio());
+        crosshair.Draw(scene.player.getCamera().GetAspectRatio());
         
         window.display();
     }
