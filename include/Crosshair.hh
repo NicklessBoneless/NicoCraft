@@ -17,14 +17,14 @@ namespace fcg{
     public:
         Crosshair(const std::string vertexFile, const std::string fragmentFile) : shader(vertexFile, fragmentFile){
             aspectLoc = glGetUniformLocation(shader.program, "aspectRatio");
-            BuildCrosshair();
+            BuildCenterCrosshair();
         }
 
         ~Crosshair(){
             Cleanup();
         }
 
-        void BuildCrosshair(){
+        void BuildCenterCrosshair(){
             //Barra orizzontale + barra verticale: due rettangoli di 4 vertici (x, y) ciascuno
             float vertices[] = {
                 // Barra orizzontale

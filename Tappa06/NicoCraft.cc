@@ -315,8 +315,6 @@ private:
     GLint viewLoc;
     GLint projLoc;
 
-    
-
 public:
     Scene(fcg::Shaders& shaders){
         chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
@@ -443,7 +441,6 @@ public:
         return result;
     }
 
-    public:
     //Rompe (rimuove) il blocco alle coordinate MONDO indicate, aggiornando la mesh
     //del chunk modificato e, se necessario, quella dei chunk adiacenti
     void BreakBlockWorld(int worldX, int worldY, int worldZ){
@@ -505,7 +502,7 @@ public:
         if(localZ == Blocks::CHUNK_SIZE_Z - 1) RebuildNeighborIfExists(chunkX, chunkZ + 1);
     }
 
-    private:
+private:
     void RebuildNeighborIfExists(int chunkX, int chunkZ){
         ChunkInstance* neighbor = GetChunkInstanceAt(chunkX, chunkZ);
         if(neighbor){
@@ -611,16 +608,23 @@ struct keyBindings{
     std::function<void()> ReleaseKey = nullptr;
 };
 
-std::vector<keyBindings> ActionsKeyBindings(Scene& scene){
-    return {
-        { sf::Keyboard::Scancode::Escape, []() { exit(0); } },
-        { 
-            sf::Keyboard::Scancode::LShift, 
-            [&scene](){ scene.player.StartSprint(); },
-            [&scene](){ scene.player.StopSprint(); }
-        }
+std::vector<keyBindings> KeyBindingsActions(Player& player){
+    std::vector<keyBindings> keybinds;
 
-    };
+    keyBindings escapeBinding;
+    escapeBinding.key = sf::Keyboard::Scancode::Escape;
+    escapeBinding.PressKey = []() { exit(0); };
+    escapeBinding.ReleaseKey = nullptr;
+    keybinds.push_back(escapeBinding);
+
+    // 3. Creazione dell'azione per Shift (Sprint)
+    keyBindings shiftBinding;
+    shiftBinding.key = sf::Keyboard::Scancode::LShift;
+    shiftBinding.PressKey = [&player]() { player.StartSprint(); };
+    shiftBinding.ReleaseKey = [&player]() { player.StopSprint(); };
+    keybinds.push_back(shiftBinding);
+    
+    return keybinds;
 }
 
 ////////////////////
@@ -707,6 +711,7 @@ int main(){
     //Carichiamo la Crosshair e l'outline dei blocchi
     fcg::Crosshair crosshair(dir + "shader_crosshair.vert", dir + "shader_crosshair.frag");
     fcg::BlockOutline outline(dir + "shader_outline.vert", dir + "shader_outline.frag");
+
     
     //Per migliorare la performance ;-)
     glEnable(GL_CULL_FACE);
@@ -714,7 +719,7 @@ int main(){
     glEnable(GL_DEPTH_TEST);
 
     //// Main Loop ////
-    std::vector<keyBindings> keyBindings = ActionsKeyBindings(scene);
+    std::vector<keyBindings> keyBindings = KeyBindingsActions(scene.player);
     sf::Clock clock; //Utile per il deltaTime
     bool programRunning = true;
     
