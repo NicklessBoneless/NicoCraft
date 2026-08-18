@@ -136,13 +136,13 @@ public:
     void Move(float deltaTime, float speed){
         float yawRad = glm::radians(yawDeg);
 
-        glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) };
-        glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) };
-        glm::vec3 up      = { 0.0f, 1.0f, 0.0f };
+        glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) }; //Piano XZ
+        glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) }; //Piano XZ ruotato di 90°
+        glm::vec3 up      = { 0.0f, 1.0f, 0.0f }; //Vettore per salire e scendere
 
         glm::vec3 moveDirection = {0.0f, 0.0f, 0.0f};
 
-        for(const auto& keyBinding : moveBindings){
+        for(const Camera::MovementBindings &keyBinding : moveBindings){
             if(sf::Keyboard::isKeyPressed(keyBinding.key)){
                 moveDirection += keyBinding.direction.x * right + keyBinding.direction.y * up + keyBinding.direction.z * forward;
             }
