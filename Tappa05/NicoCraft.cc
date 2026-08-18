@@ -12,9 +12,9 @@
 #include "Crosshair.hh"
 #include "BlockOutline.hh"
 
-const std::string dir = "../Tappa04/";
+const std::string dir = "../Tappa05/";
 const std::string res = "../Resources/";
-const std::string winTitle = "NicoCraft - Tappa04";
+const std::string winTitle = "NicoCraft - Tappa05";
 const int TEXTUREPIXELSIZE = 32;
 const int WORLDSIZECHUNKSX = 4;
 const int WORLDSIZECHUNKSZ = 4;
@@ -24,49 +24,40 @@ const float REACH_DISTANCE = 6.0f; //Distanza massima di selezione del blocco
 // Window and OpenGL setup //
 /////////////////////////////
 
-class Setup{
+class Setup {
 public:
-    //Width x Height 
     static const int window_width = 1920;
     static const int window_height = 1080;
-    sf::Window* window;
+    sf::Window window; //Senza usare pointer con new
 
-    Setup(){
-        sf::ContextSettings settings; //SFML Options
+    Setup() : window(sf::VideoMode({window_width, window_height}), winTitle, sf::Style::Default, sf::State::Windowed, createSettings()) {
+        window.setVerticalSyncEnabled(true);
+
+        if (!window.setActive(true)) {
+            std::cerr << "Failure: error during SFML OpenGL Activation." << std::endl;
+            exit(1);
+        }
+
+        int version = gladLoadGL(sf::Context::getFunction);
+        if (!version) {
+            std::cerr << "Failure: error during glad loading." << std::endl;
+            exit(1);
+        }
+        std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
+
+        glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
+    }
+
+private:
+    static sf::ContextSettings createSettings() {
+        sf::ContextSettings settings;
         settings.depthBits = 32;
         settings.stencilBits = 8;
         settings.antiAliasingLevel = 4;
         settings.attributeFlags = sf::ContextSettings::Attribute::Core;
         settings.majorVersion = 4;
         settings.minorVersion = 1;
-
-        window = new sf::Window(
-                                 sf::VideoMode({window_width, window_height}),
-                                 winTitle, //Title
-                                 sf::Style::Default,
-                                 sf::State::Windowed, //Window Type
-                                 settings
-                                 );
-        window->setVerticalSyncEnabled(true);
-
-        if(!window->setActive(true)){
-            std::cerr << "Failure: error during SFML OpenGL Activation." << std::endl;
-            exit(1);
-        }
-
-        int version = gladLoadGL(sf::Context::getFunction);
-        if(!version){
-            std::cerr << "Failure: error during glad loading." << std::endl;
-            exit(1);
-        }
-        std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
-
-        //Colore della skybox di OpenGL
-        glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
-    }
-
-    ~Setup(){
-        delete window;
+        return settings;
     }
 };
 
@@ -89,10 +80,11 @@ private:
     float pitchDeg = 25.0f;
 
     bool sprinting = false;
+    bool breakBlock = false;
     
 
     const float mouseSensitivity = 0.15f;
-    float moveSpeed = 2.0f;
+    float moveSpeed = 4.0f;
 
     // Ad ogni tasto è correllata una direzione di movimento in coordinate della camera.
     // Ogni riga corrisponde ad un input di movimento
@@ -177,7 +169,7 @@ public:
 
     void startSprint(){
         if(!sprinting){
-            moveSpeed = 6.0f;
+            moveSpeed *= 2;
             fovDegrees += 0.5;
             sprinting = true;
             ViewProjection();
@@ -188,10 +180,20 @@ public:
     void stopSprint(){
         if(sprinting){
             sprinting = false;
-            moveSpeed = 2.0f;
+            moveSpeed /= 2;
             fovDegrees -= 0.5;
             ViewProjection();
         }
+    }
+
+    void queueBreakBlock(){
+        breakBlock = true;
+    }
+
+    bool consumeBreakBlock(){
+        bool request = breakBlock;
+        breakBlock = false;
+        return request;
     }
 
     glm::mat4 ViewProjection(){
@@ -241,7 +243,7 @@ struct RaycastHit{
     int blockZ = 0;
 };
 
-//Riempie un chunk con lo stesso terreno di prova usato finora (erba sopra, terra sotto)
+//Riempie un chunk con il terreno
 void fillExistingChunks(Blocks::Chunk& chunk){
     const int SURFACE = Blocks::CHUNK_SIZE_Y*0.5;
     for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
@@ -256,9 +258,6 @@ void fillExistingChunks(Blocks::Chunk& chunk){
                 if(y == SURFACE-1 && rand() % 100 >= 99){
                     chunk.Set(x, y+1, z, Blocks::BlockType::WOOD);
                     chunk.Set(x, y+2, z, Blocks::BlockType::LEAVES);
-                }
-                else if(rand() % 100 >= 66){
-                    chunk.Set(x, y+1, z, Blocks::BlockType::AIR);
                 }
             }
         }
@@ -300,12 +299,8 @@ public:
 
         //Fase 2: ora che tutti i chunk esistono, costruisci le mesh
         //potendo controllare correttamente i blocchi dei chunk vicini
-        for(auto& instance : chunks){
-            auto isSolidOutside = [this, &instance](int localX, int localY, int localZ){
-                return IsSolidWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
-            };
-            auto meshData = Blocks::BuildChunkMesh(instance.chunk, isSolidOutside);
-            instance.mesh.Upload(meshData);
+        for(ChunkInstance& instance : chunks){
+            RebuildChunkMesh(instance);
         }
 
         std::vector<std::string> texturePaths = {
@@ -407,7 +402,44 @@ public:
         return result; //Niente colpito entro maxDistance
     }
 
+    public:
+    //Rompe (rimuove) il blocco alle coordinate MONDO indicate, aggiornando la mesh
+    //del chunk modificato e, se necessario, quella dei chunk adiacenti
+    void BreakBlockWorld(int worldX, int worldY, int worldZ){
+        if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+            return;
+        }
+
+        int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+        int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+        ChunkInstance* instance = GetChunkInstanceAt(chunkX, chunkZ);
+        if(!instance){
+            return;
+        }
+
+        int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+        int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+        instance->chunk.Set(localX, worldY, localZ, Blocks::BlockType::AIR);
+        RebuildChunkMesh(*instance);
+
+        //Se il blocco era sul bordo del chunk, il vicino potrebbe aver nascosto
+        //(o mostrato) una faccia in base al vecchio stato: va rigenerato anche lui
+        if(localX == 0) RebuildNeighborIfExists(chunkX - 1, chunkZ);
+        if(localX == Blocks::CHUNK_SIZE_X - 1) RebuildNeighborIfExists(chunkX + 1, chunkZ);
+        if(localZ == 0) RebuildNeighborIfExists(chunkX, chunkZ - 1);
+        if(localZ == Blocks::CHUNK_SIZE_Z - 1) RebuildNeighborIfExists(chunkX, chunkZ + 1);
+    }
+
     private:
+    void RebuildNeighborIfExists(int chunkX, int chunkZ){
+        ChunkInstance* neighbor = GetChunkInstanceAt(chunkX, chunkZ);
+        if(neighbor){
+            RebuildChunkMesh(*neighbor);
+        }
+    }
+
     //Cerca il chunk alle coordinate di griglia indicate, nullptr se non esiste
     Blocks::Chunk* GetChunkAt(int chunkX, int chunkZ){
         for(auto& instance : chunks){
@@ -416,6 +448,25 @@ public:
             }
         }
         return nullptr;
+    }
+
+    //Cerca la ChunkInstance completa (chunk + mesh) alle coordinate di griglia indicate
+    ChunkInstance* GetChunkInstanceAt(int chunkX, int chunkZ){
+        for(auto& instance : chunks){
+            if(instance.chunkX == chunkX && instance.chunkZ == chunkZ){
+                return &instance;
+            }
+        }
+        return nullptr;
+    }
+
+    //Rigenera la mesh di una ChunkInstance leggendo lo stato attuale del chunk
+    void RebuildChunkMesh(ChunkInstance& instance){
+        auto isSolidOutside = [this, &instance](int localX, int localY, int localZ){
+            return IsSolidWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
+        };
+        auto meshData = Blocks::BuildChunkMesh(instance.chunk, isSolidOutside);
+        instance.mesh.Upload(meshData);
     }
 
     //Controlla se e' solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
@@ -503,9 +554,10 @@ std::vector<keyBindings> ActionsKeyBindings(Scene& scene){
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, Camera& camera){
+void Handle(const sf::Event::Resized& resized, Camera& camera, sf::Vector2i& windowCenter){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
+    windowCenter = { (int)(resized.size.x / 2), (int)(resized.size.y / 2) };
 }
 
 ////////////////////
@@ -522,19 +574,25 @@ void CheckBinding(sf::Keyboard::Scancode scancode, bool isPressed, const std::ve
 }
 
 
-void HandleEvents(sf::Window& window, Camera& camera, const std::vector<keyBindings>& keyBinds, bool& running) {
+void HandleEvents(sf::Window& window, Camera& camera,sf::Vector2i& windowCenter, const std::vector<keyBindings>& keyBinds, bool& ProgramRunning) {
     while (const std::optional event = window.pollEvent()) {
         if(event->is<sf::Event::Closed>()) 
-            running = false;
+            ProgramRunning = false;
 
         else if (const auto* resized = event->getIf<sf::Event::Resized>()) 
-            Handle(*resized, camera);
+            Handle(*resized, camera, windowCenter);
 
         else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
             CheckBinding(keyPressed->scancode, true, keyBinds);  // Tasto premuto
         
         else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) 
             CheckBinding(keyReleased->scancode, false, keyBinds); // Tasto rilasciato
+
+        else if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
+            if(mousePressed->button == sf::Mouse::Button::Left){
+                camera.queueBreakBlock();
+            }
+        }
     }
 }
 
@@ -555,7 +613,7 @@ void UpdateMouseInput(sf::Window& window, Camera& camera, const sf::Vector2i& wi
 int main(){
     //// Startup ////
     Setup setup;
-    sf::Window& window = *setup.window;
+    sf::Window& window = setup.window;
 
     //Prendiamo e centriamo il cursore per la camera FPS
     window.setMouseCursorVisible(false);
@@ -582,11 +640,11 @@ int main(){
     //// Main Loop ////
     std::vector<keyBindings> keyBindings = ActionsKeyBindings(scene);
     sf::Clock clock; //Utile per il deltaTime
-    bool running = true;
+    bool programRunning = true;
     
-    while(running){
-        //Controllo input Tastiera
-        HandleEvents(window,scene.camera,keyBindings,running);
+    while(programRunning){
+        //Controllo input Tastiera e click del mouse
+        HandleEvents(window,scene.camera,windowCenter,keyBindings,programRunning);
 
         float deltaTime = clock.restart().asSeconds();
         scene.camera.Move(deltaTime);
@@ -594,11 +652,18 @@ int main(){
         //Mouse Input
         UpdateMouseInput(window,scene.camera,windowCenter);
 
+        //RayCast dalla camera: individua il blocco puntato PRIMA di disegnare,
+        //cosi' un'eventuale rottura e' visibile nello stesso frame
+        RaycastHit target = scene.RaycastBlock(scene.camera.GetPosition(), scene.camera.GetForward(), REACH_DISTANCE);
+
+        if(scene.camera.consumeBreakBlock() && target.hit){
+            scene.BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
+            target.hit = false; //Il blocco non c'e' piu': niente outline da disegnare questo frame
+        }
+
         //Disegno il mondo 3D
         scene.Draw(shaders);
 
-        //RayCast dalla camera
-        RaycastHit target = scene.RaycastBlock(scene.camera.GetPosition(), scene.camera.GetForward(), REACH_DISTANCE);
         if(target.hit){
             outline.Draw(target.blockX, target.blockY, target.blockZ, scene.camera.viewMatrix, scene.camera.projMatrix);
         }
