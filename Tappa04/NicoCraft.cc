@@ -573,7 +573,7 @@ int main(){
     //Carichiamo la Crosshair e l'outline dei blocchi
     fcg::Crosshair crosshair(dir + "shader_crosshair.vert", dir + "shader_crosshair.frag");
     fcg::BlockOutline outline(dir + "shader_outline.vert", dir + "shader_outline.frag");
-
+    
     //Per migliorare la performance ;-)
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
