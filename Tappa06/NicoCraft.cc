@@ -200,6 +200,7 @@ private:
 
     bool sprinting = false;
     bool breakBlock = false; //true per un frame quando e' stato richiesto un break
+    bool placeBlock = false; //true per un frame quando e' stato richiesto un place
 
     float moveSpeed = 4.0f;
     static constexpr float sprintFovKick = 0.5f;
@@ -244,6 +245,16 @@ public:
         breakBlock = false;
         return request;
     }
+
+    void QueuePlaceBlock(){
+        placeBlock = true;
+    }
+
+    bool ConsumePlaceBlock(){
+        bool request = placeBlock;
+        placeBlock = false;
+        return request;
+    }
 };
 
 ////////////////////
@@ -264,6 +275,7 @@ struct RaycastHit{
     int blockX = 0;
     int blockY = 0;
     int blockZ = 0;
+    int hitFace = -1; //Faccia colpita del blocco (indice in Blocks::FACE_OFFSETS), -1 se hit=false
 };
 
 //Riempie un chunk con il terreno
@@ -395,13 +407,16 @@ public:
         float tMaxY = NextBoundary(origin.y, y, direction.y, stepY);
         float tMaxZ = NextBoundary(origin.z, z, direction.z, stepZ);
 
-        float traveled = 0.0f;
+        int enteredFace = -1; //Faccia da cui si e' entrati nella cella corrente
+
+            float traveled = 0.0f;
         while(traveled < maxDistance){
             if(IsSolidAtWorld(x, y, z)){
                 result.hit = true;
                 result.blockX = x;
                 result.blockY = y;
                 result.blockZ = z;
+                result.hitFace = enteredFace;
                 return result;
             }
 
@@ -409,20 +424,23 @@ public:
                 x += stepX;
                 traveled = tMaxX;
                 tMaxX += tDeltaX;
+                enteredFace = stepX > 0 ? 2 : 3; //Entrando in +X si tocca la faccia Left(2) del blocco; in -X la Right(3)
             }
             else if(tMaxY < tMaxZ){
                 y += stepY;
                 traveled = tMaxY;
                 tMaxY += tDeltaY;
+                enteredFace = stepY > 0 ? 5 : 4; //+Y -> Bottom(5), -Y -> Top(4)
             }
             else{
                 z += stepZ;
                 traveled = tMaxZ;
                 tMaxZ += tDeltaZ;
+                enteredFace = stepZ > 0 ? 1 : 0; //+Z -> Back(1), -Z -> Front(0)
             }
         }
 
-        return result; //Niente colpito entro maxDistance
+        return result;
     }
 
     public:
@@ -449,6 +467,38 @@ public:
 
         //Se il blocco era sul bordo del chunk, il vicino potrebbe aver nascosto
         //(o mostrato) una faccia in base al vecchio stato: va rigenerato anche lui
+        if(localX == 0) RebuildNeighborIfExists(chunkX - 1, chunkZ);
+        if(localX == Blocks::CHUNK_SIZE_X - 1) RebuildNeighborIfExists(chunkX + 1, chunkZ);
+        if(localZ == 0) RebuildNeighborIfExists(chunkX, chunkZ - 1);
+        if(localZ == Blocks::CHUNK_SIZE_Z - 1) RebuildNeighborIfExists(chunkX, chunkZ + 1);
+    }
+
+    //Piazza un blocco alle coordinate MONDO indicate (tipo fisso per ora), aggiornando la mesh
+    //del chunk modificato e, se necessario, quella dei chunk adiacenti
+    void PlaceBlockWorld(int worldX, int worldY, int worldZ, Blocks::BlockType type){
+        if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+            return;
+        }
+
+        int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+        int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+        ChunkInstance* instance = GetChunkInstanceAt(chunkX, chunkZ);
+        if(!instance){
+            return;
+        }
+
+        int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+        int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+        //Sicurezza: non sovrascrivere un blocco gia' solido (non dovrebbe succedere, placeX/Y/Z e' gia' aria)
+        if(instance->chunk.IsSolid(localX, worldY, localZ)){
+            return;
+        }
+
+        instance->chunk.Set(localX, worldY, localZ, type);
+        RebuildChunkMesh(*instance);
+
         if(localX == 0) RebuildNeighborIfExists(chunkX - 1, chunkZ);
         if(localX == Blocks::CHUNK_SIZE_X - 1) RebuildNeighborIfExists(chunkX + 1, chunkZ);
         if(localZ == 0) RebuildNeighborIfExists(chunkX, chunkZ - 1);
@@ -614,6 +664,9 @@ void HandleEvents(sf::Window& window, Player& player,sf::Vector2i& windowCenter,
         else if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
             if(mousePressed->button == sf::Mouse::Button::Left){
                 player.QueueBreakBlock();
+            } 
+            else if(mousePressed->button == sf::Mouse::Button::Right){
+                player.QueuePlaceBlock();
             }
         }
     }
@@ -679,9 +732,19 @@ int main(){
         //cosi' un'eventuale rottura e' visibile nello stesso frame
         RaycastHit target = scene.RaycastBlock(scene.player.getCamera().GetPosition(), scene.player.getCamera().GetForward(), REACH_DISTANCE);
 
-        if(scene.player.ConsumeBreakBlock() && target.hit){
+        bool wantBreak = scene.player.ConsumeBreakBlock();
+        bool wantPlace = scene.player.ConsumePlaceBlock();
+
+        if(wantBreak && target.hit){
             scene.BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
-            target.hit = false; //Il blocco non c'e' piu': niente outline da disegnare questo frame
+            target.hit = false;
+        }
+        else if(wantPlace && target.hit && target.hitFace >= 0){
+            const auto& offset = Blocks::FACE_OFFSETS[target.hitFace];
+            int placeX = target.blockX + offset[0];
+            int placeY = target.blockY + offset[1];
+            int placeZ = target.blockZ + offset[2];
+            scene.PlaceBlockWorld(placeX, placeY, placeZ, Blocks::BlockType::STONE);
         }
 
         //Disegno il mondo 3D
