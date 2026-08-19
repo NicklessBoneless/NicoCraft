@@ -11,14 +11,15 @@
 #include "Chunk.hh"
 #include "Crosshair.hh"
 #include "BlockOutline.hh"
+#include "GamePhysics.hh"
 
-const std::string dir = "../Tappa06/";
+const std::string dir = "../Tappa07/";
 const std::string res = "../Resources/";
-const std::string winTitle = "NicoCraft - Tappa06";
+const std::string winTitle = "NicoCraft - Tappa07";
 const int TEXTUREPIXELSIZE = 32;
 const int WORLDSIZECHUNKSX = 4;
 const int WORLDSIZECHUNKSZ = 4;
-const float REACH_DISTANCE = 6.0f; //Distanza massima di selezione del blocco
+
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -81,12 +82,13 @@ private:
 
     const float mouseSensitivity = 0.15f;
 
+    //Usati solo in modalita' noclip (volo libero): Space/LControl fanno salire/scendere
     struct MovementBindings{
         sf::Keyboard::Key key;
         glm::vec3 direction;
     };
 
-    const MovementBindings moveBindings[6] = {
+    const MovementBindings movementKeyBindings[6] = {
         { sf::Keyboard::Key::W,        { 0.0f, 0.0f,  1.0f} },
         { sf::Keyboard::Key::S,        { 0.0f, 0.0f, -1.0f} },
         { sf::Keyboard::Key::D,        { 1.0f, 0.0f,  0.0f} },
@@ -109,8 +111,8 @@ public:
     void Look(float deltaX, float deltaY){
         yawDeg += deltaX * mouseSensitivity;
         pitchDeg += deltaY * mouseSensitivity;
-        pitchDeg = pitchDeg > 89.0f ? 89.0f : pitchDeg;
-        pitchDeg = pitchDeg < -89.0f ? -89.0f : pitchDeg;
+        pitchDeg = pitchDeg > 89.9f ? 89.9f : pitchDeg;
+        pitchDeg = pitchDeg < -89.9f ? -89.9f : pitchDeg;
         ViewProjection();
     }
 
@@ -118,8 +120,14 @@ public:
         return aspectRatio;
     }
 
-    glm::vec3 GetPosition() const{
+    glm::vec3 getPosition() const{
         return cameraPos;
+    }
+
+    //Impone direttamente la posizione della camera (usato quando e' il corpo fisico a comandare il movimento)
+    void SetPosition(glm::vec3 position){
+        cameraPos = position;
+        ViewProjection();
     }
 
     glm::vec3 GetForward() const{
@@ -132,28 +140,39 @@ public:
         );
     }
 
-    //La velocita' ora e' un parametro esterno: la Camera non sa cos'e' lo sprint
-    void Move(float deltaTime, float speed){
+    //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
+    //Niente Space/LControl qui: quelli sono gestiti dalla fisica (salto) o dal volo libero (moveBindings)
+    template <std::size_t N>
+    glm::vec3 computeHorizontalMovement(const MovementBindings (&keyBindings)[N]) const {
         float yawRad = glm::radians(yawDeg);
+        glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) };
+        glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) };
+        glm::vec3 up      = { 0.0f, 1.0f, 0.0f };
+        glm::vec3 moveDirection{0.0f};
 
-        glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) }; //Piano XZ
-        glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) }; //Piano XZ ruotato di 90°
-        glm::vec3 up      = { 0.0f, 1.0f, 0.0f }; //Vettore per salire e scendere
-
-        glm::vec3 moveDirection = {0.0f, 0.0f, 0.0f};
-
-        for(const Camera::MovementBindings &keyBinding : moveBindings){
-            if(sf::Keyboard::isKeyPressed(keyBinding.key)){
-                moveDirection += keyBinding.direction.x * right + keyBinding.direction.y * up + keyBinding.direction.z * forward;
+        for (const MovementBindings& binding : keyBindings) {
+            if (sf::Keyboard::isKeyPressed(binding.key)) {
+                moveDirection += binding.direction.z * forward + binding.direction.x * right + binding.direction.y * up;
             }
         }
 
-        if(glm::length(moveDirection) < 0.0001f)
-            return;
+        if(glm::length(moveDirection) > 0.0001f){
+            moveDirection = glm::normalize(moveDirection);
+        }
 
-        moveDirection = glm::normalize(moveDirection);
+        return moveDirection;
+    }
+
+    glm::vec3 getHorizontalMovement() const{
+        return computeHorizontalMovement(movementKeyBindings);
+    }
+
+    //Movimento libero (NOCLIP): usato solo per debug, vola in ogni direzione senza collisioni
+    void Move(float deltaTime, float speed){
+        glm::vec3 moveDirection = computeHorizontalMovement(movementKeyBindings);
+        if (glm::length(moveDirection) < 0.0001f) return;
+
         cameraPos += moveDirection * speed * deltaTime;
-
         ViewProjection();
     }
 
@@ -192,20 +211,28 @@ public:
 //    Player      //
 ////////////////////
 
-//Il giocatore possiede una camera e gestisce lo stato delle azioni:
-//sprint, rottura blocchi, e in futuro altro (piazzamento, vita, inventario...)
+//Il giocatore possiede una camera, un corpo fisico (gravita'/collisioni) e gestisce lo stato
+//delle azioni: sprint, noclip, break/place.
 class Player{
 private:
     Camera camera;
+    fcg::PlayerPhysics physics;
 
     bool sprinting = false;
+    bool noclip = false; //Modalita' "volo libero" per debug, toggle col tasto F
     bool breakBlock = false; //true per un frame quando e' stato richiesto un break
     bool placeBlock = false; //true per un frame quando e' stato richiesto un place
 
-    float moveSpeed = 4.0f;
+    const float REACH_DISTANCE = 6.0f; //Distanza massima di selezione del blocco
     static constexpr float sprintFovKick = 0.5f;
+    float moveSpeed = 4.0f;
+    
 
 public:
+    Player() : physics({40.0f, 40.0f, 40.0f}){
+        camera.SetPosition(physics.GetEyePosition());
+    }
+
     Camera& getCamera(){
         return camera;
     }
@@ -214,8 +241,34 @@ public:
         camera.Look(deltaX, deltaY);
     }
 
-    void Move(float deltaTime){
-        camera.Move(deltaTime, moveSpeed);
+    //Aggiorna il movimento del player: in noclip vola libero, altrimenti applica gravita' e collisioni.
+    //'world' e' l'interfaccia astratta implementata da Scene (vedi WorldQuery.hh)
+    void UpdatePosition(float deltaTime, fcg::IWorldQuery& world){
+        if(noclip){
+            camera.Move(deltaTime, moveSpeed);
+            return;
+        }
+
+        //Polling ad ogni frame invece che a evento: se il tasto resta premuto mentre si e' ancora
+        //in aria, il salto scatta comunque appena onGround torna true, invece di perdersi
+        //se il frame esatto della pressione non coincideva con l'atterraggio
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)){
+            physics.Jump();
+        }
+
+        glm::vec3 horizontalVelocity = camera.getHorizontalMovement() * moveSpeed;
+        physics.Update(deltaTime, world, horizontalVelocity);
+        camera.SetPosition(physics.GetEyePosition());
+    }
+
+    //Attiva/disattiva il volo libero. Uscendo dal noclip, il corpo fisico viene
+    //riallineato alla posizione raggiunta in volo, per non teletrasportarsi indietro
+    void ToggleNoclip(){
+        noclip = !noclip;
+        if(!noclip){
+            glm::vec3 feetPosition = camera.getPosition() - glm::vec3(0.0f, fcg::PlayerPhysics::eyeHeight, 0.0f);
+            physics.Teleport(feetPosition);
+        }
     }
 
     void StartSprint(){
@@ -254,6 +307,10 @@ public:
         bool request = placeBlock;
         placeBlock = false;
         return request;
+    }
+
+    float getReach(){
+        return REACH_DISTANCE;
     }
 };
 
@@ -304,7 +361,7 @@ void fillExistingChunks(Blocks::Chunk& chunk){
 //     Scene      //
 ////////////////////
 
-class Scene{
+class Scene : public fcg::IWorldQuery{
 public:
     Player player;
     std::vector<ChunkInstance> chunks;
@@ -502,6 +559,27 @@ public:
         if(localZ == Blocks::CHUNK_SIZE_Z - 1) RebuildNeighborIfExists(chunkX, chunkZ + 1);
     }
 
+    //Controlla se e' solido il blocco a coordinate MONDO, individuando da solo il chunk giusto.
+    //Override di fcg::IWorldQuery: e' cosi' che PlayerPhysics interroga il mondo senza conoscere Scene
+    bool IsSolidAtWorld(int worldX, int worldY, int worldZ) override{
+        if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+            return false;
+        }
+
+        int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+        int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+        Blocks::Chunk* chunk = GetChunkAt(chunkX, chunkZ);
+        if(!chunk){
+            return false;
+        }
+
+        int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+        int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+        return chunk->IsSolid(localX, worldY, localZ);
+    }
+
 private:
     void RebuildNeighborIfExists(int chunkX, int chunkZ){
         ChunkInstance* neighbor = GetChunkInstanceAt(chunkX, chunkZ);
@@ -575,26 +653,6 @@ private:
         float boundary = step > 0 ? (float)(voxelComp + 1) : (float) voxelComp;
         return (boundary - originComp) / dirComp;
     }
-
-    //Controlla se e' solido il blocco a coordinate MONDO, individuando da solo il chunk giusto
-    bool IsSolidAtWorld(int worldX, int worldY, int worldZ){
-        if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
-            return false;
-        }
-
-        int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
-        int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
-
-        Blocks::Chunk* chunk = GetChunkAt(chunkX, chunkZ);
-        if(!chunk){
-            return false;
-        }
-
-        int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
-        int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
-
-        return chunk->IsSolid(localX, worldY, localZ);
-    }
 };
 
 
@@ -623,6 +681,14 @@ std::vector<keyBindings> KeyBindingsActions(Player& player){
     shiftBinding.PressKey = [&player]() { player.StartSprint(); };
     shiftBinding.ReleaseKey = [&player]() { player.StopSprint(); };
     keybinds.push_back(shiftBinding);
+
+    //Salto: gestito via polling in Player::Update (vedi commento li'), non serve un binding a evento qui
+
+    //Toggle noclip/volo libero, utile per debug ed ispezionare il mondo
+    keyBindings noclipBinding;
+    noclipBinding.key = sf::Keyboard::Scancode::F;
+    noclipBinding.PressKey = [&player]() { player.ToggleNoclip(); };
+    keybinds.push_back(noclipBinding);
     
     return keybinds;
 }
@@ -728,14 +794,17 @@ int main(){
         HandleEvents(window,scene.player,windowCenter,keyBindings,programRunning);
 
         float deltaTime = clock.restart().asSeconds();
-        scene.player.Move(deltaTime);
+
+        //Aggiorna il player: gravita' + collisioni (o volo libero se noclip attivo).
+        //Scene implementa fcg::IWorldQuery, quindi passa qui come tale (upcast implicito)
+        scene.player.UpdatePosition(deltaTime, scene);
 
         //Mouse Input
         UpdateMouseInput(window,scene.player.getCamera(),windowCenter);
 
         //RayCast dalla camera: individua il blocco puntato PRIMA di disegnare,
         //cosi' un'eventuale rottura e' visibile nello stesso frame
-        RaycastHit target = scene.RaycastBlock(scene.player.getCamera().GetPosition(), scene.player.getCamera().GetForward(), REACH_DISTANCE);
+        RaycastHit target = scene.RaycastBlock(scene.player.getCamera().getPosition(), scene.player.getCamera().GetForward(), scene.player.getReach());
 
         bool wantBreak = scene.player.ConsumeBreakBlock();
         bool wantPlace = scene.player.ConsumePlaceBlock();
