@@ -62,6 +62,16 @@ private:
     }
 };
 
+struct PlayerInput {
+    bool moveForward = false;
+    bool moveBackward = false;
+    bool moveLeft = false;
+    bool moveRight = false;
+    bool jump = false;
+    bool flyUp = false;   // Usato in NoClip
+    bool flyDown = false; // Usato in NoClip
+};
+
 ////////////////////
 //    Camera      //
 ////////////////////
@@ -81,21 +91,6 @@ private:
     float pitchDeg = 25.0f;
 
     const float mouseSensitivity = 0.15f;
-
-    //Usati solo in modalita' noclip (volo libero): Space/LControl fanno salire/scendere
-    struct MovementBindings{
-        sf::Keyboard::Key key;
-        glm::vec3 direction;
-    };
-
-    const MovementBindings movementKeyBindings[6] = {
-        { sf::Keyboard::Key::W,        { 0.0f, 0.0f,  1.0f} },
-        { sf::Keyboard::Key::S,        { 0.0f, 0.0f, -1.0f} },
-        { sf::Keyboard::Key::D,        { 1.0f, 0.0f,  0.0f} },
-        { sf::Keyboard::Key::A,        {-1.0f, 0.0f,  0.0f} },
-        { sf::Keyboard::Key::Space,    { 0.0f, 1.0f,  0.0f} },
-        { sf::Keyboard::Key::LControl, { 0.0f,-1.0f,  0.0f} },
-    };
 
 public:
     Camera(){
@@ -143,22 +138,24 @@ public:
     //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
     //Niente Space/LControl qui: quelli sono gestiti dalla fisica (salto) o dal volo libero (moveBindings)
     //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
-//Usa SOLO le prime 4 celle del binding array (W,S,D,A): Space/LControl (se presenti,
-//per il noclip) vengono ignorati a prescindere, cosi' non c'e' rischio di introdurre
-//una componente Y "fantasma" quando questa funzione viene chiamata durante la camminata normale
-    glm::vec3 computeHorizontalMovement(const MovementBindings* keyBindings, int nkeys) const{
+    //Usa SOLO le prime 4 celle del binding array (W,S,D,A): Space/LControl (se presenti,
+    //per il noclip) vengono ignorati a prescindere, cosi' non c'e' rischio di introdurre
+    //una componente Y "fantasma" quando questa funzione viene chiamata durante la camminata normale
+    glm::vec3 computeHorizontalMovement(const PlayerInput& input, bool isNoClip) const {
         float yawRad = glm::radians(yawDeg);
         glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) };
         glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) };
         glm::vec3 up{0.0f,1.0f,0.0f};
         glm::vec3 moveDirection{0.0f};
 
-        for(int i = 0; i < nkeys; i++){
-            const MovementBindings& binding = keyBindings[i];
-            if(sf::Keyboard::isKeyPressed(binding.key)){
-                moveDirection += binding.direction.z * forward + binding.direction.x * right + binding.direction.y * up;
-            }
-        }
+        float x,y,z;
+        x = y = z = 1.0f;
+
+        z = input.moveForward - input.moveBackward;
+        x = input.moveRight - input.moveLeft;
+        y = isNoClip ? input.flyUp - input.flyDown : 0.0f;
+
+        moveDirection += (forward * z) + (right * x) + (up * y);
 
         if(glm::length(moveDirection) > 0.0001f){
             moveDirection = glm::normalize(moveDirection);
@@ -167,13 +164,13 @@ public:
         return moveDirection;
     }
 
-    glm::vec3 getHorizontalMovement() const{
-        return computeHorizontalMovement(movementKeyBindings,4);
+    glm::vec3 getHorizontalMovement(const PlayerInput& input) const{
+        return computeHorizontalMovement(input,false);
     }
 
     //Movimento libero (NOCLIP): usato solo per debug, vola in ogni direzione senza collisioni
-    void NoClipMove(float deltaTime, float speed){
-        glm::vec3 moveDirection = computeHorizontalMovement(movementKeyBindings,6);
+    void NoClipMove(float deltaTime, float speed,const PlayerInput& input){
+        glm::vec3 moveDirection = computeHorizontalMovement(input,true);
         if (glm::length(moveDirection) < 0.0001f) return;
 
         cameraPos += moveDirection * speed * deltaTime;
@@ -290,18 +287,18 @@ public:
         return physics.OccupiesBlock(worldX, worldY, worldZ);
     }
 
-    void UpdatePosition(float deltaTime, fcg::IWorld& world) {
-        noclip ? camera.NoClipMove(deltaTime, moveSpeed) : NormalMove(deltaTime, world);
+    void UpdatePosition(float deltaTime, fcg::IWorld& world, const PlayerInput& input) {
+        noclip ? camera.NoClipMove(deltaTime, moveSpeed,input) : NormalMove(deltaTime, world,input);
     }
 
 private:
     //Metodo helper che isola il polling di SFML e l'aggiornamento fisico
-    void NormalMove(float deltaTime, fcg::IWorld& world) {
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
+    void NormalMove(float deltaTime, fcg::IWorld& world,const PlayerInput& input) {
+        if(input.jump) {
             physics.Jump();
         }
 
-        glm::vec3 horizontalVelocity = camera.getHorizontalMovement() * moveSpeed;
+        glm::vec3 horizontalVelocity = camera.getHorizontalMovement(input) * moveSpeed;
         physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
         camera.SetPosition(physics.GetEyePosition());
     }
@@ -658,38 +655,7 @@ private:
 // Game  Bindings //
 ////////////////////
 
-struct keyBindings{
-    sf::Keyboard::Scancode key;
-    std::function<void()> PressKey;
-    std::function<void()> ReleaseKey = nullptr;
-};
 
-std::vector<keyBindings> KeyBindingsActions(Player& player){
-    std::vector<keyBindings> keybinds;
-
-    keyBindings escapeBinding;
-    escapeBinding.key = sf::Keyboard::Scancode::Escape;
-    escapeBinding.PressKey = []() { exit(0); };
-    escapeBinding.ReleaseKey = nullptr;
-    keybinds.push_back(escapeBinding);
-
-    // 3. Creazione dell'azione per Shift (Sprint)
-    keyBindings shiftBinding;
-    shiftBinding.key = sf::Keyboard::Scancode::LShift;
-    shiftBinding.PressKey = [&player]() { player.StartSprint(); };
-    shiftBinding.ReleaseKey = [&player]() { player.StopSprint(); };
-    keybinds.push_back(shiftBinding);
-
-    //Salto: gestito via polling in Player::Update (vedi commento li'), non serve un binding a evento qui
-
-    //Toggle noclip/volo libero, utile per debug ed ispezionare il mondo
-    keyBindings noclipBinding;
-    noclipBinding.key = sf::Keyboard::Scancode::F;
-    noclipBinding.PressKey = [&player]() { player.ToggleNoclip(); };
-    keybinds.push_back(noclipBinding);
-    
-    return keybinds;
-}
 
 ////////////////////
 // SFML Callbacks //
@@ -704,37 +670,49 @@ void Handle(const sf::Event::Resized& resized, Camera& camera, sf::Vector2i& win
 ////////////////////
 // AUX Functions  //
 ////////////////////
-
-// Controlla se il tasto premuto o rilasciato è tra i keyBinding e chiama la funzione
-void CheckBinding(sf::Keyboard::Scancode scancode, bool isPressed, const std::vector<keyBindings>& keyBinds) {
-    for(const keyBindings &binding : keyBinds) {
-        if(binding.key != scancode) continue;
-        if(isPressed && binding.PressKey) binding.PressKey();
-        else if(!isPressed && binding.ReleaseKey) binding.ReleaseKey();
-    }
-}
-
-
-void HandleEvents(sf::Window& window, Player& player,sf::Vector2i& windowCenter, const std::vector<keyBindings>& keyBinds, bool& ProgramRunning) {
-    while (const std::optional event = window.pollEvent()) {
-        if(event->is<sf::Event::Closed>()) 
-            ProgramRunning = false;
-
-        else if (const auto* resized = event->getIf<sf::Event::Resized>()) 
+void HandleEvents(sf::Window& window, Player& player, sf::Vector2i& windowCenter, bool& programRunning) {
+    while(const std::optional event = window.pollEvent()){
+        if (event->is<sf::Event::Closed>()){
+            programRunning = false;
+            return;
+        }
+        if(const auto* resized = event->getIf<sf::Event::Resized>()){
             Handle(*resized, player.getCamera(), windowCenter);
-
-        else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
-            CheckBinding(keyPressed->scancode, true, keyBinds);  // Tasto premuto
+            return;
+        }
         
-        else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) 
-            CheckBinding(keyReleased->scancode, false, keyBinds); // Tasto rilasciato
-
-        else if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
-            if(mousePressed->button == sf::Mouse::Button::Left){
-                player.QueueBreakBlock();
-            } 
-            else if(mousePressed->button == sf::Mouse::Button::Right){
-                player.QueuePlaceBlock();
+        if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
+            switch (keyPressed->scancode) {
+                case sf::Keyboard::Scancode::Escape:
+                    programRunning = false;
+                    return;
+                case sf::Keyboard::Scancode::F:
+                    player.ToggleNoclip();
+                    break;
+                case sf::Keyboard::Scancode::LShift:
+                    player.StartSprint();
+                    break;
+                default:
+                    break; // Ignora gli altri tasti
+            }
+        }
+        
+        else if(const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()){
+            if(keyReleased->scancode == sf::Keyboard::Scancode::LShift){
+                player.StopSprint();
+            }
+        }
+        
+        else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
+            switch(mousePressed->button) {
+                case sf::Mouse::Button::Left:
+                    player.QueueBreakBlock();
+                    break;
+                case sf::Mouse::Button::Right:
+                    player.QueuePlaceBlock();
+                    break;
+                default:
+                    break; // Ignora gli altri tasti del mouse
             }
         }
     }
@@ -748,6 +726,38 @@ void UpdateMouseInput(sf::Window& window, Camera& camera, const sf::Vector2i& wi
         camera.Look((float)delta.x, (float)delta.y);
         sf::Mouse::setPosition(windowCenter, window);
     }
+}
+
+void ProcessBlockInteractions(Scene& scene, RaycastHit& target) {
+    bool wantBreak = scene.player.ConsumeBreakBlock();
+    bool wantPlace = scene.player.ConsumePlaceBlock();
+
+    if(wantBreak && target.hit){
+        scene.BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
+        target.hit = false;
+    }
+    else if(wantPlace && target.hit && target.hitFace >= 0){
+        const auto& offset = Blocks::FACE_OFFSETS[target.hitFace];
+        int placeX = target.blockX + offset[0];
+        int placeY = target.blockY + offset[1];
+        int placeZ = target.blockZ + offset[2];
+        scene.PlaceBlockWorld(placeX, placeY, placeZ, Blocks::BlockType::STONE);
+    }
+}
+
+PlayerInput CapturePlayerInput() {
+    PlayerInput input;
+    input.moveForward  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
+    input.moveBackward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
+    input.moveLeft     = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
+    input.moveRight    = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
+    
+    // Lo spazio e il control servono sia per il salto che per il volo libero
+    input.jump         = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
+    input.flyUp        = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
+    input.flyDown      = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl);
+    
+    return input;
 }
 
 //////////
@@ -783,52 +793,47 @@ int main(){
     glEnable(GL_DEPTH_TEST);
 
     //// Main Loop ////
-    std::vector<keyBindings> keyBindings = KeyBindingsActions(scene.player);
     sf::Clock clock; //Utile per il deltaTime
     bool programRunning = true;
     
     while(programRunning){
-        //Controllo input Tastiera e click del mouse
-        HandleEvents(window,scene.player,windowCenter,keyBindings,programRunning);
+        //Eventi standard (chiusura finestra, toggle, click singoli)
+        HandleEvents(window, scene.player, windowCenter, programRunning);
 
         float deltaTime = clock.restart().asSeconds();
 
-        //Aggiorna il player: gravita' + collisioni (o volo libero se noclip attivo).
-        //Scene implementa fcg::IWorld, quindi passa qui come tale (upcast implicito)
-        scene.player.UpdatePosition(deltaTime, scene);
+        //Cattura input di movimento (tick corrente)
+        PlayerInput currentInput = CapturePlayerInput();
+
+        //Aggiorniamo il player passando la struct
+        scene.player.UpdatePosition(deltaTime, scene, currentInput);
 
         //Mouse Input
-        UpdateMouseInput(window,scene.player.getCamera(),windowCenter);
+        UpdateMouseInput(window, scene.player.getCamera(), windowCenter);
 
-        //RayCast dalla camera: individua il blocco puntato PRIMA di disegnare,
-        //cosi' un'eventuale rottura e' visibile nello stesso frame
-        RaycastHit target = scene.RaycastBlock(scene.player.getCamera().getPosition(), scene.player.getCamera().GetForward(), scene.player.getReach());
+        //Raycast (Guardiamo il Blocco?)
+        RaycastHit target = scene.RaycastBlock(
+            scene.player.getCamera().getPosition(), 
+            scene.player.getCamera().GetForward(), 
+            scene.player.getReach()
+        );
 
-        bool wantBreak = scene.player.ConsumeBreakBlock();
-        bool wantPlace = scene.player.ConsumePlaceBlock();
+        //Azioni sui blocchi
+        ProcessBlockInteractions(scene, target);
 
-        if(wantBreak && target.hit){
-            scene.BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
-            target.hit = false;
-        }
-        else if(wantPlace && target.hit && target.hitFace >= 0){
-            const auto& offset = Blocks::FACE_OFFSETS[target.hitFace];
-            int placeX = target.blockX + offset[0];
-            int placeY = target.blockY + offset[1];
-            int placeZ = target.blockZ + offset[2];
-            scene.PlaceBlockWorld(placeX, placeY, placeZ, Blocks::BlockType::STONE);
-        }
-
-        //Disegno il mondo 3D
+        //Rendering
         scene.Draw(shaders);
 
-        if(target.hit){
-            outline.Draw(target.blockX, target.blockY, target.blockZ, scene.player.getCamera().viewMatrix, scene.player.getCamera().projMatrix);
+        if(target.hit) { //Overlay blocco
+            outline.Draw(target.blockX, target.blockY, target.blockZ, 
+                         scene.player.getCamera().viewMatrix, 
+                         scene.player.getCamera().projMatrix);
         }
 
-        //Disegno la Crosshair
+        //Crosshair
         crosshair.Draw(scene.player.getCamera().GetAspectRatio());
-        
+
+        //Display finale!
         window.display();
     }
 
