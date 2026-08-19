@@ -31,7 +31,7 @@ namespace fcg{
 
         //'world' e' l'interfaccia astratta (vedi WorldQuery.hh): PlayerPhysics non sa e non le
         //interessa che dietro ci sia una Scene, sa solo che puo' chiederle "e' solido questo blocco?"
-        void UpdatePlayerPosition(float deltaTime, IWorldQuery& world, glm::vec3 horizontalVelocity){
+        void UpdatePlayerPosition(float deltaTime, IWorld& world, glm::vec3 horizontalVelocity){
             if(!onGround){
                 velocity.y -= gravity * deltaTime;
                 if(velocity.y < -terminalVelocity) velocity.y = -terminalVelocity;
@@ -86,7 +86,7 @@ namespace fcg{
 
     private:
         //Muove il player un asse alla volta, testando le collisioni dopo ogni spostamento parziale
-        void MoveWithCollision(glm::vec3 delta, IWorldQuery& world){
+        void MoveWithCollision(glm::vec3 delta, IWorld& world){
             //Asse X
             position.x += delta.x;
             if(CollidesAt(position, world)) position.x -= delta.x;
@@ -115,7 +115,7 @@ namespace fcg{
 
         //Controlla se l'AABB del player (piedi in 'feetPosition') interseca un blocco solido.
         //Itera su tutte le celle intere comprese tra min e max del box: di solito poche celle.
-        bool CollidesAt(glm::vec3 feetPosition, IWorldQuery& world) const{
+        bool CollidesAt(glm::vec3 feetPosition, IWorld& world) const{
             int minX = (int) std::floor(feetPosition.x - halfWidth);
             int maxX = (int) std::floor(feetPosition.x + halfWidth);
             int minY = (int) std::floor(feetPosition.y);

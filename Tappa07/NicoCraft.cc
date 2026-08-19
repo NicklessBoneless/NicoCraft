@@ -172,7 +172,7 @@ public:
     }
 
     //Movimento libero (NOCLIP): usato solo per debug, vola in ogni direzione senza collisioni
-    void Move(float deltaTime, float speed){
+    void NoClipMove(float deltaTime, float speed){
         glm::vec3 moveDirection = computeHorizontalMovement(movementKeyBindings,6);
         if (glm::length(moveDirection) < 0.0001f) return;
 
@@ -214,61 +214,35 @@ public:
 ////////////////////
 //    Player      //
 ////////////////////
-
-//Il giocatore possiede una camera, un corpo fisico (gravita'/collisioni) e gestisce lo stato
-//delle azioni: sprint, noclip, break/place.
-class Player{
+class Player {
 private:
     Camera camera;
     fcg::PlayerPhysics physics;
 
     bool sprinting = false;
-    bool noclip = false; //Modalita' "volo libero" per debug, toggle col tasto F
-    bool breakBlock = false; //true per un frame quando e' stato richiesto un break
-    bool placeBlock = false; //true per un frame quando e' stato richiesto un place
+    bool noclip = false; 
+    bool breakBlock = false; 
+    bool placeBlock = false; 
 
-    const float REACH_DISTANCE = 6.0f; //Distanza massima di selezione del blocco
+    const float REACH_DISTANCE = 6.0f; 
     static constexpr float sprintFovKick = 0.5f;
     float moveSpeed = 4.0f;
 
 public:
-    Player() : physics({40.0f, 40.0f, 40.0f}){
+    Player() : physics({40.0f, 40.0f, 40.0f}) {
         camera.SetPosition(physics.GetEyePosition());
     }
 
-    Camera& getCamera(){
-        return camera;
-    }
+    Camera& getCamera() { return camera; }
+    float getReach() const { return REACH_DISTANCE; }
 
-    void Look(float deltaX, float deltaY){
+    void Look(float deltaX, float deltaY) {
         camera.Look(deltaX, deltaY);
     }
 
-    //Aggiorna il movimento del player: in noclip vola libero, altrimenti applica gravita' e collisioni.
-    //'world' e' l'interfaccia astratta implementata da Scene (vedi WorldQuery.hh)
-    void UpdatePosition(float deltaTime, fcg::IWorldQuery& world){
-        if(noclip){
-            camera.Move(deltaTime, moveSpeed);
-            return;
-        }
-
-        //Polling ad ogni frame invece che a evento: se il tasto resta premuto mentre si e' ancora
-        //in aria, il salto scatta comunque appena onGround torna true, invece di perdersi
-        //se il frame esatto della pressione non coincideva con l'atterraggio
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)){
-            physics.Jump();
-        }
-
-        glm::vec3 horizontalVelocity = camera.getHorizontalMovement() * moveSpeed;
-        physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
-        camera.SetPosition(physics.GetEyePosition());
-    }
-
-    //Attiva/disattiva il volo libero. Uscendo dal noclip, il corpo fisico viene
-    //riallineato alla posizione raggiunta in volo, per non teletrasportarsi indietro
-    void ToggleNoclip(){
+    void ToggleNoclip() {
         noclip = !noclip;
-        if(!noclip){
+        if (!noclip) {
             glm::vec3 feetPosition = camera.getPosition() - glm::vec3(0.0f, fcg::PlayerPhysics::eyeHeight, 0.0f);
             physics.Teleport(feetPosition);
         }
@@ -312,12 +286,24 @@ public:
         return request;
     }
 
-    bool isPlayerOccupyingBlock(int worldX, int worldY, int worldZ) const{
+    bool IsPlayerOccupyingBlock(int worldX, int worldY, int worldZ) const {
         return physics.OccupiesBlock(worldX, worldY, worldZ);
     }
 
-    float getReach(){
-        return REACH_DISTANCE;
+    void UpdatePosition(float deltaTime, fcg::IWorld& world) {
+        noclip ? camera.NoClipMove(deltaTime, moveSpeed) : NormalMove(deltaTime, world);
+    }
+
+private:
+    //Metodo helper che isola il polling di SFML e l'aggiornamento fisico
+    void NormalMove(float deltaTime, fcg::IWorld& world) {
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
+            physics.Jump();
+        }
+
+        glm::vec3 horizontalVelocity = camera.getHorizontalMovement() * moveSpeed;
+        physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
+        camera.SetPosition(physics.GetEyePosition());
     }
 };
 
@@ -368,62 +354,23 @@ void fillExistingChunks(Blocks::Chunk& chunk){
 //     Scene      //
 ////////////////////
 
-class Scene : public fcg::IWorldQuery{
+class Scene : public fcg::IWorld {
 public:
     Player player;
     std::vector<ChunkInstance> chunks;
     Blocks::TextureArray textureArray;
 
 private:
-    GLint modelLoc;
-    GLint viewLoc;
-    GLint projLoc;
+    GLint modelLoc, viewLoc, projLoc;
 
 public:
-    Scene(fcg::Shaders& shaders){
+    Scene(fcg::Shaders& shaders) {
         chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
-
-        //Fase 1: genera tutti i chunk (senza ancora costruire le mesh)
-        for(int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++){
-            for(int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++){
-                chunks.emplace_back();
-                ChunkInstance& instance = chunks.back();
-                instance.chunkX = chunkX;
-                instance.chunkZ = chunkZ;
-                fillExistingChunks(instance.chunk);
-            }
-        }
-
-        //Fase 2: ora che tutti i chunk esistono, costruisci le mesh
-        //potendo controllare correttamente i blocchi dei chunk vicini
-        for(ChunkInstance& instance : chunks){
-            RebuildChunkMesh(instance);
-        }
-
-        std::vector<std::string> texturePaths = {
-            res + "MissingTextureBlock.png",
-            res + "grassTop.png",
-            res + "dirt.png",
-            res + "grassSide.png",
-            res + "stone.png",
-            res + "logTop.png",
-            res + "logSide.png",
-            res + "leaves.png" 
-        };
-
-        textureArray.LoadTextures(texturePaths, TEXTUREPIXELSIZE, TEXTUREPIXELSIZE);
-
+        
+        GenerateAllChunks();
+        BuildAllMeshes();
+        InitializeTextures();
         Locations(shaders);
-    }
-
-    void Locations(fcg::Shaders& shaders)
-    {
-        modelLoc = glGetUniformLocation(shaders.program, "model");
-        viewLoc  = glGetUniformLocation(shaders.program, "view");
-        projLoc  = glGetUniformLocation(shaders.program, "projection");
-
-        GLint samplerLoc = glGetUniformLocation(shaders.program, "textureArray");
-        glUniform1i(samplerLoc, 0);
     }
 
     void Draw(fcg::Shaders& shaders)
@@ -542,7 +489,7 @@ public:
         }
 
         //Non si puo' piazzare un blocco dentro il volume occupato dal player
-        if(player.isPlayerOccupyingBlock(worldX, worldY, worldZ)){
+        if(player.IsPlayerOccupyingBlock(worldX, worldY, worldZ)){
             return;
         }
 
@@ -593,6 +540,45 @@ public:
     }
 
 private:
+    void GenerateAllChunks() {
+        for (int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++) {
+            for (int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++) {
+                chunks.emplace_back();
+                ChunkInstance& instance = chunks.back();
+                instance.chunkX = chunkX;
+                instance.chunkZ = chunkZ;
+                fillExistingChunks(instance.chunk);
+            }
+        }
+    }
+
+    void BuildAllMeshes() {
+        // La lambda è dentro RebuildChunkMesh e non si tocca!
+        for (ChunkInstance& instance : chunks) {
+            RebuildChunkMesh(instance); 
+        }
+    }
+
+    void InitializeTextures() {
+        std::vector<std::string> texturePaths = {
+            res + "MissingTextureBlock.png", res + "grassTop.png",
+            res + "dirt.png", res + "grassSide.png",
+            res + "stone.png", res + "logTop.png",
+            res + "logSide.png", res + "leaves.png" 
+        };
+        textureArray.LoadTextures(texturePaths, TEXTUREPIXELSIZE, TEXTUREPIXELSIZE);
+    }
+
+    void Locations(fcg::Shaders& shaders)
+    {
+        modelLoc = glGetUniformLocation(shaders.program, "model");
+        viewLoc  = glGetUniformLocation(shaders.program, "view");
+        projLoc  = glGetUniformLocation(shaders.program, "projection");
+
+        GLint samplerLoc = glGetUniformLocation(shaders.program, "textureArray");
+        glUniform1i(samplerLoc, 0);
+    }
+
     void RebuildNeighborIfExists(int chunkX, int chunkZ){
         ChunkInstance* neighbor = GetChunkInstanceAt(chunkX, chunkZ);
         if(neighbor){
@@ -808,7 +794,7 @@ int main(){
         float deltaTime = clock.restart().asSeconds();
 
         //Aggiorna il player: gravita' + collisioni (o volo libero se noclip attivo).
-        //Scene implementa fcg::IWorldQuery, quindi passa qui come tale (upcast implicito)
+        //Scene implementa fcg::IWorld, quindi passa qui come tale (upcast implicito)
         scene.player.UpdatePosition(deltaTime, scene);
 
         //Mouse Input

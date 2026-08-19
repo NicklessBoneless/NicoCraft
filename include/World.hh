@@ -8,10 +8,10 @@ namespace fcg
     //PlayerPhysics dipende SOLO da questa interfaccia, non dalla classe Scene per intero:
     //cosi' non ha ne' bisogno ne' accesso a nulla che non le serva (Draw, RaycastBlock, texture...).
     //Scene la implementera' (public IWorldQuery) piu' sotto in NicoCraft.cc.
-    class IWorldQuery{
+    class IWorld{
     public:
         virtual bool IsSolidAtWorld(int worldX, int worldY, int worldZ) = 0;
-        virtual ~IWorldQuery() = default;
+        virtual ~IWorld() = default;
     };
 }
 
