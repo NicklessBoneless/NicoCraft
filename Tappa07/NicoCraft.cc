@@ -11,7 +11,7 @@
 #include "Chunk.hh"
 #include "Crosshair.hh"
 #include "BlockOutline.hh"
-#include "GamePhysics.hh"
+#include "PlayerPhysics.hh"
 
 const std::string dir = "../Tappa07/";
 const std::string res = "../Resources/";
@@ -142,16 +142,20 @@ public:
 
     //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
     //Niente Space/LControl qui: quelli sono gestiti dalla fisica (salto) o dal volo libero (moveBindings)
-    template <std::size_t N>
-    glm::vec3 computeHorizontalMovement(const MovementBindings (&keyBindings)[N]) const {
+    //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
+//Usa SOLO le prime 4 celle del binding array (W,S,D,A): Space/LControl (se presenti,
+//per il noclip) vengono ignorati a prescindere, cosi' non c'e' rischio di introdurre
+//una componente Y "fantasma" quando questa funzione viene chiamata durante la camminata normale
+    glm::vec3 computeHorizontalMovement(const MovementBindings* keyBindings, int nkeys) const{
         float yawRad = glm::radians(yawDeg);
         glm::vec3 forward = { glm::sin(yawRad), 0.0f, -glm::cos(yawRad) };
         glm::vec3 right   = { glm::cos(yawRad), 0.0f,  glm::sin(yawRad) };
-        glm::vec3 up      = { 0.0f, 1.0f, 0.0f };
+        glm::vec3 up{0.0f,1.0f,0.0f};
         glm::vec3 moveDirection{0.0f};
 
-        for (const MovementBindings& binding : keyBindings) {
-            if (sf::Keyboard::isKeyPressed(binding.key)) {
+        for(int i = 0; i < nkeys; i++){
+            const MovementBindings& binding = keyBindings[i];
+            if(sf::Keyboard::isKeyPressed(binding.key)){
                 moveDirection += binding.direction.z * forward + binding.direction.x * right + binding.direction.y * up;
             }
         }
@@ -164,12 +168,12 @@ public:
     }
 
     glm::vec3 getHorizontalMovement() const{
-        return computeHorizontalMovement(movementKeyBindings);
+        return computeHorizontalMovement(movementKeyBindings,4);
     }
 
     //Movimento libero (NOCLIP): usato solo per debug, vola in ogni direzione senza collisioni
     void Move(float deltaTime, float speed){
-        glm::vec3 moveDirection = computeHorizontalMovement(movementKeyBindings);
+        glm::vec3 moveDirection = computeHorizontalMovement(movementKeyBindings,6);
         if (glm::length(moveDirection) < 0.0001f) return;
 
         cameraPos += moveDirection * speed * deltaTime;
@@ -226,7 +230,6 @@ private:
     const float REACH_DISTANCE = 6.0f; //Distanza massima di selezione del blocco
     static constexpr float sprintFovKick = 0.5f;
     float moveSpeed = 4.0f;
-    
 
 public:
     Player() : physics({40.0f, 40.0f, 40.0f}){
@@ -257,7 +260,7 @@ public:
         }
 
         glm::vec3 horizontalVelocity = camera.getHorizontalMovement() * moveSpeed;
-        physics.Update(deltaTime, world, horizontalVelocity);
+        physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
         camera.SetPosition(physics.GetEyePosition());
     }
 
@@ -307,6 +310,10 @@ public:
         bool request = placeBlock;
         placeBlock = false;
         return request;
+    }
+
+    bool isPlayerOccupyingBlock(int worldX, int worldY, int worldZ) const{
+        return physics.OccupiesBlock(worldX, worldY, worldZ);
     }
 
     float getReach(){
@@ -531,6 +538,11 @@ public:
     //del chunk modificato e, se necessario, quella dei chunk adiacenti
     void PlaceBlockWorld(int worldX, int worldY, int worldZ, Blocks::BlockType type){
         if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+            return;
+        }
+
+        //Non si puo' piazzare un blocco dentro il volume occupato dal player
+        if(player.isPlayerOccupyingBlock(worldX, worldY, worldZ)){
             return;
         }
 
