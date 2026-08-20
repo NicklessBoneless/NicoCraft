@@ -558,7 +558,7 @@ private:
 
     void InitializeTextures() {
         std::vector<std::string> texturePaths = {
-            res + "MissingTextureBlock.png", res + "grassTop.png",
+            res + "missingTextureBlock.png", res + "grassTop.png",
             res + "dirt.png", res + "grassSide.png",
             res + "stone.png", res + "logTop.png",
             res + "logSide.png", res + "leaves.png" 

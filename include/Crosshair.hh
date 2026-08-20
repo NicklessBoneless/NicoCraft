@@ -1,7 +1,7 @@
 #ifndef CROSSHAIR_HH
 #define CROSSHAIR_HH
 
-#include "hotshaders.hh"
+#include "Hotshaders.hh"
 
 namespace fcg{
     class Crosshair{

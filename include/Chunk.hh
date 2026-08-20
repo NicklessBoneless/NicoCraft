@@ -1,6 +1,6 @@
 #include "Blocks.hh"
-#include "matrices.hh"
-#include "hotshaders.hh"
+#include "Matrices.hh"
+#include "Hotshaders.hh"
 #include <functional>
 
 namespace Blocks

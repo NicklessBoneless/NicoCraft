@@ -9,8 +9,8 @@
 #include <iostream>
 #include <cstdlib>
 
-#include "matrices.hh"
-#include "hotshaders.hh"
+#include "Matrices.hh"
+#include "Hotshaders.hh"
 
 const std::string dir = "../Tappa01/";
 const std::string res = "../Resources/";
@@ -310,7 +310,7 @@ public:
             std::cerr << "Warning: Failed to load texture: " << path
                     << " — using fallback texture." << std::endl;
 
-            std::string fallbackPath = res + "MissingTextureBlock.png";
+            std::string fallbackPath = res + "missingTextureBlock.png";
             if (!image.loadFromFile (fallbackPath)) {
                 std::cerr << "Error: Failed to load fallback texture: " << fallbackPath << std::endl;
                 exit (1);

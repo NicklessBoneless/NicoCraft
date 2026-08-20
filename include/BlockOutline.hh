@@ -1,8 +1,8 @@
 #ifndef BLOCK_OUTLINE_HH
 #define BLOCK_OUTLINE_HH
 
-#include "hotshaders.hh"
-#include "matrices.hh"
+#include "Hotshaders.hh"
+#include "Matrices.hh"
 
 namespace fcg{
     //Disegna un bordo bianco sui lati del blocco puntato dal giocatore
@@ -16,6 +16,7 @@ namespace fcg{
         //ed evitare z-fighting con le facce della mesh
         static constexpr float offsetLine = 0.001f;
         static constexpr float lineThickness = 4.0f;
+        static constexpr float polygonOffset = -10.0f;
 
         void Cleanup(){
             if(vao){ 
@@ -99,7 +100,7 @@ namespace fcg{
             glDepthFunc(GL_LEQUAL);
 
             glEnable(GL_POLYGON_OFFSET_LINE);
-            glPolygonOffset(-12.0,-12.0);
+            glPolygonOffset(polygonOffset,polygonOffset);
 
             glBindVertexArray(vao);
             glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);

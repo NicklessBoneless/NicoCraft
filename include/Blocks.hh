@@ -1,9 +1,13 @@
 #ifndef BLOCK_HH
 #define BLOCK_HH
 
+#include <vector>
+#include <string>
+#include <cstdint>
+#include <iostream>
 #include <SFML/Graphics/Image.hpp>
 #include <glm/vec3.hpp>
-#include "basicLib.hh"
+
 
 namespace Blocks{
     enum class BlockType : uint8_t
@@ -97,8 +101,15 @@ namespace Blocks{
                 //Necessario per non prendere le texture rovesciate
                 img.flipVertically();
 
+                
                 // Copia i pixel dell'immagine nel layer 'i'
                 glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
+
+                GLenum err = glGetError();
+                if(err != GL_NO_ERROR){
+                    std::cerr << "GL error dopo texture " << i << ": " << err << std::endl;
+                }
+
             }
 
             //Filtraggio stile pixel-art (Minecraft)

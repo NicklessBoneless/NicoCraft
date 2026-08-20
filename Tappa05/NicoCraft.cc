@@ -327,7 +327,7 @@ public:
         }
 
         std::vector<std::string> texturePaths = {
-            res + "MissingTextureBlock.png",
+            res + "missingTextureBlock.png",
             res + "grassTop.png",
             res + "dirt.png",
             res + "grassSide.png",

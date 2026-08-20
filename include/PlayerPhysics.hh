@@ -3,7 +3,7 @@
 
 #include <glm/vec3.hpp>
 #include <cmath>
-#include "World.hh"
+#include "IWorld.hh"
 
 namespace fcg{
 
@@ -29,8 +29,8 @@ namespace fcg{
     public:
         PlayerPhysics(glm::vec3 startFeetPosition) : position(startFeetPosition) {}
 
-        //'world' e' l'interfaccia astratta (vedi WorldQuery.hh): PlayerPhysics non sa e non le
-        //interessa che dietro ci sia una Scene, sa solo che puo' chiederle "e' solido questo blocco?"
+        //'world' e' l'interfaccia astratta (vedi IWorld.hh): PlayerPhysics non sa e non le
+        //interessa che dietro ci sia una World o altro, sa solo che puo' chiederle "e' solido questo blocco?"
         void UpdatePlayerPosition(float deltaTime, IWorld& world, glm::vec3 horizontalVelocity){
             if(!onGround){
                 velocity.y -= gravity * deltaTime;
@@ -80,8 +80,8 @@ namespace fcg{
             bool X = (worldX >= minX && worldX <= maxX);
             bool Y = (worldY >= minY && worldY <= maxY);
             bool Z = (worldZ >= minZ && worldZ <= maxZ);
-            
-            return X && Y && Z;        
+
+            return X && Y && Z;
         }
 
     private:

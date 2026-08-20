@@ -7,8 +7,8 @@
 #include <glm/geometric.hpp>
 
 #include "Blocks.hh" //Messo per primo per dipendenze
-#include "matrices.hh"
-#include "hotshaders.hh"
+#include "Matrices.hh"
+#include "Hotshaders.hh"
 
 
 
@@ -287,7 +287,7 @@ public:
         };
 
         std::vector<std::string> texture_paths = {
-            texture_path+"MissingTextureBlock.png",
+            texture_path+"missingTextureBlock.png",
             texture_path+"grassTop.png",    // Indice 1 -> Erba Sopra
             texture_path+"dirt.png",         // Indice 2 -> Terra
             texture_path+"grassSide.png",   // ... 3 -> Lato Erba
