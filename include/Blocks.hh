@@ -39,6 +39,17 @@ namespace Blocks{
         }
     };
 
+    inline bool isBlockTransparent(BlockType type){
+        switch(type)
+        {
+        case BlockType::AIR:
+        case BlockType::LEAVES:
+            return false;
+        default:
+            return true;
+        }
+    }
+
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
     inline uint32_t getTextureIndex(BlockType type, BlockFace face)
     {

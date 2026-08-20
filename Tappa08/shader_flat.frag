@@ -9,6 +9,13 @@ uniform sampler2DArray textureArray;
 
 void main()
 {
-    // Campiona dalla Texture Array usando UV (2D) + Layer (1D)
-    FragColor = texture(textureArray, vec3(TexCoord, TexLayer));
+    vec4 texColor = texture(textureArray, vec3(TexCoord, TexLayer));
+
+    //Alpha test: scarta i pixel trasparenti invece di disegnarli neri.
+    //Niente blending necessario: la trasparenza delle foglie e' binaria (o c'e' o non c'e')
+    if(texColor.a < 0.5){
+        discard;
+    }
+
+    FragColor = texColor;
 }

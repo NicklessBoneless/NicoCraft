@@ -45,6 +45,11 @@ namespace Blocks
             {
                 return Get(x, y, z) != BlockType::AIR;
             }
+
+            bool IsTransparent(int x, int y, int z) const
+            {
+                return isBlockTransparent(Get(x, y, z));
+            }
     };
 
     struct Vertex
@@ -77,7 +82,7 @@ namespace Blocks
 
     using NeighborSolidFn = std::function<bool(int, int, int)>;
 
-    inline MeshData BuildChunkMesh(const Chunk& chunk, const NeighborSolidFn& isSolidOutside){
+    inline MeshData BuildChunkMesh(const Chunk& chunk, const NeighborSolidFn& isNeighborTransparent){
         MeshData mesh;
         for(int z = 0; z < CHUNK_SIZE_Z; ++z){
             for(int y = 0; y < CHUNK_SIZE_Y; ++y){
@@ -93,11 +98,9 @@ namespace Blocks
                         int ny = y + FACE_OFFSETS[i][1];
                         int nz = z + FACE_OFFSETS[i][2];
 
-                        //Se il vicino e' dentro lo stesso chunk usiamo il controllo normale,
-                        //altrimenti chiediamo alla funzione esterna di controllare nel chunk adiacente
-                        bool neighborSolid = chunk.InBounds(nx, ny, nz) ? chunk.IsSolid(nx, ny, nz) : isSolidOutside(nx, ny, nz);
-
-                        if(neighborSolid){
+                
+                        bool neighborTransparent = chunk.InBounds(nx, ny, nz) ? chunk.IsTransparent(nx, ny, nz) : isNeighborTransparent(nx, ny, nz);
+                        if(neighborTransparent){
                             continue;
                         }
                         uint32_t base = static_cast<uint32_t>(mesh.vertices.size());

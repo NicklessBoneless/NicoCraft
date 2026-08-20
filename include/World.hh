@@ -282,16 +282,16 @@ namespace fcg
 
         //Rigenera la mesh di una ChunkInstance leggendo lo stato attuale del chunk
         void RebuildChunkMesh(ChunkInstance& instance){
-            auto isSolidOutside = [this, &instance](int localX, int localY, int localZ){
-                return IsSolidWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
+            auto isTransparentOutside = [this, &instance](int localX, int localY, int localZ){
+                return IsTransparentWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
             };
-            auto meshData = Blocks::BuildChunkMesh(instance.chunk, isSolidOutside);
+            auto meshData = Blocks::BuildChunkMesh(instance.chunk, isTransparentOutside);
             instance.mesh.Upload(meshData);
         }
 
         //Controlla se e' solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
         //rispetto al chunk (chunkX, chunkZ), guardando nel chunk vicino se necessario
-        bool IsSolidWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
+        bool IsTransparentWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
             //Y non e' suddiviso in chunk: se esce sopra/sotto e' semplicemente aria
             if(localY < 0 || localY >= Blocks::CHUNK_SIZE_Y){
                 return false;
@@ -308,7 +308,7 @@ namespace fcg
             int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;
             int wrappedZ = ((localZ % Blocks::CHUNK_SIZE_Z) + Blocks::CHUNK_SIZE_Z) % Blocks::CHUNK_SIZE_Z;
 
-            return neighbor->IsSolid(wrappedX, localY, wrappedZ);
+            return neighbor->IsTransparent(wrappedX, localY, wrappedZ);
         }
 
         //Divisione intera "verso il basso" (floor): serve perche' l'operatore % di C++
