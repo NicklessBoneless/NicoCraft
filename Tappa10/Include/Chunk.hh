@@ -55,6 +55,7 @@ namespace Blocks
         float x, y, z;
         float u, v;
         float texture;
+        float brightness;
     };
 
     struct MeshData
@@ -77,6 +78,8 @@ namespace Blocks
     };
 
     constexpr float FACE_UV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
+    //Front, Back, Left, Right, Top, Bottom
+    constexpr float FACE_BRIGHTNESS[6] = { 0.75f, 0.75f, 0.75f, 0.75f, 1.f, 0.55f };
 
     using NeighborSolidFn = std::function<bool(int, int, int)>;
 
@@ -103,6 +106,7 @@ namespace Blocks
                         }
                         uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
                         float texture = static_cast<float>(getTextureIndex(type, face));
+                        float brightness = FACE_BRIGHTNESS[i];
 
                         for(int v = 0; v < 4; ++v){
                             mesh.vertices.push_back({
@@ -111,7 +115,8 @@ namespace Blocks
                                 z + FACE_VERTICES[i][v][2],
                                 FACE_UV[v][0], 
                                 FACE_UV[v][1], 
-                                texture
+                                texture,
+                                brightness
                             });
                         }
                         mesh.indices.insert(mesh.indices.end(),{ base+0, base+1, base+2, base+2, base+3, base+0 });
@@ -154,6 +159,8 @@ namespace Blocks
             glEnableVertexAttribArray(1);
             glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, texture));
             glEnableVertexAttribArray(2);
+            glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, brightness));
+            glEnableVertexAttribArray(3);
 
             glBindVertexArray(0);
         }

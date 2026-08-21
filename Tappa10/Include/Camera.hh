@@ -17,7 +17,7 @@ namespace fcg
         glm::mat4 projMatrix;
 
     private:
-        float fovDegrees = 70.0f;
+        float fovDegrees = 90.0f;
         float aspectRatio = 1.0f;
 
         glm::vec3 cameraPos = {40.0f, 40.0f, 40.0f};

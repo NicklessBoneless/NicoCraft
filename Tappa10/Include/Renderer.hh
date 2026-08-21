@@ -26,8 +26,17 @@ namespace fcg
         fcg::BlockOutline outline;
 
         GLint modelLoc = -1, viewLoc = -1, projLoc = -1;
+        GLint daylightLoc = -1;
 
+        //Ciclo giorno/notte: elapsedTime accumula i deltaTime passati a Draw(),
+        //daylightSpeed regola quanto e' lungo un ciclo completo (piu' basso = piu' lento)
+        float elapsedTime = 0.0f;
+        static constexpr float daylightSpeed = 0.2f; //Un ciclo completo dura circa 2*PI/daylightSpeed secondi (~63s)
+        static constexpr float minDaylight = 0.4f;   //Luminosita' minima (notte fonda)
+        static constexpr float maxDaylight = 1.0f;   //Luminosita' massima (pieno giorno)
 
+        const glm::vec3 daySky = {0.53f, 0.81f, 0.92f};   //Colore cielo di giorno (era il glClearColor fisso in Setup)
+        const glm::vec3 nightSky = {0.01f, 0.015f, 0.04f}; //Colore cielo di notte (blu scuro/quasi nero, niente componente rossa)
     public:
         Renderer(const std::vector<ShaderFiles>& shaderSets,
                 const std::string& res, int texturePixelSize) : 
@@ -40,12 +49,22 @@ namespace fcg
         }
 
         //Disegna un frame completo: mondo, outline del blocco puntato (se presente), crosshair
-        void Draw(const World& world, Camera& camera, const RaycastHit& target){
+        void Draw(const World& world, Camera& camera, const RaycastHit& target,float deltaTime){
+            elapsedTime += deltaTime;
+
+            //t oscilla tra 0 (notte piena) e 1 (giorno pieno) seguendo una sinusoide
+            float t = (glm::sin(elapsedTime * daylightSpeed) + 1.0f) * 0.5f;
+            float daylightFactor = minDaylight + (maxDaylight - minDaylight) * t;
+            glm::vec3 skyColor = nightSky + (daySky - nightSky) * t;
+
+            glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
+
             worldShader.use();
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &camera.viewMatrix[0][0]);
+            glUniform1f(daylightLoc, daylightFactor);
 
             textureArray.Bind(0);
 
@@ -89,6 +108,7 @@ namespace fcg
             modelLoc = glGetUniformLocation(worldShader.program, "model");
             viewLoc  = glGetUniformLocation(worldShader.program, "view");
             projLoc  = glGetUniformLocation(worldShader.program, "projection");
+            daylightLoc = glGetUniformLocation(worldShader.program, "daylightFactor");
 
             GLint samplerLoc = glGetUniformLocation(worldShader.program, "textureArray");
             glUniform1i(samplerLoc, 0);

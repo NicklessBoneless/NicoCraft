@@ -2,10 +2,12 @@
 
 in vec2 TexCoord;
 in float TexLayer; //Passato dal Vertex Shader
+in float Brightness; //Passato dal Vertex Shader
 
 out vec4 FragColor;
 
 uniform sampler2DArray textureArray;
+uniform float daylightFactor; //Fattore globale del ciclo giorno/notte, aggiornato da Renderer::Draw
 
 void main()
 {
@@ -16,6 +18,8 @@ void main()
     if(texColor.a < 0.5){
         discard;
     }
+
+    texColor.rgb *= Brightness * daylightFactor; //Shading per faccia moltiplicato per la luce globale del momento
 
     FragColor = texColor;
 }

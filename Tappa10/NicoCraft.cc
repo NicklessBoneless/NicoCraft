@@ -238,7 +238,7 @@ int main(){
 
         world.ProcessBlockInteractions(player, target, hotbar.GetSelectedBlockType());
 
-        renderer.Draw(world, player.getCamera(), target);
+        renderer.Draw(world, player.getCamera(), target,deltaTime);
 
         window.pushGLStates();
         hotbar.Draw(window);
