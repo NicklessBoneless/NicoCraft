@@ -52,8 +52,10 @@ namespace fcg{
                 {{Blocks::BlockType::GRASS}},
                 {{Blocks::BlockType::DIRT}},
                 {{Blocks::BlockType::STONE}},
-                {{Blocks::BlockType::WOOD}},
-                {{Blocks::BlockType::LEAVES}}
+                {{Blocks::BlockType::PLANK}},
+                {{Blocks::BlockType::LOGWOOD}},
+                {{Blocks::BlockType::LEAVES}},
+                {{Blocks::BlockType::GLASS}}
             };
 
             LoadTextures(resourcesDir);
@@ -74,6 +76,11 @@ namespace fcg{
             if(index >= 0 && index < (int) slots.size()){
                 selectedIndex = index;
             }
+        }
+
+        void ScrollSelected(int delta){
+            int count = (int) slots.size();
+            selectedIndex = ((selectedIndex + delta) % count + count) % count; //Modulo "sicuro" anche per delta negativi
         }
 
         void Draw(sf::RenderWindow& window){
@@ -110,11 +117,13 @@ namespace fcg{
 
             //Top/side per ciascun blocco mostrato in hotbar (stessa logica di getTextureIndex in Blocks.hh,
             //ma qui servono come sf::Texture separate, non nella TextureArray OpenGL del mondo)
-            LoadBlockTexture(resourcesDir, Blocks::BlockType::GRASS, "grassTop.png", "grassSide.png");
-            LoadBlockTexture(resourcesDir, Blocks::BlockType::DIRT,  "dirt.png",     "dirt.png");
-            LoadBlockTexture(resourcesDir, Blocks::BlockType::STONE, "stone.png",    "stone.png");
-            LoadBlockTexture(resourcesDir, Blocks::BlockType::WOOD,  "logTop.png",   "logSide.png");
-            LoadBlockTexture(resourcesDir, Blocks::BlockType::LEAVES,"leaves.png",   "leaves.png");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::GRASS,  "grassTop.png", "grassSide.png");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::DIRT,   "dirt.png",     "");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::STONE,  "stone.png",    "");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::PLANK,  "woodplank.png",   "");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::LOGWOOD,"logTop.png",   "logSide.png");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::LEAVES, "leaves.png",   "");
+            LoadBlockTexture(resourcesDir, Blocks::BlockType::GLASS,  "glass.png",   "");
         }
 
         void LoadBlockTexture(const std::string& resourcesDir, Blocks::BlockType type,
@@ -126,7 +135,7 @@ namespace fcg{
                     std::cerr << "Errore nel caricamento texture di fallback :-(" << std::endl;
                 }
             }
-            if(topFile == sideFile){
+            if(sideFile == ""){
                 topTextures[type] = top;
                 sideTextures[type] = top;
                 return;

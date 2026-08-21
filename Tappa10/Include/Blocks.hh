@@ -15,7 +15,8 @@ namespace Blocks{
         DIRT,
         GRASS,
         STONE,
-        WOOD,
+        PLANK,
+        LOGWOOD,
         LEAVES,
         GLASS
     };
@@ -38,6 +39,7 @@ namespace Blocks{
         GRASS_TOP,
         GRASS_SIDE,
         STONE,
+        PLANK,
         LOG_TOP,
         LOG_SIDE,
         LEAVES,
@@ -80,7 +82,10 @@ namespace Blocks{
         case BlockType::STONE:
             return static_cast<uint32_t>(TextureIndex::STONE);
 
-        case BlockType::WOOD:
+        case BlockType::PLANK:
+            return static_cast<uint32_t>(TextureIndex::PLANK);
+        
+        case BlockType::LOGWOOD:
             if(face == BlockFace::Top || face == BlockFace::Bottom) 
                 return static_cast<uint32_t>(TextureIndex::LOG_TOP);
             return static_cast<uint32_t>(TextureIndex::LOG_SIDE);
@@ -108,10 +113,11 @@ namespace Blocks{
             "grassTop.png",            // Index 2 -> GRASS_TOP
             "grassSide.png",           // Index 3 -> GRASS_SIDE
             "stone.png",               // Index 4 -> STONE
-            "logTop.png",              // Index 5 -> LOG_TOP
-            "logSide.png",             // Index 6 -> LOG_SIDE
-            "leaves.png",              // Index 7 -> LEAVES
-            "glass.png"                // Index 8 -> GLASS
+            "woodplank.png",           // Index 5 -> PLANK
+            "logTop.png",              // Index 6 -> LOG_TOP
+            "logSide.png",             // Index 7 -> LOG_SIDE
+            "leaves.png",              // Index 8 -> LEAVES
+            "glass.png"                // Index 9 -> GLASS
         };
 
         const int textureSize = 32;
@@ -122,19 +128,19 @@ namespace Blocks{
 
         // Carica una lista di percorsi immagini e le impila nella Texture Array
         void LoadTextures(const std::string& res) {
-            GLsizei textureCount = static_cast<GLsizei>(fileNames.size());
+            GLsizei numberOfTextures = static_cast<GLsizei>(fileNames.size());
 
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
 
             // Alloca lo spazio GPU per 'textureCount' immagini 2D
-            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, textureSize, textureSize, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, textureSize, textureSize, numberOfTextures, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             // Carica ogni singola immagine e la copia nel rispettivo layer z
-            for(GLsizei i = 0; i < textureCount; i++) {
+            for(GLsizei textureIndex = 0; textureIndex < numberOfTextures; textureIndex++) {
                 sf::Image img;
-                if(!img.loadFromFile(res + fileNames[i])) {
-                    std::cerr << "Errore nel caricamento della texture: " << res + fileNames[i] << std::endl;
+                if(!img.loadFromFile(res + fileNames[textureIndex])) {
+                    std::cerr << "Errore nel caricamento della texture: " << res + fileNames[textureIndex] << std::endl;
                     std::cerr << "Eseguo fallback!\n";
                     if(!img.loadFromFile(res + fileNames[0])) {
                         std::cerr << "Fallback fallito :-( !\n";
@@ -145,12 +151,12 @@ namespace Blocks{
                 // Necessario per non avere le texture capovolte
                 img.flipVertically();
 
-                // Copia i pixel dell'immagine nel layer 'i'
-                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, textureSize, textureSize, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
+                //Copia la texture nella posizione textureIndex dell'array di OpenGL
+                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, textureIndex, textureSize, textureSize, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
 
                 GLenum err = glGetError();
                 if(err != GL_NO_ERROR) {
-                    std::cerr << "GL error dopo texture " << i << ": " << err << std::endl;
+                    std::cerr << "GL error dopo texture " << textureIndex << ": " << err << std::endl;
                 }
             }
 

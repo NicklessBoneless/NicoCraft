@@ -67,7 +67,7 @@ namespace Blocks
         { 0, 0, 1}, { 0, 0,-1}, {-1, 0, 0}, { 1, 0, 0}, { 0, 1, 0}, { 0,-1, 0}
     };
 
-    constexpr float FACE_VERTS[6][4][3] = {
+    constexpr float FACE_VERTICES[6][4][3] = {
         {{0,0,1},{1,0,1},{1,1,1},{0,1,1}},
         {{1,0,0},{0,0,0},{0,1,0},{1,1,0}},
         {{0,0,0},{0,0,1},{0,1,1},{0,1,0}},
@@ -102,11 +102,16 @@ namespace Blocks
                             continue;
                         }
                         uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
-                        float layer = static_cast<float>(getTextureIndex(type, face));
+                        float texture = static_cast<float>(getTextureIndex(type, face));
 
                         for(int v = 0; v < 4; ++v){
                             mesh.vertices.push_back({
-                                x + FACE_VERTS[i][v][0], y + FACE_VERTS[i][v][1], z + FACE_VERTS[i][v][2],FACE_UV[v][0], FACE_UV[v][1], layer
+                                x + FACE_VERTICES[i][v][0], 
+                                y + FACE_VERTICES[i][v][1], 
+                                z + FACE_VERTICES[i][v][2],
+                                FACE_UV[v][0], 
+                                FACE_UV[v][1], 
+                                texture
                             });
                         }
                         mesh.indices.insert(mesh.indices.end(),{ base+0, base+1, base+2, base+2, base+3, base+0 });

@@ -107,6 +107,19 @@ void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, 
                 case sf::Keyboard::Scancode::Num5:
                     hotbar.SetSelected(4);
                     break;
+                case sf::Keyboard::Scancode::Num6:
+                    hotbar.SetSelected(5);
+                    break;
+                case sf::Keyboard::Scancode::Num7:
+                    hotbar.SetSelected(6);
+                    break;
+                case sf::Keyboard::Scancode::Num8:
+                    hotbar.SetSelected(6);
+                    break;
+                case sf::Keyboard::Scancode::Num9:
+                    hotbar.SetSelected(6);
+                    break;
+
                 default:
                     break; //Ignora gli altri tasti
             }
@@ -128,6 +141,13 @@ void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, 
                     break;
                 default:
                     break;
+            }
+        }
+        else if(const auto* mouseScrolled = event->getIf<sf::Event::MouseWheelScrolled>()){
+            if(mouseScrolled->wheel == sf::Mouse::Wheel::Vertical){
+                //delta > 0 = rotellina verso l'alto: avanti di uno slot; delta < 0 = indietro
+                int direction = mouseScrolled->delta > 0.0f ? 1 : -1;
+                hotbar.ScrollSelected(direction);
             }
         }
     }

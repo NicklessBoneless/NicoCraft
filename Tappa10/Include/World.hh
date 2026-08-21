@@ -228,7 +228,7 @@ namespace fcg
                         else chunk.Set(x, y, z, Blocks::BlockType::DIRT);
 
                         if(y == SURFACE - 1 && rand() % 100 >= 99){
-                            chunk.Set(x, y + 1, z, Blocks::BlockType::WOOD);
+                            chunk.Set(x, y + 1, z, Blocks::BlockType::LOGWOOD);
                             chunk.Set(x, y + 2, z, Blocks::BlockType::LEAVES);
                         }
                     }
