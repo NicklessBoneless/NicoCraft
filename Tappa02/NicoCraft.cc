@@ -6,12 +6,9 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
 
-#include "Blocks.hh" //Messo per primo per dipendenze
-#include "Matrices.hh"
-#include "Hotshaders.hh"
-
-
-
+#include "./Include/Blocks.hh" //Messo per primo per dipendenze
+#include "./Include/Matrices.hh"
+#include "./Include/Hotshaders.hh"
 
 const std::string dir = "../Tappa02/";
 const std::string res = "../Resources/";

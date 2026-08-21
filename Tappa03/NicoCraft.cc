@@ -5,8 +5,8 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
 
-#include "Blocks.hh" //Messo per primo per dipendenze
-#include "Chunk.hh"
+#include "./Include/Blocks.hh" //Messo per primo per dipendenze
+#include "./Include/Chunk.hh"
 
 const std::string dir = "../Tappa03/";
 const std::string res = "../Resources/";

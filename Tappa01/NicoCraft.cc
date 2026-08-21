@@ -9,8 +9,8 @@
 #include <iostream>
 #include <cstdlib>
 
-#include "Matrices.hh"
-#include "Hotshaders.hh"
+#include "./Include/Matrices.hh"
+#include "./Include/Hotshaders.hh"
 
 const std::string dir = "../Tappa01/";
 const std::string res = "../Resources/";
