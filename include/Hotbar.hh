@@ -41,7 +41,7 @@ namespace fcg{
         int windowHeight = 1080;
 
         static constexpr float slotSize = 72.0f;
-        static constexpr float slotPadding = 8.0f;
+        static constexpr float slotPadding = 0.0f;
         static constexpr float slotMargin = 20.0f;  //Distanza dal bordo inferiore dello schermo
         static constexpr float iconMargin = 10.0f;   //Margine tra il bordo dello slot e l'icona
 

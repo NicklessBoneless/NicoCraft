@@ -21,8 +21,8 @@ namespace fcg
         float aspectRatio = 1.0f;
 
         glm::vec3 cameraPos = {40.0f, 40.0f, 40.0f};
-        float yawDeg = -45.0f;
-        float pitchDeg = 25.0f;
+        float yawDeg = 0.0f;
+        float pitchDeg = 0.0f;
 
         const float mouseSensitivity = 0.15f;
 
@@ -39,6 +39,7 @@ namespace fcg
         }
 
         void Look(float deltaX, float deltaY){
+            std::cerr << yawDeg;
             yawDeg += deltaX * mouseSensitivity;
             pitchDeg += deltaY * mouseSensitivity;
             pitchDeg = pitchDeg > 89.9f ? 89.9f : pitchDeg;
@@ -57,6 +58,12 @@ namespace fcg
         //Impone direttamente la posizione della camera (usato quando e' il corpo fisico a comandare il movimento)
         void SetPosition(glm::vec3 position){
             cameraPos = position;
+            ViewProjection();
+        }
+
+        void SetOrientation(float yawDeg, float pitchDeg){
+            Camera::yawDeg = yawDeg;
+            Camera::pitchDeg = pitchDeg;
             ViewProjection();
         }
 

@@ -170,7 +170,6 @@ int main(){
     window.setMouseCursorVisible(false);
     window.setMouseCursorGrabbed(true);
     sf::Vector2i windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
-    sf::Mouse::setPosition(windowCenter, window);
 
     fcg::Player player;
     player.getCamera().SetWindowSize(Setup::window_width, Setup::window_height);
@@ -200,6 +199,7 @@ int main(){
 
     sf::Clock clock;
     bool programRunning = true;
+    sf::Mouse::setPosition(windowCenter, window); //Sync forzato prima di fidarci del delta
 
     while(programRunning){
         HandleEvents(window, player, hotbar, windowCenter, programRunning);
@@ -208,7 +208,12 @@ int main(){
 
         PlayerInput currentInput = CapturePlayerInput();
         player.UpdatePosition(deltaTime, world, currentInput);
-        UpdateMouseInput(window, player.getCamera(), windowCenter);
+
+       
+            UpdateMouseInput(window, player.getCamera(), windowCenter);
+        
+        
+        
 
         fcg::RaycastHit target = world.RaycastBlock(
             player.getCamera().getPosition(),

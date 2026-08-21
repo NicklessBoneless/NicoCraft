@@ -1,10 +1,12 @@
 #ifndef PLAYER_HH
 #define PLAYER_HH
 
+#include <iostream>
 #include "Camera.hh"
 #include "PlayerPhysics.hh"
 #include "PlayerInput.hh"
 #include "IWorld.hh"
+
 
 namespace fcg
 {
@@ -20,10 +22,14 @@ namespace fcg
 
         const float REACH_DISTANCE = 6.0f;
         static constexpr float sprintFovKick = 0.5f;
+        static constexpr float MinimumYaxis = -40.0f;
+        static constexpr glm::vec3 spawnPosition = {40.0f,40.f,40.0f};
+        static constexpr float spawnYawDeg = 0.0f;
+        static constexpr float spawnPitchDeg = 0.0f;
         float moveSpeed = 4.0f;
 
     public:
-        Player() : physics({40.0f, 40.0f, 40.0f}){
+        Player() : physics(spawnPosition){
             camera.SetPosition(physics.GetEyePosition());
         }
 
@@ -94,10 +100,24 @@ namespace fcg
             if(input.jump){
                 physics.Jump();
             }
-
+            
             glm::vec3 horizontalVelocity = camera.getHorizontalMovement(input) * moveSpeed;
             physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
+            CheckPlayerPosition();
             camera.SetPosition(physics.GetEyePosition());
+        }
+
+        void CheckPlayerPosition(){
+            //std::cerr << "feetY=" << physics.GetFeetPosition().y << std::endl; //DEBUG temporaneo
+            if(physics.GetFeetPosition().y < MinimumYaxis){
+                SpawnPlayer();
+            }
+        }
+
+        void SpawnPlayer(){
+            physics.Teleport(spawnPosition);
+            camera.SetPosition(physics.GetEyePosition());
+            camera.SetOrientation(spawnYawDeg, spawnPitchDeg);
         }
     };
 }
