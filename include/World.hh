@@ -171,23 +171,24 @@ namespace fcg
         //Traduce l'input in coda sul Player (break/place) in modifiche effettive al mondo.
         //E' logica di dominio (manipola i blocchi), non orchestrazione: per questo vive qui
         //e non in NicoCraft.cc
-        void ProcessBlockInteractions(Player& player, RaycastHit& target){
+        //Traduce l'input in coda sul Player (break/place) in modifiche effettive al mondo.
+        void ProcessBlockInteractions(Player& player, RaycastHit& target, Blocks::BlockType selectedBlockType){
             bool wantBreak = player.ConsumeBreakBlock();
             bool wantPlace = player.ConsumePlaceBlock();
 
             if(wantBreak && target.hit){
                 BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
                 target.hit = false;
+                return;
             }
-            else if(wantPlace && target.hit && target.hitFace >= 0){
+            if(wantPlace && target.hit && target.hitFace >= 0){
                 const auto& offset = Blocks::FACE_OFFSETS[target.hitFace];
                 int placeX = target.blockX + offset[0];
                 int placeY = target.blockY + offset[1];
                 int placeZ = target.blockZ + offset[2];
 
-                //Non si puo' piazzare un blocco dentro il volume occupato dal player
                 if(!player.IsPlayerOccupyingBlock(placeX, placeY, placeZ)){
-                    PlaceBlockWorld(placeX, placeY, placeZ, Blocks::BlockType::STONE);
+                    PlaceBlockWorld(placeX, placeY, placeZ, selectedBlockType);
                 }
             }
         }

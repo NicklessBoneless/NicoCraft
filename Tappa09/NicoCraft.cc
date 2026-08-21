@@ -6,10 +6,11 @@
 #include "Player.hh"
 #include "World.hh"
 #include "Renderer.hh"
+#include "Hotbar.hh"
 
-const std::string dir = "../Tappa08/";
+const std::string dir = "../Tappa09/";
 const std::string res = "../Resources/";
-const std::string winTitle = "NicoCraft - Tappa08";
+const std::string winTitle = "NicoCraft - Tappa09";
 const int TEXTUREPIXELSIZE = 32;
 
 
@@ -21,7 +22,7 @@ class Setup{
 public:
     static const int window_width = 1920;
     static const int window_height = 1080;
-    sf::Window window; //Senza usare pointer con new
+    sf::RenderWindow window; //Senza usare pointer con new
 
     Setup() : window(sf::VideoMode({window_width, window_height}), winTitle, sf::Style::Default, sf::State::Windowed, createSettings()){
         window.setVerticalSyncEnabled(true);
@@ -47,7 +48,7 @@ private:
         settings.depthBits = 32;
         settings.stencilBits = 8;
         settings.antiAliasingLevel = 4;
-        settings.attributeFlags = sf::ContextSettings::Attribute::Core;
+        settings.attributeFlags = sf::ContextSettings::Attribute::Default;
         settings.majorVersion = 4;
         settings.minorVersion = 1;
         return settings;
@@ -58,9 +59,10 @@ private:
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, sf::Vector2i& windowCenter){
+void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar, sf::Vector2i& windowCenter){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
+    hotbar.SetWindowSize(resized.size.x, resized.size.y);
     windowCenter = {(int)(resized.size.x / 2), (int)(resized.size.y / 2)};
 }
 
@@ -68,14 +70,14 @@ void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, sf::Vector2i
 // AUX Functions  //
 ////////////////////
 
-void HandleEvents(sf::Window& window, fcg::Player& player, sf::Vector2i& windowCenter, bool& programRunning){
+void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, sf::Vector2i& windowCenter, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            Handle(*resized, player.getCamera(), windowCenter);
+            Handle(*resized, player.getCamera(), hotbar, windowCenter);
             return;
         }
 
@@ -89,6 +91,21 @@ void HandleEvents(sf::Window& window, fcg::Player& player, sf::Vector2i& windowC
                     break;
                 case sf::Keyboard::Scancode::LShift:
                     player.StartSprint();
+                    break;
+                case sf::Keyboard::Scancode::Num1:
+                    hotbar.SetSelected(0);
+                    break;
+                case sf::Keyboard::Scancode::Num2:
+                    hotbar.SetSelected(1);
+                    break;
+                case sf::Keyboard::Scancode::Num3:
+                    hotbar.SetSelected(2);
+                    break;
+                case sf::Keyboard::Scancode::Num4:
+                    hotbar.SetSelected(3);
+                    break;
+                case sf::Keyboard::Scancode::Num5:
+                    hotbar.SetSelected(4);
                     break;
                 default:
                     break; //Ignora gli altri tasti
@@ -110,7 +127,7 @@ void HandleEvents(sf::Window& window, fcg::Player& player, sf::Vector2i& windowC
                     player.QueuePlaceBlock();
                     break;
                 default:
-                    break; //Ignora gli altri tasti del mouse
+                    break;
             }
         }
     }
@@ -148,22 +165,18 @@ PlayerInput CapturePlayerInput(){
 int main(){
     //// Startup ////
     Setup setup;
-    sf::Window& window = setup.window;
+    sf::RenderWindow& window = setup.window;
 
-    //Prendiamo e centriamo il cursore per la camera FPS
     window.setMouseCursorVisible(false);
     window.setMouseCursorGrabbed(true);
     sf::Vector2i windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
     sf::Mouse::setPosition(windowCenter, window);
 
-    //Player e camera
     fcg::Player player;
     player.getCamera().SetWindowSize(Setup::window_width, Setup::window_height);
 
-    //Mondo di gioco (simulazione: chunk, editing, raycast)
     fcg::World world;
 
-    //Renderer (shader, texture, crosshair, outline: tutto il disegno vive qui)
     fcg::Renderer renderer(
         dir + "shader_flat.vert", dir + "shader_flat.frag",
         dir + "shader_crosshair.vert", dir + "shader_crosshair.frag",
@@ -177,44 +190,39 @@ int main(){
         TEXTUREPIXELSIZE
     );
 
-    //Per migliorare la performance ;-)
+    fcg::Hotbar hotbar(res);
+    hotbar.SetWindowSize(Setup::window_width, Setup::window_height);
+
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glEnable(GL_DEPTH_TEST);
 
-    //// Main Loop ////
-    sf::Clock clock; //Utile per il deltaTime
+    sf::Clock clock;
     bool programRunning = true;
 
     while(programRunning){
-        //Eventi standard (chiusura finestra, toggle, click singoli)
-        HandleEvents(window, player, windowCenter, programRunning);
+        HandleEvents(window, player, hotbar, windowCenter, programRunning);
 
         float deltaTime = clock.restart().asSeconds();
 
-        //Cattura input di movimento (tick corrente)
         PlayerInput currentInput = CapturePlayerInput();
-
-        //Aggiorniamo il player (camera + fisica)
         player.UpdatePosition(deltaTime, world, currentInput);
-
-        //Mouse Input
         UpdateMouseInput(window, player.getCamera(), windowCenter);
 
-        //Raycast (Guardiamo il Blocco?)
         fcg::RaycastHit target = world.RaycastBlock(
             player.getCamera().getPosition(),
             player.getCamera().GetForward(),
             player.getReach()
         );
 
-        //Azioni sui blocchi (break/place)
-        world.ProcessBlockInteractions(player, target);
+        world.ProcessBlockInteractions(player, target, hotbar.GetSelectedBlockType());
 
-        //Rendering (mondo + outline + crosshair, tutto in un unico punto)
         renderer.Draw(world, player.getCamera(), target);
 
-        //Display finale!
+        window.pushGLStates();
+        hotbar.Draw(window);
+        window.popGLStates();
+
         window.display();
     }
 

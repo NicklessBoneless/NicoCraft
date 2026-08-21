@@ -87,7 +87,7 @@ namespace fcg{
         //Disegna il contorno posizionato sul blocco (blockX, blockY, blockZ), coordinate mondo
         void Draw(int blockX, int blockY, int blockZ, const glm::mat4& view, const glm::mat4& projection){
             glm::mat4 model = fcg::translation((float) blockX, (float) blockY, (float) blockZ); //Traslazione da 0,0,0
-            glm::mat4 vm = view * model; //Rotazione e spostamento attorno alla videocamera 
+            glm::mat4 vm =  view * model; //Rotazione e spostamento attorno alla videocamera 
             glm::mat4 pvm = projection * vm; //Proiezione dello spazio 3D in 2D
            
             shader.use();

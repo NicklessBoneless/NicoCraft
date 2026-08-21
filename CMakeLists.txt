@@ -75,7 +75,7 @@ add_executable(Tappa08 Tappa08/NicoCraft.cc)
 target_link_libraries(Tappa08 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
 
 add_executable(Tappa09 Tappa09/NicoCraft.cc) 
-target_link_libraries(Tappa08 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
+target_link_libraries(Tappa09 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
 
 
 
