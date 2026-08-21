@@ -182,12 +182,7 @@ int main(){
         {"crosshair", dir + "shader_crosshair.vert", dir + "shader_crosshair.frag"},
         {"outline",   dir + "shader_outline.vert",   dir + "shader_outline.frag"}
     },
-    {
-        res + "missingTextureBlock.png", res + "grassTop.png",
-        res + "dirt.png", res + "grassSide.png",
-        res + "stone.png", res + "logTop.png",
-        res + "logSide.png", res + "leaves.png"
-    },
+    res,
     TEXTUREPIXELSIZE);
 
     fcg::Hotbar hotbar(res);

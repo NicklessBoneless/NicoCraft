@@ -8,7 +8,6 @@
 #include <SFML/Graphics/Image.hpp>
 #include <glm/vec3.hpp>
 
-
 namespace Blocks{
     enum class BlockType : uint8_t
     {
@@ -31,16 +30,30 @@ namespace Blocks{
         Bottom     // -Y
     };
 
+    // Identificatori chiari per ogni layer nell'array di texture
+    enum class TextureIndex : uint32_t
+    {
+        MISSING = 0,
+        DIRT,
+        GRASS_TOP,
+        GRASS_SIDE,
+        STONE,
+        LOG_TOP,
+        LOG_SIDE,
+        LEAVES,
+        GLASS
+    };
+
     struct Block
     {
         BlockType type = BlockType::AIR;
 
-        bool isSolid() const{
+        bool isSolid() const {
             return type != BlockType::AIR;
         }
     };
 
-    inline bool isBlockTransparent(BlockType type){
+    inline bool isBlockTransparent(BlockType type) {
         switch(type)
         {
         case BlockType::AIR:
@@ -55,80 +68,93 @@ namespace Blocks{
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
     inline uint32_t getTextureIndex(BlockType type, BlockFace face)
     {
-        switch(type)
-        {
+        switch(type) {
         case BlockType::GRASS:
-            if(face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
-            if(face == BlockFace::Bottom) return 2; // Index 2: Terra
-            return 3;                           // Index 3: Lato Erba
+            if(face == BlockFace::Bottom) return static_cast<uint32_t>(TextureIndex::DIRT);
+            if(face == BlockFace::Top)    return static_cast<uint32_t>(TextureIndex::GRASS_TOP);
+            return static_cast<uint32_t>(TextureIndex::GRASS_SIDE);
         
         case BlockType::DIRT:
-            return 2; //Texture tutta uguale
+            return static_cast<uint32_t>(TextureIndex::DIRT);
 
         case BlockType::STONE:
-            return 4; //Tutta uguale
+            return static_cast<uint32_t>(TextureIndex::STONE);
 
         case BlockType::WOOD:
-            if(face == BlockFace::Top || face == BlockFace::Bottom) return 5; //Anelli del Tronco
-            return 6;                                               //Corteccia (lati)
+            if(face == BlockFace::Top || face == BlockFace::Bottom) 
+                return static_cast<uint32_t>(TextureIndex::LOG_TOP);
+            return static_cast<uint32_t>(TextureIndex::LOG_SIDE);
 
         case BlockType::LEAVES:
-            return 7;
+            return static_cast<uint32_t>(TextureIndex::LEAVES);
 
         case BlockType::GLASS:
-            return 8;
+            return static_cast<uint32_t>(TextureIndex::GLASS);
             
         default:
-            return 0; 
+            return static_cast<uint32_t>(TextureIndex::MISSING); 
         }
     }
 
-    //Gestione delle Texture Array OpenGL [GL_TEXTURE_2D_ARRAY]
-    class TextureArray{
+    // Gestione delle Texture Array OpenGL [GL_TEXTURE_2D_ARRAY]
+    class TextureArray {
     private:
         GLuint textureID = 0;
+
+        // L'ordine in questo vector corrisponde agli indici definiti in TextureIndex
+        const std::vector<std::string> fileNames = {
+            "missingTextureBlock.png", // Index 0 -> MISSING
+            "dirt.png",                // Index 1 -> DIRT
+            "grassTop.png",            // Index 2 -> GRASS_TOP
+            "grassSide.png",           // Index 3 -> GRASS_SIDE
+            "stone.png",               // Index 4 -> STONE
+            "logTop.png",              // Index 5 -> LOG_TOP
+            "logSide.png",             // Index 6 -> LOG_SIDE
+            "leaves.png",              // Index 7 -> LEAVES
+            "glass.png"                // Index 8 -> GLASS
+        };
+
+        const int textureSize = 32;
 
     public:
         TextureArray() = default;
         ~TextureArray() { Clean(); }
 
-        //Carica una lista di percorsi immagini e le impila nella Texture Array
-        void LoadTextures(const std::vector<std::string>& filepaths, int width = 32, int height = 32){
-            GLsizei textureCount = static_cast<GLsizei>(filepaths.size());
+        // Carica una lista di percorsi immagini e le impila nella Texture Array
+        void LoadTextures(const std::string& res) {
+            GLsizei textureCount = static_cast<GLsizei>(fileNames.size());
 
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
 
-            // Alloca lo spazio GPU per 'layerCount' immagini 2D
-            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            // Alloca lo spazio GPU per 'textureCount' immagini 2D
+            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, textureSize, textureSize, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             // Carica ogni singola immagine e la copia nel rispettivo layer z
-            for(GLsizei i = 0; i < textureCount; i++){
+            for(GLsizei i = 0; i < textureCount; i++) {
                 sf::Image img;
-                if(!img.loadFromFile(filepaths[i])){
-                    std::cerr << "Errore nel caricamento della texture: " << filepaths[i] << std::endl;
+                if(!img.loadFromFile(res + fileNames[i])) {
+                    std::cerr << "Errore nel caricamento della texture: " << res + fileNames[i] << std::endl;
                     std::cerr << "Eseguo fallback!\n";
-                    if(!img.loadFromFile(filepaths[0])){
-                      std::cerr << "Fallback fallito :-( !\n";
-                      continue;
+                    if(!img.loadFromFile(res + fileNames[0])) {
+                        std::cerr << "Fallback fallito :-( !\n";
+                        continue;
                     }
                 }
 
-                //Necessario per non prendere le texture rovesciate
+                // Necessario per non avere le texture capovolte
                 img.flipVertically();
 
-                
                 // Copia i pixel dell'immagine nel layer 'i'
-                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
+                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, textureSize, textureSize, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
 
                 GLenum err = glGetError();
-                if(err != GL_NO_ERROR){
+                if(err != GL_NO_ERROR) {
                     std::cerr << "GL error dopo texture " << i << ": " << err << std::endl;
                 }
-
             }
 
-            //Filtraggio stile pixel-art (Minecraft)
+            // Filtraggio stile pixel-art (Minecraft)
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -146,7 +172,7 @@ namespace Blocks{
 
         void Clean()
         {
-            if(textureID != 0){
+            if(textureID != 0) {
                 glDeleteTextures(1, &textureID);
                 textureID = 0;
             }

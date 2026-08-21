@@ -27,14 +27,15 @@ namespace fcg
 
         GLint modelLoc = -1, viewLoc = -1, projLoc = -1;
 
+
     public:
         Renderer(const std::vector<ShaderFiles>& shaderSets,
-                const std::vector<std::string>& texturePaths, int texturePixelSize) : 
+                const std::string& res, int texturePixelSize) : 
             worldShader(FindShaderFiles(shaderSets, "world").vertexFile,FindShaderFiles(shaderSets, "world").fragmentFile),
             crosshair(FindShaderFiles(shaderSets, "crosshair").vertexFile,FindShaderFiles(shaderSets, "crosshair").fragmentFile),
             outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile)
         {
-            InitializeTextures(texturePaths, texturePixelSize);
+            InitializeTextures(res);
             Locations();
         }
 
@@ -78,8 +79,8 @@ namespace fcg
             exit(1);
         }
 
-        void InitializeTextures(const std::vector<std::string>& texturePaths, int texturePixelSize){
-            textureArray.LoadTextures(texturePaths, texturePixelSize, texturePixelSize);
+        void InitializeTextures(const std::string& res){
+            textureArray.LoadTextures(res);
         }
 
         void Locations(){
