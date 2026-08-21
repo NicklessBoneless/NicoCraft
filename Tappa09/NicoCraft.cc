@@ -178,17 +178,18 @@ int main(){
     fcg::World world;
 
     fcg::Renderer renderer(
-        dir + "shader_flat.vert", dir + "shader_flat.frag",
-        dir + "shader_crosshair.vert", dir + "shader_crosshair.frag",
-        dir + "shader_outline.vert", dir + "shader_outline.frag",
-        {
-            res + "missingTextureBlock.png", res + "grassTop.png",
-            res + "dirt.png", res + "grassSide.png",
-            res + "stone.png", res + "logTop.png",
-            res + "logSide.png", res + "leaves.png"
-        },
-        TEXTUREPIXELSIZE
-    );
+    {
+        {"world",     dir + "shader_flat.vert",     dir + "shader_flat.frag"},
+        {"crosshair", dir + "shader_crosshair.vert", dir + "shader_crosshair.frag"},
+        {"outline",   dir + "shader_outline.vert",   dir + "shader_outline.frag"}
+    },
+    {
+        res + "missingTextureBlock.png", res + "grassTop.png",
+        res + "dirt.png", res + "grassSide.png",
+        res + "stone.png", res + "logTop.png",
+        res + "logSide.png", res + "leaves.png"
+    },
+    TEXTUREPIXELSIZE);
 
     fcg::Hotbar hotbar(res);
     hotbar.SetWindowSize(Setup::window_width, Setup::window_height);

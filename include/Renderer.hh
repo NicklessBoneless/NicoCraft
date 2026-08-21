@@ -28,13 +28,11 @@ namespace fcg
         GLint modelLoc = -1, viewLoc = -1, projLoc = -1;
 
     public:
-        Renderer(const std::string& worldVertexFile, const std::string& worldFragmentFile,
-                 const std::string& crosshairVertexFile, const std::string& crosshairFragmentFile,
-                 const std::string& outlineVertexFile, const std::string& outlineFragmentFile,
-                 const std::vector<std::string>& texturePaths, int texturePixelSize)
-            : worldShader(worldVertexFile, worldFragmentFile),
-              crosshair(crosshairVertexFile, crosshairFragmentFile),
-              outline(outlineVertexFile, outlineFragmentFile)
+        Renderer(const std::vector<ShaderFiles>& shaderSets,
+                const std::vector<std::string>& texturePaths, int texturePixelSize) : 
+            worldShader(FindShaderFiles(shaderSets, "world").vertexFile,FindShaderFiles(shaderSets, "world").fragmentFile),
+            crosshair(FindShaderFiles(shaderSets, "crosshair").vertexFile,FindShaderFiles(shaderSets, "crosshair").fragmentFile),
+            outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile)
         {
             InitializeTextures(texturePaths, texturePixelSize);
             Locations();
@@ -69,6 +67,17 @@ namespace fcg
         }
 
     private:
+        //Cerca nel vector lo ShaderFiles con il nome dato. Se manca, e' un errore di
+        //configurazione a monte (chi ha costruito Renderer si e' dimenticato uno shader):
+        //fermiamo il programma subito, stesso stile di errore usato in Hotshaders.hh
+        static const ShaderFiles& FindShaderFiles(const std::vector<ShaderFiles>& shaderSets, const std::string& name){
+            for(const ShaderFiles& s : shaderSets){
+                if(s.name == name) return s;
+            }
+            std::cerr << "Errore (Renderer): shader '" << name << "' non trovato tra quelle disponibili." << std::endl;
+            exit(1);
+        }
+
         void InitializeTextures(const std::vector<std::string>& texturePaths, int texturePixelSize){
             textureArray.LoadTextures(texturePaths, texturePixelSize, texturePixelSize);
         }

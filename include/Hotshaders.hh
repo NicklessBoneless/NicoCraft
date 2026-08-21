@@ -8,6 +8,12 @@
 
 namespace fcg
 {
+    struct ShaderFiles
+    {
+        std::string name;
+        std::string vertexFile;
+        std::string fragmentFile;
+    };
 
     // returns a C++ string loaded with the contents of a whole file
     inline std::string read_file (const std::string filename){
