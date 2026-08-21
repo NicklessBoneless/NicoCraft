@@ -7,11 +7,11 @@
 #include <cmath>
 #include <limits>
 
-#include "Blocks.hh" //Messo per primo per dipendenze
-#include "Chunk.hh"
-#include "Crosshair.hh"
-#include "BlockOutline.hh"
-#include "PlayerPhysics.hh"
+#include "./Include/Blocks.hh" //Messo per primo per dipendenze
+#include "./Include/Chunk.hh"
+#include "./Include/Crosshair.hh"
+#include "./Include/BlockOutline.hh"
+#include "./Include/PlayerPhysics.hh"
 
 const std::string dir = "../Tappa07/";
 const std::string res = "../Resources/";

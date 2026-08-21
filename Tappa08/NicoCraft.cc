@@ -3,9 +3,9 @@
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
 
-#include "Player.hh"
-#include "World.hh"
-#include "Renderer.hh"
+#include "./Include/Player.hh"
+#include "./Include/World.hh"
+#include "./Include/Renderer.hh"
 
 const std::string dir = "../Tappa08/";
 const std::string res = "../Resources/";
