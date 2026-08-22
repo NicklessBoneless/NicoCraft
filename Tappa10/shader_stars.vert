@@ -1,15 +1,27 @@
 #version 410 core
 
-layout (location = 0) in vec3 aDir; //Direzione unitaria sull'emisfero, generata una volta in Sky::BuildStars
+layout (location = 0) in vec3 aDir;
+layout (location = 1) in vec2 aCorner;
+layout (location = 2) in float aRotation;
 
 uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 cameraPos;
 uniform float starRadius;
-uniform float pointSize;
+uniform float starSize;
 
 void main(){
-    vec3 worldPos = cameraPos + aDir * starRadius;
+    //Ruota il corner locale (-1,-1)/(1,-1)/(1,1)/(-1,1) dell'angolo random della stella
+    float c = cos(aRotation);
+    float s = sin(aRotation);
+    vec2 rotatedCorner = vec2(aCorner.x * c - aCorner.y * s, aCorner.x * s + aCorner.y * c);
+
+    //Assi camera estratti dalla view matrix, per il billboard verso lo schermo
+    vec3 cameraRight = vec3(view[0][0], view[1][0], view[2][0]);
+    vec3 cameraUp    = vec3(view[0][1], view[1][1], view[2][1]);
+
+    vec3 worldPos = cameraPos + aDir * starRadius
+                  + (rotatedCorner.x * cameraRight + rotatedCorner.y * cameraUp) *starSize;
+
     gl_Position = projection * view * vec4(worldPos, 1.0);
-    gl_PointSize = pointSize;
 }

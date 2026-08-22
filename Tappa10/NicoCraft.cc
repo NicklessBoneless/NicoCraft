@@ -39,9 +39,6 @@ public:
         }
         std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
 
-        float pointSizeRange[2];
-        glGetFloatv(GL_SMOOTH_POINT_SIZE_RANGE, pointSizeRange);
-        std::cout << "Point size range: [" << pointSizeRange[0] << ", " << pointSizeRange[1] << "]" << std::endl;
         //glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     }
 
@@ -149,7 +146,7 @@ void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, 
         else if(const auto* mouseScrolled = event->getIf<sf::Event::MouseWheelScrolled>()){
             if(mouseScrolled->wheel == sf::Mouse::Wheel::Vertical){
                 //delta > 0 = rotellina verso l'alto: avanti di uno slot; delta < 0 = indietro
-                int direction = mouseScrolled->delta > 0.0f ? 1 : -1;
+                int direction = mouseScrolled->delta > 0.0f ? -1 : 1;
                 hotbar.ScrollSelected(direction);
             }
         }
