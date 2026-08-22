@@ -198,7 +198,7 @@ int main(){
     player.getCamera().SetWindowSize(Setup::window_width, Setup::window_height);
 
     glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per impostare gl_PointSize nel vertex shader delle stelle
-    glEnable(GL_POINT_SIZE);
+
 
     fcg::World world;
 

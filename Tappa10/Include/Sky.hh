@@ -20,7 +20,7 @@ namespace fcg{
     private:
         //// Stato temporale ////
         float elapsedTime = 0.0f;
-        static constexpr float daylightSpeed = 0.3f; //Un ciclo completo dura circa 2*PI/daylightSpeed secondi (~63s)
+        static constexpr float daylightSpeed = 0.1f; //Un ciclo completo dura circa 2*PI/daylightSpeed secondi (~63s)
         static constexpr float minDaylight = 0.3f;   //Luminosita' minima dei blocchi (notte fonda)
         static constexpr float maxDaylight = 1.0f;   //Luminosita' massima dei blocchi (pieno giorno)
 
