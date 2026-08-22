@@ -39,7 +39,10 @@ public:
         }
         std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
 
-        glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
+        float pointSizeRange[2];
+        glGetFloatv(GL_SMOOTH_POINT_SIZE_RANGE, pointSizeRange);
+        std::cout << "Point size range: [" << pointSizeRange[0] << ", " << pointSizeRange[1] << "]" << std::endl;
+        //glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     }
 
 private:
@@ -194,16 +197,20 @@ int main(){
     fcg::Player player;
     player.getCamera().SetWindowSize(Setup::window_width, Setup::window_height);
 
+    glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per impostare gl_PointSize nel vertex shader delle stelle
+    glEnable(GL_POINT_SIZE);
+
     fcg::World world;
 
-    fcg::Renderer renderer(
+        fcg::Renderer renderer(
     {
         {"world",     dir + "shader_flat.vert",     dir + "shader_flat.frag"},
         {"crosshair", dir + "shader_crosshair.vert", dir + "shader_crosshair.frag"},
-        {"outline",   dir + "shader_outline.vert",   dir + "shader_outline.frag"}
+        {"outline",   dir + "shader_outline.vert",   dir + "shader_outline.frag"},
     },
     res,
-    TEXTUREPIXELSIZE);
+    TEXTUREPIXELSIZE,
+    dir);
 
     fcg::Hotbar hotbar(res);
     hotbar.SetWindowSize(Setup::window_width, Setup::window_height);
@@ -211,6 +218,7 @@ int main(){
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glEnable(GL_DEPTH_TEST);
+    
 
     sf::Clock clock;
     bool programRunning = true;
@@ -223,13 +231,9 @@ int main(){
 
         PlayerInput currentInput = CapturePlayerInput();
         player.UpdatePosition(deltaTime, world, currentInput);
-
        
-            UpdateMouseInput(window, player.getCamera(), windowCenter);
+        UpdateMouseInput(window, player.getCamera(), windowCenter);
         
-        
-        
-
         fcg::RaycastHit target = world.RaycastBlock(
             player.getCamera().getPosition(),
             player.getCamera().GetForward(),

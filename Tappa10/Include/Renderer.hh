@@ -11,60 +11,51 @@
 #include "Camera.hh"
 #include "Crosshair.hh"
 #include "BlockOutline.hh"
+#include "Sky.hh"
 
 namespace fcg
 {
     //Tutto e solo il rendering: shader del mondo, texture array, uniform, draw call.
     //Non modifica mai lo stato del mondo e non gestisce input: legge World e Camera,
-    //disegna. Possiede anche Crosshair e BlockOutline, che prima venivano istanziati
-    //direttamente in main()
+    //disegna. Possiede anche Crosshair, BlockOutline e Sky (ciclo giorno/notte,
+    //Sole/Luna/stelle), che prima venivano istanziati direttamente in main()
     class Renderer{
     private:
         fcg::Shaders worldShader;
         Blocks::TextureArray textureArray;
         fcg::Crosshair crosshair;
         fcg::BlockOutline outline;
+        fcg::Sky sky;
 
-        GLint modelLoc = -1, viewLoc = -1, projLoc = -1;
-        GLint daylightLoc = -1;
+        GLint modelLoc = -1, viewLoc = -1, projLoc = -1, daylightLoc = -1;
 
-        //Ciclo giorno/notte: elapsedTime accumula i deltaTime passati a Draw(),
-        //daylightSpeed regola quanto e' lungo un ciclo completo (piu' basso = piu' lento)
-        float elapsedTime = 0.0f;
-        static constexpr float daylightSpeed = 0.2f; //Un ciclo completo dura circa 2*PI/daylightSpeed secondi (~63s)
-        static constexpr float minDaylight = 0.4f;   //Luminosita' minima (notte fonda)
-        static constexpr float maxDaylight = 1.0f;   //Luminosita' massima (pieno giorno)
-
-        const glm::vec3 daySky = {0.53f, 0.81f, 0.92f};   //Colore cielo di giorno (era il glClearColor fisso in Setup)
-        const glm::vec3 nightSky = {0.01f, 0.015f, 0.04f}; //Colore cielo di notte (blu scuro/quasi nero, niente componente rossa)
     public:
         Renderer(const std::vector<ShaderFiles>& shaderSets,
-                const std::string& res, int texturePixelSize) : 
+                const std::string& res, int texturePixelSize, const std::string& shaderDir) : 
             worldShader(FindShaderFiles(shaderSets, "world").vertexFile,FindShaderFiles(shaderSets, "world").fragmentFile),
             crosshair(FindShaderFiles(shaderSets, "crosshair").vertexFile,FindShaderFiles(shaderSets, "crosshair").fragmentFile),
-            outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile)
+            outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile),
+            sky(res, shaderDir)
         {
             InitializeTextures(res);
             Locations();
         }
 
-        //Disegna un frame completo: mondo, outline del blocco puntato (se presente), crosshair
-        void Draw(const World& world, Camera& camera, const RaycastHit& target,float deltaTime){
-            elapsedTime += deltaTime;
+        //Disegna un frame completo: cielo (Sole/Luna/stelle), mondo, outline del blocco
+        //puntato (se presente), crosshair. deltaTime fa avanzare il ciclo giorno/notte
+        void Draw(const World& world, Camera& camera, const RaycastHit& target, float deltaTime){
+            sky.Update(deltaTime);
 
-            //t oscilla tra 0 (notte piena) e 1 (giorno pieno) seguendo una sinusoide
-            float t = (glm::sin(elapsedTime * daylightSpeed) + 1.0f) * 0.5f;
-            float daylightFactor = minDaylight + (maxDaylight - minDaylight) * t;
-            glm::vec3 skyColor = nightSky + (daySky - nightSky) * t;
-
+            glm::vec3 skyColor = sky.GetSkyColor();
             glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
-
-            worldShader.use();
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            sky.Draw(camera);
+
+            worldShader.use();
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &camera.viewMatrix[0][0]);
-            glUniform1f(daylightLoc, daylightFactor);
+            glUniform1f(daylightLoc, sky.GetDaylightFactor());
 
             textureArray.Bind(0);
 
@@ -87,9 +78,6 @@ namespace fcg
         }
 
     private:
-        //Cerca nel vector lo ShaderFiles con il nome dato. Se manca, e' un errore di
-        //configurazione a monte (chi ha costruito Renderer si e' dimenticato uno shader):
-        //fermiamo il programma subito, stesso stile di errore usato in Hotshaders.hh
         static const ShaderFiles& FindShaderFiles(const std::vector<ShaderFiles>& shaderSets, const std::string& name){
             for(const ShaderFiles& s : shaderSets){
                 if(s.name == name) return s;
@@ -105,9 +93,9 @@ namespace fcg
         void Locations(){
             worldShader.use();
 
-            modelLoc = glGetUniformLocation(worldShader.program, "model");
-            viewLoc  = glGetUniformLocation(worldShader.program, "view");
-            projLoc  = glGetUniformLocation(worldShader.program, "projection");
+            modelLoc    = glGetUniformLocation(worldShader.program, "model");
+            viewLoc     = glGetUniformLocation(worldShader.program, "view");
+            projLoc     = glGetUniformLocation(worldShader.program, "projection");
             daylightLoc = glGetUniformLocation(worldShader.program, "daylightFactor");
 
             GLint samplerLoc = glGetUniformLocation(worldShader.program, "textureArray");
