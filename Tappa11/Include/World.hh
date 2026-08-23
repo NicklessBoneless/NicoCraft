@@ -226,14 +226,56 @@ namespace fcg
                         }
                         else if(y < SURFACE * 0.90) chunk.Set(x, y, z, Blocks::BlockType::STONE);
                         else chunk.Set(x, y, z, Blocks::BlockType::DIRT);
-
-                        if(y == SURFACE - 1 && rand() % 100 >= 99){
-                            chunk.Set(x, y + 1, z, Blocks::BlockType::LOGWOOD);
-                            chunk.Set(x, y + 2, z, Blocks::BlockType::LEAVES);
-                        }
                     }
                 }
             }
+        }
+
+        void GenerateTrees(Blocks::Chunk& chunk){
+            const int SURFACE = Blocks::CHUNK_SIZE_Y * 0.5;
+            const int MIN_TREE_DISTANCE = 3; //Distanza minima (in blocchi) tra due tronchi
+            const int TREEHEIGHT = 5 + SURFACE;
+            std::vector<std::pair<int,int>> treePositions; //Tronchi gia' piazzati in questo chunk (x,z)
+
+            //x/z partono da 1 e si fermano a CHUNK_SIZE-2: cosi' x-1, x+1, z-1, z+1 restano sempre in bounds
+            for(int x = 1; x < Blocks::CHUNK_SIZE_X - 1; x++){
+                for(int z = 1; z < Blocks::CHUNK_SIZE_Z - 1; z++){
+                    if((rand() % 100 + 1) < 99.99) continue; //Stessa probabilita' di prima
+
+                    if(IsTooCloseToOtherTree(x, z, treePositions, MIN_TREE_DISTANCE)) continue;
+
+                    treePositions.push_back({x, z});
+                    
+                    for(int i = SURFACE; i < TREEHEIGHT ; i++){
+                        chunk.Set(x, i, z, Blocks::BlockType::LOGWOOD);
+                    }
+
+                    for(int i = SURFACE + 3; i < TREEHEIGHT + 1; i++){
+                        if(i == SURFACE) continue;
+                        if(i == TREEHEIGHT) chunk.Set(x, i, z,Blocks::BlockType::LEAVES);
+                        chunk.Set(x + 1, i, z + 1, Blocks::BlockType::LEAVES);
+                        chunk.Set(x - 1, i, z - 1, Blocks::BlockType::LEAVES);
+                        chunk.Set(x - 1, i, z + 1, Blocks::BlockType::LEAVES);
+                        chunk.Set(x + 1, i, z - 1, Blocks::BlockType::LEAVES);
+                        chunk.Set(x + 1, i, z,     Blocks::BlockType::LEAVES);
+                        chunk.Set(x,     i, z + 1, Blocks::BlockType::LEAVES);
+                        chunk.Set(x,     i, z - 1, Blocks::BlockType::LEAVES);
+                        chunk.Set(x - 1, i, z,     Blocks::BlockType::LEAVES);
+                    }
+                }
+            }
+        }
+
+        //Controlla se (x,z) e' entro minDistance da un tronco gia' piazzato (distanza euclidea al quadrato,
+        //per evitare la sqrt)
+        static bool IsTooCloseToOtherTree(int x, int z, const std::vector<std::pair<int,int>>& treePositions, int minDistance){
+            int minDistanceSquared = minDistance * minDistance;
+            for(const auto& pos : treePositions){
+                int dx = x - pos.first;
+                int dz = z - pos.second;
+                if(dx * dx + dz * dz < minDistanceSquared) return true;
+            }
+            return false;
         }
 
         void GenerateAllChunks(){
@@ -245,6 +287,9 @@ namespace fcg
                     instance.chunkZ = chunkZ;
                     fillExistingChunks(instance.chunk);
                 }
+            }
+            for(ChunkInstance& instance: chunks){
+                GenerateTrees(instance.chunk);
             }
         }
 

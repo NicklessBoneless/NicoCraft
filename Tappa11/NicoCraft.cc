@@ -72,21 +72,8 @@ void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar&
 // AUX Functions  //
 ////////////////////
 
-//Applica una nuova risoluzione alla finestra vera e propria e a tutti gli oggetti
-//che dipendono dalle dimensioni dello schermo (Camera, Hotbar, MainMenu)
-void ApplyResolution(sf::RenderWindow& window, fcg::Camera& camera, fcg::Hotbar& hotbar, fcg::MainMenu& mainMenu, int width, int height){
-    window.setSize({(unsigned int) width, (unsigned int) height});
-    glViewport(0, 0, width, height);
-    camera.SetWindowSize(width, height);
-    hotbar.SetWindowSize(width, height);
-    mainMenu.SetWindowSize(width, height);
-}
-
-//Eventi durante lo stato MainMenu: resize, Esc per uscire, click sinistro sui tasti del
-//menu (Genera Mondo/Opzioni/Esci nella schermata principale, FOV/risoluzione/Indietro
-//in quella Opzioni). FOV e risoluzione vengono applicati subito, cosi' l'utente vede
-//l'effetto in tempo reale mentre e' ancora nel menu
-void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, fcg::Player& player, fcg::Hotbar& hotbar, GameState& state, bool& programRunning){
+//Eventi durante lo stato MainMenu: resize, Esc per uscire, click sinistro sui tasti del menu
+void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
@@ -108,21 +95,13 @@ void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, fcg::Pl
         else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
             if(mousePressed->button == sf::Mouse::Button::Left){
                 fcg::MainMenu::MenuAction action = mainMenu.HandleClick(mousePressed->position);
-                switch(action){
-                    case fcg::MainMenu::MenuAction::GenerateWorld:
-                        state = GameState::Playing;
-                        return;
-                    case fcg::MainMenu::MenuAction::Exit:
-                        programRunning = false;
-                        return;
-                    case fcg::MainMenu::MenuAction::FovChanged:
-                        player.getCamera().SetFov(mainMenu.GetFov());
-                        break;
-                    case fcg::MainMenu::MenuAction::ResolutionChanged:
-                        ApplyResolution(window, player.getCamera(), hotbar, mainMenu, mainMenu.GetResolutionWidth(), mainMenu.GetResolutionHeight());
-                        break;
-                    default:
-                        break; //MenuAction::None: navigazione interna gia' gestita da HandleClick
+                if(action == fcg::MainMenu::MenuAction::GenerateWorld){
+                    state = GameState::Playing;
+                    return;
+                }
+                if(action == fcg::MainMenu::MenuAction::Exit){
+                    programRunning = false;
+                    return;
                 }
             }
         }
@@ -243,6 +222,7 @@ PlayerInput CapturePlayerInput(){
 //////////
 
 int main(){
+    srand (time(0));
     //// Startup ////
     Setup setup;
     sf::RenderWindow& window = setup.window;
@@ -263,7 +243,6 @@ int main(){
 
     fcg::Player player;
     player.getCamera().SetWindowSize(Setup::window_width, Setup::window_height);
-    player.getCamera().SetFov(mainMenu.GetFov()); //Allinea la Camera al FOV di default del menu
 
     //Il mondo NON viene creato qui: nasce (con generazione dei chunk) solo alla
     //pressione di "Genera Mondo" nel menu, vedi il ramo MainMenu del game loop
@@ -289,7 +268,7 @@ int main(){
 
     while(programRunning){
         if(state == GameState::MainMenu){
-            HandleMenuEvents(window, mainMenu, player, hotbar, state, programRunning);
+            HandleMenuEvents(window, mainMenu, state, programRunning);
             if(!programRunning) break;
 
             if(state == GameState::Playing){

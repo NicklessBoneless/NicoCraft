@@ -1,3 +1,7 @@
+#ifndef CHUNK_HH
+#define CHUNK_HH
+
+
 #include "Blocks.hh"
 #include "Matrices.hh"
 #include "Hotshaders.hh"
@@ -182,3 +186,5 @@ namespace Blocks
         }
     };
 }
+
+#endif
