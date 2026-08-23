@@ -2,17 +2,21 @@
 #include "glad/gl.h"
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
+#include <memory>
 
 #include "./Include/Player.hh"
 #include "./Include/World.hh"
 #include "./Include/Renderer.hh"
 #include "./Include/Hotbar.hh"
+#include "./Include/MainMenu.hh"
 
 const std::string dir = "../Tappa11/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa11";
 const int TEXTUREPIXELSIZE = 32;
 
+//Stato di alto livello del programma: MainMenu (nessun mondo ancora generato) o Playing
+enum class GameState{ MainMenu, Playing };
 
 /////////////////////////////
 // Window and OpenGL setup //
@@ -38,8 +42,6 @@ public:
             exit(1);
         }
         std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
-
-        //glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     }
 
 private:
@@ -70,6 +72,64 @@ void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar&
 // AUX Functions  //
 ////////////////////
 
+//Applica una nuova risoluzione alla finestra vera e propria e a tutti gli oggetti
+//che dipendono dalle dimensioni dello schermo (Camera, Hotbar, MainMenu)
+void ApplyResolution(sf::RenderWindow& window, fcg::Camera& camera, fcg::Hotbar& hotbar, fcg::MainMenu& mainMenu, int width, int height){
+    window.setSize({(unsigned int) width, (unsigned int) height});
+    glViewport(0, 0, width, height);
+    camera.SetWindowSize(width, height);
+    hotbar.SetWindowSize(width, height);
+    mainMenu.SetWindowSize(width, height);
+}
+
+//Eventi durante lo stato MainMenu: resize, Esc per uscire, click sinistro sui tasti del
+//menu (Genera Mondo/Opzioni/Esci nella schermata principale, FOV/risoluzione/Indietro
+//in quella Opzioni). FOV e risoluzione vengono applicati subito, cosi' l'utente vede
+//l'effetto in tempo reale mentre e' ancora nel menu
+void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, fcg::Player& player, fcg::Hotbar& hotbar, GameState& state, bool& programRunning){
+    while(const std::optional event = window.pollEvent()){
+        if(event->is<sf::Event::Closed>()){
+            programRunning = false;
+            return;
+        }
+
+        if(const auto* resized = event->getIf<sf::Event::Resized>()){
+            glViewport(0, 0, resized->size.x, resized->size.y);
+            mainMenu.SetWindowSize(resized->size.x, resized->size.y);
+            return;
+        }
+
+        if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
+            if(keyPressed->scancode == sf::Keyboard::Scancode::Escape){
+                programRunning = false;
+                return;
+            }
+        }
+        else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
+            if(mousePressed->button == sf::Mouse::Button::Left){
+                fcg::MainMenu::MenuAction action = mainMenu.HandleClick(mousePressed->position);
+                switch(action){
+                    case fcg::MainMenu::MenuAction::GenerateWorld:
+                        state = GameState::Playing;
+                        return;
+                    case fcg::MainMenu::MenuAction::Exit:
+                        programRunning = false;
+                        return;
+                    case fcg::MainMenu::MenuAction::FovChanged:
+                        player.getCamera().SetFov(mainMenu.GetFov());
+                        break;
+                    case fcg::MainMenu::MenuAction::ResolutionChanged:
+                        ApplyResolution(window, player.getCamera(), hotbar, mainMenu, mainMenu.GetResolutionWidth(), mainMenu.GetResolutionHeight());
+                        break;
+                    default:
+                        break; //MenuAction::None: navigazione interna gia' gestita da HandleClick
+                }
+            }
+        }
+    }
+}
+
+//Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente
 void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, sf::Vector2i& windowCenter, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
@@ -187,19 +247,29 @@ int main(){
     Setup setup;
     sf::RenderWindow& window = setup.window;
 
-    window.setMouseCursorVisible(false);
-    window.setMouseCursorGrabbed(true);
-    sf::Vector2i windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
+    glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per impostare gl_PointSize nel vertex shader delle stelle
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glEnable(GL_DEPTH_TEST);
+
+    GameState state = GameState::MainMenu;
+
+    fcg::MainMenu mainMenu(res);
+    mainMenu.SetWindowSize(Setup::window_width, Setup::window_height);
+
+    //Nel menu il cursore resta visibile e libero, per poter cliccare sui tasti
+    window.setMouseCursorVisible(true);
+    window.setMouseCursorGrabbed(false);
 
     fcg::Player player;
     player.getCamera().SetWindowSize(Setup::window_width, Setup::window_height);
+    player.getCamera().SetFov(mainMenu.GetFov()); //Allinea la Camera al FOV di default del menu
 
-    glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per impostare gl_PointSize nel vertex shader delle stelle
+    //Il mondo NON viene creato qui: nasce (con generazione dei chunk) solo alla
+    //pressione di "Genera Mondo" nel menu, vedi il ramo MainMenu del game loop
+    std::unique_ptr<fcg::World> world;
 
-
-    fcg::World world;
-
-        fcg::Renderer renderer(
+    fcg::Renderer renderer(
     {
         {"world",     dir + "shader_flat.vert",     dir + "shader_flat.frag"},
         {"crosshair", dir + "shader_crosshair.vert", dir + "shader_crosshair.frag"},
@@ -212,34 +282,59 @@ int main(){
     fcg::Hotbar hotbar(res);
     hotbar.SetWindowSize(Setup::window_width, Setup::window_height);
 
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glEnable(GL_DEPTH_TEST);
-    
+    sf::Vector2i windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
 
     sf::Clock clock;
     bool programRunning = true;
-    sf::Mouse::setPosition(windowCenter, window); //Sync forzato prima di fidarci del delta
 
     while(programRunning){
+        if(state == GameState::MainMenu){
+            HandleMenuEvents(window, mainMenu, player, hotbar, state, programRunning);
+            if(!programRunning) break;
+
+            if(state == GameState::Playing){
+                //Transizione menu -> gioco: SOLO ora nasce il mondo (chunk + mesh)
+                world = std::make_unique<fcg::World>();
+
+                window.setMouseCursorVisible(false);
+                window.setMouseCursorGrabbed(true);
+                windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
+                sf::Mouse::setPosition(windowCenter, window);
+
+                clock.restart(); //Evita un deltaTime enorme dovuto al tempo passato nel menu
+                continue;
+            }
+
+            mainMenu.UpdateHover(sf::Mouse::getPosition(window));
+
+            window.clear(sf::Color(18, 18, 26));
+            window.pushGLStates();
+            mainMenu.Draw(window);
+            window.popGLStates();
+            window.display();
+            continue;
+        }
+
+        //// state == GameState::Playing ////
         HandleEvents(window, player, hotbar, windowCenter, programRunning);
+        if(!programRunning) break;
 
         float deltaTime = clock.restart().asSeconds();
 
         PlayerInput currentInput = CapturePlayerInput();
-        player.UpdatePosition(deltaTime, world, currentInput);
-       
+        player.UpdatePosition(deltaTime, *world, currentInput);
+
         UpdateMouseInput(window, player.getCamera(), windowCenter);
-        
-        fcg::RaycastHit target = world.RaycastBlock(
+
+        fcg::RaycastHit target = world->RaycastBlock(
             player.getCamera().getPosition(),
             player.getCamera().GetForward(),
             player.getReach()
         );
 
-        world.ProcessBlockInteractions(player, target, hotbar.GetSelectedBlockType());
+        world->ProcessBlockInteractions(player, target, hotbar.GetSelectedBlockType());
 
-        renderer.Draw(world, player.getCamera(), target,deltaTime);
+        renderer.Draw(*world, player.getCamera(), target, deltaTime);
 
         window.pushGLStates();
         hotbar.Draw(window);

@@ -122,6 +122,16 @@ namespace fcg
             ViewProjection();
         }
 
+        //Imposta il FOV in modo assoluto (usato dal menu Opzioni)
+        void SetFov(float fov){
+            fovDegrees = fov;
+            ViewProjection();
+        }
+
+        float GetFov() const{
+            return fovDegrees;
+        }
+
         glm::mat4 ViewProjection(){
             float nearPlane = 0.1f;
             float farPlane = 100.0f;
