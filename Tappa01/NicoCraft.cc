@@ -19,16 +19,14 @@ const std::string res = "../Resources/";
 // Window and OpenGL setup //
 /////////////////////////////
 
-class Setup
-{
+class Setup{
 public:
     //Width x Height 
     static const int window_width = 1920;
     static const int window_height = 1080;
     sf::Window* window;
 
-    Setup ()
-    {
+    Setup (){
         sf::ContextSettings settings; //SFML Options
         settings.depthBits = 32;
         settings.stencilBits = 8;
@@ -108,7 +106,6 @@ private:
         { sf::Keyboard::Key::LControl, { 0.0f,-1.0f,  0.0f} },
     };
 
-
 public:
     Camera ()
     {
@@ -136,8 +133,7 @@ public:
 
     void Look (float x, float y)
     {
-        if (!looking)
-            return;
+        if (!looking) return;
 
         float dx = x - lastMouseX;
         float dy = y - lastMouseY;
@@ -146,8 +142,8 @@ public:
 
         phiDeg += dx * mouseSensitivity;
         thetaDeg += dy * mouseSensitivity;
-        thetaDeg = thetaDeg > 89.0f ? 89.0f : thetaDeg;
-        thetaDeg = thetaDeg < -89.0f ? -89.0f : thetaDeg;
+        thetaDeg = thetaDeg > 90.0f ? 90.0f : thetaDeg;
+        thetaDeg = thetaDeg < -90.0f ? -90.0f : thetaDeg;
 
         ViewProjection ();
     }
