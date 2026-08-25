@@ -136,8 +136,8 @@ public:
 
         phiDeg += dx * mouseSensitivity;
         thetaDeg += dy * mouseSensitivity;
-        thetaDeg = thetaDeg > 89.0f ? 89.0f : thetaDeg;
-        thetaDeg = thetaDeg < -89.0f ? -89.0f : thetaDeg;
+        thetaDeg = thetaDeg > 90.0f ? 90.0f : thetaDeg;
+        thetaDeg = thetaDeg < -90.0f ? -90.0f : thetaDeg;
 
         ViewProjection ();
     }
