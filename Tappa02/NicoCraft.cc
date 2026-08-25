@@ -194,15 +194,15 @@ public:
         float a = (fcp + ncp) / (ncp - fcp); //
         float b = 2.0f * fcp * ncp / (ncp - fcp); //
 
-        // Salvala direttamente in 'pr' della classe[cite: 3]
+        // Salvala direttamente in 'pr' della classe
         pr = glm::mat4(
             fd,  0.0,     0.0,  0.0,
             0.0, fd * ar, 0.0,  0.0,
             0.0, 0.0,       a, -1.0,
             0.0, 0.0,       b,  0.0
-        ); //[cite: 3]
+        );
 
-        return pr * v; //[cite: 3]
+        return pr * v;
     }
 };
 
@@ -426,7 +426,7 @@ int main (){
 
     Scene scene (shaders);
 
-    glEnable (GL_CULL_FACE); //[cite: 3]
+    glEnable (GL_CULL_FACE); 
     glCullFace (GL_BACK);
 
     glEnable (GL_DEPTH_TEST);
