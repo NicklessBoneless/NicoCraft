@@ -67,8 +67,7 @@ public:
 // Camera         //
 ////////////////////
 
-class Camera
-{
+class Camera{
 public:
     glm::mat4 v;
     glm::mat4 vp;
@@ -107,32 +106,27 @@ private:
     };
 
 public:
-    Camera ()
-    {
+    Camera (){
         SetWindowSize (Setup::window_width, Setup::window_height);
         ViewProjection ();
     }
 
-    void SetWindowSize (int w, int h)
-    {
+    void SetWindowSize (int w, int h){
         ar = ((float) w) / (float) h;
         ViewProjection ();
     }
 
-    void StartLook (float x, float y)
-    {
+    void StartLook (float x, float y){
         looking = true;
         lastMouseX = x;
         lastMouseY = y;
     }
 
-    void StopLook ()
-    {
+    void StopLook (){
         looking = false;
     }
 
-    void Look (float x, float y)
-    {
+    void Look (float x, float y){
         if (!looking) return;
 
         float dx = x - lastMouseX;
@@ -148,8 +142,7 @@ public:
         ViewProjection ();
     }
 
-    void Move (float dt)
-    {
+    void Move (float dt){
         float phiRad = glm::radians (phiDeg);
 
         glm::vec3 forward = { glm::sin (phiRad), 0.0f, -glm::cos (phiRad) };
@@ -188,8 +181,7 @@ public:
         }
     }
 
-    void ViewProjection ()
-    {
+    void ViewProjection (){
         float ncp = 0.1f;
         float fcp = 100.0f;
 
@@ -216,8 +208,7 @@ public:
 // Cube (texture, niente luce dinamica) //
 ////////////////////
 
-class GPUCube
-{
+class GPUCube{
 private:
     GLuint vbo;
     GLuint vao;
@@ -227,8 +218,7 @@ public:
     GPUCube (const std::string& texture_path) { Load (texture_path); }
     ~GPUCube () { Clean (); }
 
-    void Load (const std::string& texture_path)
-    {
+    void Load (const std::string& texture_path){
         // pos (3) + uv (2) = 5 float per vertice (niente normali: non servono più)
         static const float vertices[] = {
             // Front (+Z)
@@ -327,15 +317,13 @@ public:
                     GL_RGBA, GL_UNSIGNED_BYTE, image.getPixelsPtr ());
     }
 
-    void Clean ()
-    {
+    void Clean (){
         glDeleteVertexArrays (1, &vao);
         glDeleteBuffers (1, &vbo);
         glDeleteTextures (1, &texture);
     }
 
-    void Draw ()
-    {
+    void Draw (){
         glActiveTexture (GL_TEXTURE0);
         glBindTexture (GL_TEXTURE_2D, texture);
         glBindVertexArray (vao);
@@ -349,8 +337,7 @@ public:
 // Scene           //
 ////////////////////
 
-class Scene
-{
+class Scene{
 public:
     Camera camera;
     GPUCube cube;
@@ -360,19 +347,16 @@ private:
     GLint vp_loc;
 
 public:
-    Scene (fcg::Shaders& shaders) : cube (dir + "block.png")
-    {
+    Scene (fcg::Shaders& shaders) : cube (dir + "block.png"){
         Locations (shaders);
     }
 
-    void Locations (fcg::Shaders& shaders)
-    {
+    void Locations (fcg::Shaders& shaders){
         model_loc = glGetUniformLocation (shaders.program, "model");
         vp_loc = glGetUniformLocation (shaders.program, "vp");
     }
 
-    void Draw ()
-    {
+    void Draw (){
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUniformMatrix4fv (vp_loc, 1, GL_FALSE, &camera.vp[0][0]);
@@ -388,15 +372,13 @@ public:
 // Game  Bindings //
 ////////////////////
 
-struct keyBindings
-{
+struct keyBindings{
     sf::Keyboard::Scancode key;
     std::function<void()> PressKey;
     std::function<void()> ReleaseKey = nullptr;
 };
 
-std::vector<keyBindings>ActionsKeyBindings (Scene& scene)
-{
+std::vector<keyBindings>ActionsKeyBindings (Scene& scene){
     return {
         { sf::Keyboard::Scancode::Escape, [] () { exit (0); } },
         { 
@@ -412,8 +394,7 @@ std::vector<keyBindings>ActionsKeyBindings (Scene& scene)
 // SFML Callbacks //
 ////////////////////
 
-void Handle (const sf::Event::Resized& resized, Camera& camera)
-{
+void Handle (const sf::Event::Resized& resized, Camera& camera){
     glViewport (0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize (resized.size.x, resized.size.y);
 }
@@ -422,8 +403,7 @@ void Handle (const sf::Event::Resized& resized, Camera& camera)
 // Main //
 //////////
 
-int main ()
-{
+int main (){
     //// Startup ////
 
     Setup setup;
@@ -444,10 +424,8 @@ int main ()
     std::vector<keyBindings> bindings = ActionsKeyBindings(scene);
     sf::Clock clock;
     bool running = true;
-    while (running)
-    {
-        while (const std::optional event = window.pollEvent ())
-        {
+    while (running){
+        while (const std::optional event = window.pollEvent ()){
             if (event->is<sf::Event::Closed> ())
                 running = false;
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
