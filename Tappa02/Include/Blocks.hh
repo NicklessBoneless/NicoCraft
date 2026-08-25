@@ -46,9 +46,9 @@ namespace Blocks{
         case BlockType::AIR:
         case BlockType::LEAVES:
         case BlockType::GLASS:
-            return false;
-        default:
             return true;
+        default:
+            return false;
         }
     }
 
