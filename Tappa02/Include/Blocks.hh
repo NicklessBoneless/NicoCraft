@@ -10,8 +10,7 @@
 
 
 namespace Blocks{
-    enum class BlockType : uint8_t
-    {
+    enum class BlockType : uint8_t{
         AIR = 0,
         DIRT,
         GRASS,
@@ -21,8 +20,7 @@ namespace Blocks{
         GLASS
     };
 
-    enum class BlockFace : uint8_t
-    {
+    enum class BlockFace : uint8_t{
         Front = 0, // +Z
         Back,      // -Z
         Left,      // -X
@@ -31,8 +29,7 @@ namespace Blocks{
         Bottom     // -Y
     };
 
-    struct Block
-    {
+    struct Block{
         BlockType type = BlockType::AIR;
 
         bool isSolid() const{
@@ -41,26 +38,23 @@ namespace Blocks{
     };
 
     inline bool isBlockTransparent(BlockType type){
-        switch(type)
-        {
-        case BlockType::AIR:
-        case BlockType::LEAVES:
-        case BlockType::GLASS:
-            return true;
-        default:
-            return false;
+        switch(type){
+            case BlockType::AIR:
+            case BlockType::LEAVES:
+            case BlockType::GLASS:
+                return true;
+            default:
+                return false;
         }
     }
 
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
-    inline uint32_t getTextureIndex(BlockType type, BlockFace face)
-    {
-        switch(type)
-        {
+    inline uint32_t getTextureIndex(BlockType type, BlockFace face){
+        switch(type){
         case BlockType::GRASS:
             if(face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
             if(face == BlockFace::Bottom) return 2; // Index 2: Terra
-            return 3;                           // Index 3: Lato Erba
+            return 3;                               // Index 3: Lato Erba
         
         case BlockType::DIRT:
             return 2; //Texture tutta uguale
@@ -99,10 +93,10 @@ namespace Blocks{
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
 
-            // Alloca lo spazio GPU per 'layerCount' immagini 2D
+            //Alloca lo spazio GPU per 'layerCount' immagini 2D
             glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, textureCount, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-            // Carica ogni singola immagine e la copia nel rispettivo layer z
+            //Carica ogni singola immagine e la copia nel rispettivo layer z
             for(GLsizei i = 0; i < textureCount; i++){
                 sf::Image img;
                 if(!img.loadFromFile(filepaths[i])){
@@ -138,14 +132,12 @@ namespace Blocks{
             glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
         }
 
-        void Bind(GLuint unit = 0) const
-        {
+        void Bind(GLuint unit = 0) const{
             glActiveTexture(GL_TEXTURE0 + unit);
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
         }
 
-        void Clean()
-        {
+        void Clean(){
             if(textureID != 0){
                 glDeleteTextures(1, &textureID);
                 textureID = 0;

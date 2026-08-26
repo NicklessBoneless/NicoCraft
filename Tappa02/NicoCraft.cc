@@ -18,14 +18,16 @@ const std::string winTitle = "NicoCraft - Tappa02";
 // Window and OpenGL setup //
 /////////////////////////////
 
-class Setup{
+class Setup
+{
 public:
     //Width x Height 
     static const int window_width = 1920;
     static const int window_height = 1080;
     sf::Window* window;
 
-    Setup (){
+    Setup ()
+    {
         sf::ContextSettings settings; //SFML Options
         settings.depthBits = 32;
         settings.stencilBits = 8;
@@ -66,7 +68,8 @@ public:
 // Camera         //
 ////////////////////
 
-class Camera{
+class Camera
+{
 public:
     glm::mat4 v;
     glm::mat4 vp;
@@ -89,7 +92,8 @@ private:
 
     // Ad ogni tasto è correllata una direzione di movimento in coordinate della camera.
     // Ogni riga corrisponde ad un input di movimento
-    struct MovementBindings{
+    struct MovementBindings
+    {
         sf::Keyboard::Key key;
         glm::vec3 direction; // in coordinate locali: x=right, y=up, z=forward
     };
@@ -105,27 +109,32 @@ private:
 
 
 public:
-    Camera (){
+    Camera ()
+    {
         SetWindowSize (Setup::window_width, Setup::window_height);
         ViewProjection ();
     }
 
-    void SetWindowSize (int w, int h){
+    void SetWindowSize (int w, int h)
+    {
         ar = ((float) w) / (float) h;
         ViewProjection ();
     }
 
-    void StartLook (float x, float y){
+    void StartLook (float x, float y)
+    {
         looking = true;
         lastMouseX = x;
         lastMouseY = y;
     }
 
-    void StopLook (){
+    void StopLook ()
+    {
         looking = false;
     }
 
-    void Look (float x, float y){
+    void Look (float x, float y)
+    {
         if (!looking)
             return;
 
@@ -136,13 +145,14 @@ public:
 
         phiDeg += dx * mouseSensitivity;
         thetaDeg += dy * mouseSensitivity;
-        thetaDeg = thetaDeg > 90.0f ? 90.0f : thetaDeg;
-        thetaDeg = thetaDeg < -90.0f ? -90.0f : thetaDeg;
+        thetaDeg = thetaDeg > 89.0f ? 89.0f : thetaDeg;
+        thetaDeg = thetaDeg < -89.0f ? -89.0f : thetaDeg;
 
         ViewProjection ();
     }
 
-    void Move (float dt){
+    void Move (float dt)
+    {
         float phiRad = glm::radians (phiDeg);
 
         glm::vec3 forward = { glm::sin (phiRad), 0.0f, -glm::cos (phiRad) };
@@ -151,7 +161,7 @@ public:
 
         glm::vec3 moveDir = {0.0f, 0.0f, 0.0f};
 
-        for (const auto& keyBinding : moveBindings){
+        for (const auto& keyBinding : moveBindings) {
             if (sf::Keyboard::isKeyPressed (keyBinding.key)) {
                 moveDir += keyBinding.direction.x * right + keyBinding.direction.y * up + keyBinding.direction.z * forward;
             }
@@ -181,7 +191,7 @@ public:
         }
     }
 
-    glm::mat4 ViewProjection (){
+    void ViewProjection (){
         float ncp = 0.1f;
         float fcp = 100.0f;
 
@@ -194,15 +204,12 @@ public:
         float a = (fcp + ncp) / (ncp - fcp); //
         float b = 2.0f * fcp * ncp / (ncp - fcp); //
 
-        // Salvala direttamente in 'pr' della classe
         pr = glm::mat4(
             fd,  0.0,     0.0,  0.0,
             0.0, fd * ar, 0.0,  0.0,
             0.0, 0.0,       a, -1.0,
             0.0, 0.0,       b,  0.0
         );
-
-        return pr * v;
     }
 };
 
@@ -210,7 +217,8 @@ public:
 // Cube (texture, niente luce dinamica) //
 ////////////////////
 
-class GPUCube{
+class GPUCube
+{
 private:
     GLuint vbo;
     GLuint vao;
@@ -221,7 +229,8 @@ public:
     GPUCube (const std::string& texture_path) { Load (texture_path); }
     ~GPUCube () { Clean (); }
 
-    void Load (const std::string& texture_path){
+    void Load (const std::string& texture_path)
+    {
         float vertices[] = {
             // --- FACCIA FRONTALE (+Z) -> Layer 3 (Lato Erba) ---
             -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  1.0f,
@@ -260,7 +269,7 @@ public:
             -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  0.0f
         };
 
-        // 36 Indici per collegare i 24 vertici
+        //36 Indici per collegare i 24 vertici
         unsigned int indices[] = {
             0,  1,  2,  2,  3,  0, // Front
             4,  5,  6,  6,  7,  4, // Back
@@ -313,13 +322,15 @@ public:
         textureArray.LoadTextures(texture_paths, 32, 32);
     }
 
-    void Clean (){
+    void Clean ()
+    {
         glDeleteVertexArrays (1, &vao);
         glDeleteBuffers (1, &vbo);
         glDeleteBuffers(1,&ebo);
     }
 
-    void Draw(){
+    void Draw()
+    {
         glBindVertexArray(vao);
         
         //Bind del TextureArray e imposta la shader
@@ -338,7 +349,8 @@ public:
 // Scene           //
 ////////////////////
 
-class Scene{
+class Scene
+{
 public:
     Camera camera;
     GPUCube cube;
@@ -349,11 +361,13 @@ private:
     GLint proj_loc;
 
 public:
-    Scene (fcg::Shaders& shaders) : cube (res){ //Costruttore per il singolo cubo
+    Scene (fcg::Shaders& shaders) : cube (res) //Costruttore per il singolo cubo
+    {
         Locations (shaders);
     }
 
-    void Locations (fcg::Shaders& shaders){
+    void Locations (fcg::Shaders& shaders)
+    {
         model_loc = glGetUniformLocation (shaders.program, "model");
         view_loc  = glGetUniformLocation (shaders.program, "view");
         proj_loc  = glGetUniformLocation (shaders.program, "projection");
@@ -362,7 +376,8 @@ public:
         glUniform1i(samplerLoc, 0);
     }
 
-    void Draw (){
+    void Draw ()
+    {
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Separiamo la matrice View dalla Projection (presenti nella classe Camera)
@@ -381,13 +396,15 @@ public:
 // Game  Bindings //
 ////////////////////
 
-struct keyBindings{
+struct keyBindings
+{
     sf::Keyboard::Scancode key;
     std::function<void()> PressKey;
     std::function<void()> ReleaseKey = nullptr;
 };
 
-std::vector<keyBindings>ActionsKeyBindings (Scene& scene){
+std::vector<keyBindings>ActionsKeyBindings (Scene& scene)
+{
     return {
         { sf::Keyboard::Scancode::Escape, [] () { exit (0); } },
         { 
@@ -403,7 +420,8 @@ std::vector<keyBindings>ActionsKeyBindings (Scene& scene){
 // SFML Callbacks //
 ////////////////////
 
-void Handle (const sf::Event::Resized& resized, Camera& camera){
+void Handle (const sf::Event::Resized& resized, Camera& camera)
+{
     glViewport (0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize (resized.size.x, resized.size.y);
 }
@@ -415,7 +433,8 @@ void Handle (const sf::Event::Resized& resized, Camera& camera){
 // Main //
 //////////
 
-int main (){
+int main ()
+{
     //// Startup ////
 
     Setup setup;
@@ -426,7 +445,7 @@ int main (){
 
     Scene scene (shaders);
 
-    glEnable (GL_CULL_FACE); 
+    glEnable (GL_CULL_FACE); //[cite: 3]
     glCullFace (GL_BACK);
 
     glEnable (GL_DEPTH_TEST);
@@ -436,13 +455,15 @@ int main (){
     std::vector<keyBindings> bindings = ActionsKeyBindings(scene);
     sf::Clock clock;
     bool running = true;
-    while (running){
-        while (const std::optional event = window.pollEvent ()){
+    while (running)
+    {
+        while (const std::optional event = window.pollEvent ())
+        {
             if (event->is<sf::Event::Closed> ())
                 running = false;
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
                 Handle (*resized, scene.camera);
-            else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed>()){
+            else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed>()) {
                 // Scorriamo tutti i binding che abbiamo definito
                 for (const auto& binding : bindings) {
                     // Se il tasto premuto coincide con la chiave e c'è una funzione definita
@@ -451,20 +472,20 @@ int main (){
                     }
                 }
             }
-            else if (const auto* key_released = event->getIf<sf::Event::KeyReleased>()){
+            else if (const auto* key_released = event->getIf<sf::Event::KeyReleased>()) {
                 // Scorriamo nuovamente i binding
                 for (const auto& binding : bindings) {
                     // Se il tasto rilasciato coincide con la chiave e c'è una funzione di rilascio
-                    if (key_released->scancode == binding.key && binding.ReleaseKey){
+                    if (key_released->scancode == binding.key && binding.ReleaseKey) {
                         binding.ReleaseKey(); // Esegue ad es. scene.camera.stopSprint()
                     }
                 }
             }
-            else if (const auto* mouse_pressed = event->getIf<sf::Event::MouseButtonPressed> ()){
+            else if (const auto* mouse_pressed = event->getIf<sf::Event::MouseButtonPressed> ()) {
                 if (mouse_pressed->button == sf::Mouse::Button::Left)
                     scene.camera.StartLook (mouse_pressed->position.x, mouse_pressed->position.y);
             }
-            else if (const auto* mouse_released = event->getIf<sf::Event::MouseButtonReleased> ()){
+            else if (const auto* mouse_released = event->getIf<sf::Event::MouseButtonReleased> ()) {
                 if (mouse_released->button == sf::Mouse::Button::Left)
                     scene.camera.StopLook ();
             }
