@@ -10,6 +10,6 @@ uniform sampler2DArray textureArray;
 void main()
 {
     //Campiona dalla Texture Array usando UV (2D) + Layer (1D)
-    FragColor = texture(textureArray, vec3(uvCoordinates, outTextureIndex));
+    FragColor = texture(textureArray, vec3(outUvCoordinates, outTextureIndex));
 }
 
