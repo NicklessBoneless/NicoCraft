@@ -348,7 +348,7 @@ namespace fcg
 
             Blocks::Chunk* neighbor = GetChunkAt(neighborChunkX, neighborChunkZ);
             if(!neighbor){
-                return true; //Bordo del mondo: nessun chunk vicino, quindi aria
+                return true; //Bordo del mondo: nessun chunk vicino.
             }
 
             int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;

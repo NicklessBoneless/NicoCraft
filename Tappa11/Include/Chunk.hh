@@ -105,8 +105,12 @@ namespace Blocks
                         int ny = y + FACE_OFFSETS[i][1];
                         int nz = z + FACE_OFFSETS[i][2];
 
-                
-                        bool IsNeighborTransparent = chunk.InBounds(nx, ny, nz) ? chunk.IsTransparent(nx, ny, nz) : isNeighborTransparent(nx, ny, nz);
+                        bool IsNeighborTransparent = false;
+                        if(chunk.InBounds(nx, ny, nz))
+                            IsNeighborTransparent = chunk.IsTransparent(nx, ny, nz);
+                        else //Out of bounds
+                            IsNeighborTransparent = isNeighborTransparent(nx, ny, nz);
+
                         if(!IsNeighborTransparent){
                             continue;
                         }
