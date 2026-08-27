@@ -10,8 +10,7 @@
 
 
 namespace Blocks{
-    enum class BlockType : uint8_t
-    {
+    enum class BlockType : uint8_t{
         AIR = 0,
         DIRT,
         GRASS,
@@ -21,8 +20,7 @@ namespace Blocks{
         GLASS
     };
 
-    enum class BlockFace : uint8_t
-    {
+    enum class BlockFace : uint8_t{
         Front = 0, // +Z
         Back,      // -Z
         Left,      // -X
@@ -31,8 +29,7 @@ namespace Blocks{
         Bottom     // -Y
     };
 
-    struct Block
-    {
+    struct Block{
         BlockType type = BlockType::AIR;
 
         bool isSolid() const{
@@ -41,8 +38,7 @@ namespace Blocks{
     };
 
     inline bool isBlockTransparent(BlockType type){
-        switch(type)
-        {
+        switch(type){
         case BlockType::AIR:
         case BlockType::LEAVES:
         case BlockType::GLASS:
@@ -53,33 +49,31 @@ namespace Blocks{
     }
 
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
-    inline uint32_t getTextureIndex(BlockType type, BlockFace face)
-    {
-        switch(type)
-        {
-        case BlockType::GRASS:
-            if(face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
-            if(face == BlockFace::Bottom) return 2; // Index 2: Terra
-            return 3;                           // Index 3: Lato Erba
-        
-        case BlockType::DIRT:
-            return 2; //Texture tutta uguale
-
-        case BlockType::STONE:
-            return 4; //Tutta uguale
-
-        case BlockType::WOOD:
-            if(face == BlockFace::Top || face == BlockFace::Bottom) return 5; //Anelli del Tronco
-            return 6;                                               //Corteccia (lati)
-
-        case BlockType::LEAVES:
-            return 7;
-
-        case BlockType::GLASS:
-            return 8;
+    inline uint32_t getTextureIndex(BlockType type, BlockFace face){
+        switch(type){
+            case BlockType::GRASS:
+                if(face == BlockFace::Top)    return 1; // Index 1: Erba (Sopra)
+                if(face == BlockFace::Bottom) return 2; // Index 2: Terra
+                return 3;                           // Index 3: Lato Erba
             
-        default:
-            return 0; 
+            case BlockType::DIRT:
+                return 2; //Texture tutta uguale
+
+            case BlockType::STONE:
+                return 4; //Tutta uguale
+
+            case BlockType::WOOD:
+                if(face == BlockFace::Top || face == BlockFace::Bottom) return 5; //Anelli del Tronco
+                return 6;                                               //Corteccia (lati)
+
+            case BlockType::LEAVES:
+                return 7;
+
+            case BlockType::GLASS:
+                return 8;
+                
+            default:
+                return 0; 
         }
     }
 
@@ -144,8 +138,7 @@ namespace Blocks{
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
         }
 
-        void Clean()
-        {
+        void Clean(){
             if(textureID != 0){
                 glDeleteTextures(1, &textureID);
                 textureID = 0;
