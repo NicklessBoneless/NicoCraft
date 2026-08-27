@@ -340,7 +340,7 @@ namespace fcg
         bool IsTransparentWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
             //Y non e' suddiviso in chunk: se esce sopra/sotto e' semplicemente aria
             if(localY < 0 || localY >= Blocks::CHUNK_SIZE_Y){
-                return false;
+                return true;
             }
 
             int neighborChunkX = chunkX + (localX < 0 ? -1 : (localX >= Blocks::CHUNK_SIZE_X ? 1 : 0));
@@ -348,7 +348,7 @@ namespace fcg
 
             Blocks::Chunk* neighbor = GetChunkAt(neighborChunkX, neighborChunkZ);
             if(!neighbor){
-                return false; //Bordo del mondo: nessun chunk vicino, quindi aria
+                return true; //Bordo del mondo: nessun chunk vicino, quindi aria
             }
 
             int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;

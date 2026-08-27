@@ -56,14 +56,13 @@ namespace Blocks{
     };
 
     inline bool isBlockTransparent(BlockType type) {
-        switch(type)
-        {
-        case BlockType::AIR:
-        case BlockType::LEAVES:
-        case BlockType::GLASS:
-            return false;
-        default:
-            return true;
+        switch(type){
+            case BlockType::AIR:
+            case BlockType::LEAVES:
+            case BlockType::GLASS:
+                return true;
+            default:
+                return false;
         }
     }
 

@@ -2,6 +2,8 @@
 #define CHUNK_HH
 
 
+//BugFix isNeightborTransparent
+
 #include "Blocks.hh"
 #include "Matrices.hh"
 #include "Hotshaders.hh"
@@ -104,8 +106,8 @@ namespace Blocks
                         int nz = z + FACE_OFFSETS[i][2];
 
                 
-                        bool neighborTransparent = chunk.InBounds(nx, ny, nz) ? chunk.IsTransparent(nx, ny, nz) : isNeighborTransparent(nx, ny, nz);
-                        if(neighborTransparent){
+                        bool IsNeighborTransparent = chunk.InBounds(nx, ny, nz) ? chunk.IsTransparent(nx, ny, nz) : isNeighborTransparent(nx, ny, nz);
+                        if(!IsNeighborTransparent){
                             continue;
                         }
                         uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
