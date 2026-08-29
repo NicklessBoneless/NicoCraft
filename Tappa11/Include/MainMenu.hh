@@ -1,6 +1,8 @@
 #ifndef MAIN_MENU_HH
 #define MAIN_MENU_HH
 
+//MOdificato menu principale e posizione scritte
+
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/Text.hpp>
@@ -70,7 +72,7 @@ namespace fcg{
             exitButtonText.setFillColor(sf::Color::White);
 
             commandsText.setFillColor(sf::Color(210, 210, 210));
-            commandsText.setLineSpacing(1.3f);
+            commandsText.setLineSpacing(1.6f);
 
             generateButtonShape.setSize({buttonWidth, buttonHeight});
             optionsButtonShape.setSize({buttonWidth, buttonHeight});
@@ -173,17 +175,17 @@ namespace fcg{
 
         static std::string BuildCommandsString(){
             return
-                "COMANDI\n"
-                "W A S D - muovi\n"
-                "Mouse - guarda\n"
-                "LShift - sprint\n"
-                "Spazio - salta / vola su (noclip)\n"
-                "LCtrl - vola giu' (noclip)\n"
-                "F - attiva/disattiva noclip\n"
-                "Click sinistro - rompi blocco\n"
-                "Click destro - piazza blocco\n"
-                "1-7 / rotellina - seleziona blocco\n"
-                "Esc - pausa";
+                "COMANDI:\n"
+                "- Movimento : WASD\n"
+                "- Camera    : Mouse\n"
+                "- Rompi blocco : LMB\n"
+                "- Piazza blocco: RMB\n"
+                "- Hotbar : Rotella / 1-7 \n"
+                "- Sprint : LShift\n"
+                "- Salta  : Spazio \n"
+                "- Vai giu' (noclip) : LCTRL\n"
+                "- Toggle noclip : F\n"
+                "- Pausa : ESC\n";
         }
 
         void Layout(){
@@ -202,7 +204,7 @@ namespace fcg{
             CenterTextOnButton(optionsButtonText, optionsButtonShape);
             CenterTextOnButton(exitButtonText, exitButtonShape);
 
-            commandsText.setPosition({40.0f, windowHeight - 300.0f});
+            commandsText.setPosition({40.0f, windowHeight - 340.0f});
 
             optionsPanel.SetWindowSize(windowWidth, windowHeight, windowHeight * 0.10f);
         }

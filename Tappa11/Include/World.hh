@@ -13,8 +13,8 @@
 
 namespace fcg
 {
-    constexpr int WORLDSIZECHUNKSX = 4;
-    constexpr int WORLDSIZECHUNKSZ = 4;
+    constexpr int WORLDSIZECHUNKSX = 24;
+    constexpr int WORLDSIZECHUNKSZ = 24;
 
     //Un chunk posizionato nella griglia mondo (coordinate in unita' di chunk, non di blocco)
     struct ChunkInstance{
@@ -348,7 +348,7 @@ namespace fcg
 
             Blocks::Chunk* neighbor = GetChunkAt(neighborChunkX, neighborChunkZ);
             if(!neighbor){
-                return true; //Bordo del mondo: nessun chunk vicino.
+                return true; //Bordo del mondo: nessun chunk vicino. Renderizza.
             }
 
             int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;

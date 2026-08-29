@@ -12,6 +12,7 @@
 #include "./Include/MainMenu.hh"
 #include "./Include/PauseMenu.hh"
 #include "./Include/Settings.hh"
+#include "./Include/LoadingScreen.hh"
 
 const std::string dir = "../Tappa11/";
 const std::string res = "../Resources/";
@@ -340,7 +341,11 @@ int main(){
 
             if(state == GameState::Playing){
                 //Transizione menu -> gioco: qui, e SOLO qui, nascono Player, Renderer,
-                //Hotbar, World (chunk + mesh compresi) e PauseMenu
+                //Hotbar, World (chunk + mesh compresi) e PauseMenu. Renderer e World sono
+                //sincroni e bloccano il thread principale: mostriamo la loading screen
+                //PRIMA di iniziare, cosi' non resta uno schermo bloccato durante l'attesa
+                fcg::DrawLoadingScreen(window, res);
+
                 player = std::make_unique<fcg::Player>();
                 player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
                 player->getCamera().SetFov(mainMenu->GetFov());

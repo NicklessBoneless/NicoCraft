@@ -10,6 +10,8 @@
 #include <string>
 #include "OptionsPanel.hh"
 
+//Modificati i pulsanti delle impostazioni
+
 namespace fcg{
 
     //Overlay di pausa (ESC durante il gioco): scurisce lo schermo con un riquadro
@@ -46,9 +48,9 @@ namespace fcg{
         int windowWidth = 1920;
         int windowHeight = 1080;
 
-        static constexpr float bigButtonWidth = 420.0f;
-        static constexpr float bigButtonHeight = 80.0f;
-        static constexpr float smallButtonWidth = 260.0f;
+        static constexpr float bigButtonWidth = 576.0f;
+        static constexpr float bigButtonHeight = 64.0f;
+        static constexpr float smallButtonWidth = 280.0f;
         static constexpr float smallButtonHeight = 64.0f;
         static constexpr float rowGap = 26.0f;
         static constexpr float smallRowGap = 16.0f;
