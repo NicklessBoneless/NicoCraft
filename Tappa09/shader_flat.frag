@@ -1,7 +1,7 @@
 #version 410 core
 
-in vec2 TexCoord;
-in float TexLayer; //Passato dal Vertex Shader
+in vec2 outUvCoordinates;
+in float outTextureIndex; //Passato dal Vertex Shader
 
 out vec4 FragColor;
 
