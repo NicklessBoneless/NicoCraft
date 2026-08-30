@@ -98,11 +98,14 @@ namespace fcg{
                 if(delta.y < 0.0f) onGround = true; //stava cadendo ed ha toccato terra
                 velocity.y = 0.0f;
             }
-            else{
-                //Nessuna collisione questo frame non vuol dire "in aria": se il player e' fermo
-                //a terra, delta.y puo' essere 0 esatto e i piedi toccano il blocco senza overlap.
-                //Sondiamo con un piccolo margine sotto i piedi per un rilevamento stabile, altrimenti
-                //onGround sfarfetta true/false ogni frame e il salto risulta poco responsive.
+            else{ //Nessuna collisione,(Non per forza in "aria"): 
+                /*
+                  Puo' capitare quando il player è fermo a terra (i piedi toccano il blocco senza overlap), 
+                  ma anche nell'istante in cui lo spostamento verticale è nullo (es. all'apice di un salto) 
+                  Sondiamo con un piccolo margine sotto i piedi per un rilevamento stabile,
+                  indipendente da delta.y, altrimenti onGround sfarfalla true/false ogni frame e il
+                  salto risulta poco reattivo.
+                */
                 glm::vec3 groundProbePosition = position;
                 groundProbePosition.y -= groundCheckEpsilon;
                 onGround = CollidesAt(groundProbePosition, world);
