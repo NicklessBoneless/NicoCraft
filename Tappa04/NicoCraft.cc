@@ -450,7 +450,7 @@ public:
     static int FloorDiv(int a, int b){
         int d = a / b;
         int r = a % b;
-        if(r != 0 && ((r < 0) != (b < 0))) ? d - 1 : d;
+        return (r != 0 && ((r < 0) != (b < 0))) ? d - 1 : d;
     }
 
     //Distanza (in unita' di t lungo il raggio) dal punto 'originComp' al prossimo confine di voxel
