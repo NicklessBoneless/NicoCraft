@@ -13,20 +13,20 @@
 
 namespace fcg{
 
-    //Gestisce il ciclo giorno/notte: avanzamento del tempo, colore del cielo, fattore di
-    //luce globale (usato anche per lo shading dei blocchi in Renderer), e il disegno di
-    //Sole, Luna e stelle. E' la fonte unica di verita' per lo stato temporale del cielo
+    //Gestisce il ciclo giorno/notte: avanzamento del tempo, colore del cielo,
+    //Si usa un fattore di luce globale (usato anche per lo shading dei blocchi in Renderer), e il disegno di Sole, Luna e stelle. 
     class Sky{
     private:
         //// Stato temporale ////
-        float elapsedTime = 000.0f;
-        static constexpr float daylightSpeed = 0.005f; //Un ciclo completo dura circa 2*PI/daylightSpeed secondi (~63s)
+        float elapsedTime = 50.0f;
+        static constexpr float daylightSpeed = 0.005f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
         static constexpr float minDaylight = 0.35f;   //Luminosita' minima dei blocchi (notte fonda)
         static constexpr float maxDaylight = 1.0f;   //Luminosita' massima dei blocchi (pieno giorno)
 
         const glm::vec3 daySky = {0.53f, 0.81f, 0.92f};
         const glm::vec3 nightSky = {0.01f, 0.015f, 0.04f};
         const float darknessMultiplier = 1.25f;
+        const float lightMultiplier = 1.25f;
 
         //// Sole e Luna ////
         static constexpr float skyRadius = 90.0f;  //Distanza di Sole/Luna dalla camera
@@ -38,13 +38,13 @@ namespace fcg{
 
         //// Stelle ////
         static constexpr float starRadius = 95.0f; //Deve restare sotto il farPlane (100.0f) della Camera
-        static constexpr float starPointSize = 0.55f;
-        static constexpr float starThreshold = 0.51f;
+        static constexpr float starPointSize = 0.50f;
+        static constexpr float starThreshold = 0.54f;
         GLuint starsVao = 0, starsVbo = 0, starsEbo = 0;
         Shaders starsShader;
         GLint starsViewLoc = -1, starsProjLoc = -1, starsCamPosLoc = -1;
         GLint starsAlphaLoc = -1, starsRadiusLoc = -1, starsSizeLoc = -1;
-        int starCount = 0;
+        const int starCount = 225;
         GLsizei starIndexCount = 0;
        
        
@@ -77,7 +77,7 @@ namespace fcg{
 
         //Fattore di luce globale da applicare ai blocchi del mondo (range [minDaylight, maxDaylight])
         float GetDaylightFactor() const{
-            return minDaylight + (maxDaylight - minDaylight) * GetDayNightT();
+            return minDaylight + (maxDaylight * lightMultiplier - minDaylight) * GetDayNightT();
         }
 
         //Colore corrente del cielo, da passare a glClearColor
@@ -139,16 +139,14 @@ namespace fcg{
 
         //Genera 'count' direzioni casuali sull'emisfero superiore (le stelle non servono sotto l'orizzonte)
         void BuildStars(){
-            const int count = 250;
-            starCount = count;
             std::vector<float> vertexData; //Ora: direzione(3) + corner locale(2) + rotazione(1) = 6 float per vertice, 4 vertici per stella
-            vertexData.reserve(count * 4 * 6);
+            vertexData.reserve(starCount* 4 * 6);
             std::vector<uint32_t> indices;
-            indices.reserve(count * 6);
+            indices.reserve(starCount * 6);
 
             const float localCorners[4][2] = { {-1,-1}, {1,-1}, {1,1}, {-1,1} };
 
-            for(int i = 0; i < count; i++){
+            for(int i = 0; i < starCount; i++){
                 float theta = ((float) rand() / RAND_MAX) * 6.2831853f;
                 float height = ((float) rand() / RAND_MAX) * 0.9f + 0.05f;
                 float radius = std::sqrt(1.0f - height * height);

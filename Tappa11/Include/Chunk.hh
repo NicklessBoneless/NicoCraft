@@ -1,9 +1,6 @@
 #ifndef CHUNK_HH
 #define CHUNK_HH
 
-
-//BugFix isNeightborTransparent
-
 #include "Blocks.hh"
 #include "Matrices.hh"
 #include "Hotshaders.hh"
@@ -19,8 +16,7 @@ namespace Blocks
         private:
             std::vector<BlockType> blocks;
 
-            inline int Index(int x, int y, int z) const
-            {
+            inline int Index(int x, int y, int z) const{
                 return x + CHUNK_SIZE_X * (y + CHUNK_SIZE_Y * z);
             }
 
@@ -114,6 +110,7 @@ namespace Blocks
                         if(!IsNeighborTransparent){
                             continue;
                         }
+                        
                         uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
                         float texture = static_cast<float>(getTextureIndex(type, face));
                         float brightness = FACE_BRIGHTNESS[i];

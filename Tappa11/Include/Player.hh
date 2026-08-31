@@ -98,7 +98,7 @@ namespace fcg
         //Metodo helper che isola il polling di SFML e l'aggiornamento fisico
         void NormalMove(float deltaTime, fcg::IWorld& world, const PlayerInput& input){
             if(input.jump){
-                physics.Jump();
+                physics.Jump(world);
             }
             
             glm::vec3 horizontalVelocity = camera.getHorizontalMovement(input) * moveSpeed;

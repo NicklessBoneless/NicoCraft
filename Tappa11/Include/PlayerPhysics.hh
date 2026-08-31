@@ -6,7 +6,6 @@
 #include "IWorld.hh"
 
 namespace fcg{
-
     //Corpo fisico del player: gestisce gravita' e collisioni AABB contro il mondo voxel.
     //Separato dalla Camera: la Camera si limita a leggere la posizione occhi da qui.
     class PlayerPhysics{
@@ -20,11 +19,13 @@ namespace fcg{
         glm::vec3 position; //Piedi del player, coordinate mondo
         glm::vec3 velocity = {0.0f, 0.0f, 0.0f};
         bool onGround = false;
+        bool isCeiling = false;
 
         static constexpr float gravity = 25.0f;
         static constexpr float terminalVelocity = 50.0f;
         static constexpr float jumpSpeed = 8.0f;
         static constexpr float groundCheckEpsilon = 0.05f; //Margine della sonda per il rilevamento stabile di onGround
+        static constexpr float ceilingCheckEpsilon = 0.2f; //Margine della sonda per il rilevamento stabile del soffitto
 
     public:
         PlayerPhysics(glm::vec3 startFeetPosition) : position(startFeetPosition) {}
@@ -34,7 +35,7 @@ namespace fcg{
         void UpdatePlayerPosition(float deltaTime, IWorld& world, glm::vec3 horizontalVelocity){
             if(!onGround){
                 velocity.y -= gravity * deltaTime;
-                if(velocity.y < -terminalVelocity) velocity.y = -terminalVelocity;
+                if(-velocity.y > terminalVelocity) velocity.y = -terminalVelocity;
             }
 
             glm::vec3 delta = horizontalVelocity * deltaTime;
@@ -43,11 +44,18 @@ namespace fcg{
             MoveWithCollision(delta, world);
         }
 
-        void Jump(){
-            if(onGround){
+        void Jump(IWorld& world){
+            if(!onGround) return;
+            float headroom = GetHeadroom(world);
+            // Se lo spazio sopra la testa è inferiore a 0.25 blocchi (es. tunnel 2x1)
+            if (headroom < 0.2f) {
+                //Impostiamo una velocità iniziale ridotta proporzionale allo spazio rimasto,
+                //sufficiente per dare una sensazione di molla/spinta dolce senza impattare violentemente.
+                velocity.y = std::min(jumpSpeed * 0.25f, std::sqrt(2.0f * gravity * headroom * 0.8f));
+            } else {
                 velocity.y = jumpSpeed;
-                onGround = false;
             }
+            onGround = false;  
         }
 
         glm::vec3 GetEyePosition() const{
@@ -92,17 +100,24 @@ namespace fcg{
             if(CollidesAt(position, world)) position.x -= delta.x;
 
             //Asse Y
-            position.y += delta.y;
-            if(CollidesAt(position, world)){
-                position.y -= delta.y;
-                if(delta.y < 0.0f) onGround = true; //stava cadendo ed ha toccato terra
-                velocity.y = 0.0f;
-            }
-            else{
-                //Nessuna collisione questo frame non vuol dire "in aria": se il player e' fermo
-                //a terra, delta.y puo' essere 0 esatto e i piedi toccano il blocco senza overlap.
-                //Sondiamo con un piccolo margine sotto i piedi per un rilevamento stabile, altrimenti
-                //onGround sfarfetta true/false ogni frame e il salto risulta poco responsive.
+            isCeiling = false;
+            if(delta.y > 0.0f){
+                position.y += delta.y;
+                if (CollidesAt(position, world)) {
+                    // Invece di fare il semplice rollback e azzerare d'impatto la velocità,
+                    // riallineiamo la posizione dei piedi al limite massimo consentito dal soffitto.
+                    position.y -= delta.y; // Annulla lo spostamento
+                    velocity.y = 0.0f;     // Azzera la velocità verticale
+                    isCeiling = true;
+                }
+            }else if(delta.y < 0.0f) {
+                position.y += delta.y;
+                if (CollidesAt(position, world)) {
+                    position.y -= delta.y;
+                    velocity.y = 0.0f;
+                    onGround = true;
+                }else onGround = false;
+            }else{
                 glm::vec3 groundProbePosition = position;
                 groundProbePosition.y -= groundCheckEpsilon;
                 onGround = CollidesAt(groundProbePosition, world);
@@ -131,6 +146,32 @@ namespace fcg{
                 }
             }
             return false;
+        }
+
+        float GetHeadroom(IWorld& world) const {
+            // Effettuiamo un test veloce: se a 0.2 unità sopra la testa c'è già collisione,
+            // misuriamo lo spazio libero a passi di 0.05f.
+            glm::vec3 testPos = position;
+            testPos.y += ceilingCheckEpsilon;
+
+            if(!CollidesAt(testPos, world)){
+                return ceilingCheckEpsilon; // C'è abbastanza spazio per un salto normale o parziale senza urtare subito
+            }
+
+            // Se c'è collisione a 0.2f, troviamo la massima distanza percorribile senza compenetrazione
+            float step = 0.05f;
+            float currentOffset = 0.0f;
+
+            while (currentOffset + step < 0.2f) {
+                glm::vec3 probe = position;
+                probe.y += currentOffset + step;
+                if (CollidesAt(probe, world)) {
+                    break;
+                }
+                currentOffset += step;
+            }
+
+            return currentOffset;
         }
     };
 }

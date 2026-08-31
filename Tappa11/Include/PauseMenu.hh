@@ -13,7 +13,6 @@
 //Modificati i pulsanti delle impostazioni
 
 namespace fcg{
-
     //Overlay di pausa (ESC durante il gioco): scurisce lo schermo con un riquadro
     //semi-trasparente e mostra Ritorna al gioco / Opzioni / (Menu Principale, Esci dal
     //gioco sulla stessa riga, piu' piccoli). Il chiamante NON deve leggere alcun input

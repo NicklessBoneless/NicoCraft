@@ -1,7 +1,7 @@
 #ifndef MAIN_MENU_HH
 #define MAIN_MENU_HH
 
-//MOdificato menu principale e posizione scritte
+//Modificato menu principale e posizione scritte
 
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>

@@ -33,7 +33,7 @@ namespace fcg{
         int windowWidth = (int) window.getSize().x;
         int windowHeight = (int) window.getSize().y;
 
-        window.clear(sf::Color(18, 18, 26));
+        window.clear(sf::Color(0, 0, 0)); //RGB 18,18,26
         window.pushGLStates();
 
         if(logoLoaded){
