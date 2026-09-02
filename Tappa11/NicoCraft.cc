@@ -13,6 +13,7 @@
 #include "./Include/PauseMenu.hh"
 #include "./Include/Settings.hh"
 #include "./Include/LoadingScreen.hh"
+#include "./Include/Compass.hh"
 
 const std::string dir = "../Tappa11/";
 const std::string res = "../Resources/";
@@ -72,10 +73,11 @@ public:
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar, sf::Vector2i& windowCenter){
+void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar,fcg::Compass& compass, sf::Vector2i& windowCenter){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
     hotbar.SetWindowSize(resized.size.x, resized.size.y);
+    compass.SetWindowSize(resized.size.x,resized.size.y);
     windowCenter = {(int)(resized.size.x / 2), (int)(resized.size.y / 2)};
 }
 
@@ -189,14 +191,14 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
 //Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
 //Esc che ora apre la pausa invece di chiudere il programma
-void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, sf::Vector2i& windowCenter, GameState& state, bool& programRunning){
+void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar,fcg::Compass& compass ,sf::Vector2i& windowCenter, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            Handle(*resized, player.getCamera(), hotbar, windowCenter);
+            Handle(*resized, player.getCamera(), hotbar,compass, windowCenter);
             return;
         }
 
@@ -326,6 +328,7 @@ int main(){
     std::unique_ptr<fcg::Hotbar> hotbar;
     std::unique_ptr<fcg::World> world;
     std::unique_ptr<fcg::PauseMenu> pauseMenu;
+    std::unique_ptr<fcg::Compass> compass;
 
     fcg::RaycastHit target; //Ultimo blocco puntato: resta "congelato" mentre si e' in pausa
 
@@ -363,6 +366,9 @@ int main(){
                 hotbar = std::make_unique<fcg::Hotbar>(res);
                 hotbar->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
 
+                compass = std::make_unique<fcg::Compass>(res);
+                compass->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+               
                 world = std::make_unique<fcg::World>();
 
                 pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
@@ -444,7 +450,7 @@ int main(){
         }
 
         //// state == GameState::Playing ////
-        HandleEvents(window, *player, *hotbar, windowCenter, state, programRunning);
+        HandleEvents(window, *player, *hotbar,*compass, windowCenter, state, programRunning);
         if(!programRunning) break;
 
         if(state == GameState::Paused){
@@ -471,9 +477,11 @@ int main(){
         world->ProcessBlockInteractions(*player, target, hotbar->GetSelectedBlockType());
 
         renderer->Draw(*world, player->getCamera(), target, deltaTime);
+        compass->Update(player->getCamera().GetYaw());
 
         window.pushGLStates();
         hotbar->Draw(window);
+        compass->Draw(window);
         window.popGLStates();
 
         window.display();

@@ -33,6 +33,10 @@ namespace fcg
             ViewProjection();
         }
 
+        float GetYaw() const{
+            return yawDeg;
+        }
+
         void SetWindowSize(int width, int height){
             aspectRatio = ((float) width) / (float) height;
             ViewProjection();

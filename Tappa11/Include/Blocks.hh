@@ -18,7 +18,9 @@ namespace Blocks{
         PLANK,
         LOGWOOD,
         LEAVES,
-        GLASS
+        GLASS,
+        LOGWOODNORTHZ,
+        LOGWOODEASTX
     };
 
     enum class BlockFace : uint8_t
@@ -42,8 +44,11 @@ namespace Blocks{
         PLANK,
         LOG_TOP,
         LOG_SIDE,
+        LOG_SIDEFLIP,
+        LOG_SIDELEFTROT,
+        LOG_SIDERIGHTROT,
         LEAVES,
-        GLASS
+        GLASS,
     };
 
     struct Block
@@ -83,12 +88,30 @@ namespace Blocks{
 
         case BlockType::PLANK:
             return static_cast<uint32_t>(TextureIndex::PLANK);
-        
+    
         case BlockType::LOGWOOD:
             if(face == BlockFace::Top || face == BlockFace::Bottom) 
                 return static_cast<uint32_t>(TextureIndex::LOG_TOP);
             return static_cast<uint32_t>(TextureIndex::LOG_SIDE);
 
+        case BlockType::LOGWOODEASTX:
+            if(face == BlockFace::Right || face == BlockFace::Left)
+                return static_cast<uint32_t>(TextureIndex::LOG_TOP);
+            if(face == BlockFace::Top || face == BlockFace::Bottom || face == BlockFace::Front)
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); 
+            return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
+
+        case BlockType::LOGWOODNORTHZ:
+            if(face == BlockFace::Front || face == BlockFace::Back)
+                return static_cast<uint32_t>(TextureIndex::LOG_TOP);
+            if(face == BlockFace::Top)
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDE); 
+            if(face == BlockFace::Bottom)
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDEFLIP); 
+            if(face == BlockFace::Right)
+                 return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); //Left
+            return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
+            
         case BlockType::LEAVES:
             return static_cast<uint32_t>(TextureIndex::LEAVES);
 
@@ -115,8 +138,11 @@ namespace Blocks{
             "woodplank.png",           // Index 5 -> PLANK
             "logTop.png",              // Index 6 -> LOG_TOP
             "logSide.png",             // Index 7 -> LOG_SIDE
-            "leaves.png",              // Index 8 -> LEAVES
-            "glass.png"                // Index 9 -> GLASS
+            "logSideFlip.png",         // Index 8 -> LOG_SIDEFLIP
+            "logSideLeftRot.png",      // Index 9 -> LOG_ROT
+            "logSideRightRot.png",     // Index 10 -> LOG_ROT
+            "leaves.png",              // Index 11 -> LEAVES
+            "glass.png"                // Index 12 -> GLASS
         };
 
         const int textureSize = 32;

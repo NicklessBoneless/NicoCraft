@@ -18,7 +18,7 @@ namespace fcg{
     class Sky{
     private:
         //// Stato temporale ////
-        float elapsedTime = 50.0f;
+        float elapsedTime = 50.0f; //Metà giornata è sempre PI/daylightSpeed*2
         static constexpr float daylightSpeed = 0.005f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
         static constexpr float minDaylight = 0.35f;   //Luminosita' minima dei blocchi (notte fonda)
         static constexpr float maxDaylight = 1.0f;   //Luminosita' massima dei blocchi (pieno giorno)

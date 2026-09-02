@@ -186,9 +186,10 @@ namespace fcg
                 int placeX = target.blockX + offset[0];
                 int placeY = target.blockY + offset[1];
                 int placeZ = target.blockZ + offset[2];
-
+                Blocks::BlockType typeToPlace = selectedBlockType;
+                if(typeToPlace == Blocks::BlockType::LOGWOOD) typeToPlace = ChangeRotation(selectedBlockType, target.hitFace);
                 if(!player.IsPlayerOccupyingBlock(placeX, placeY, placeZ)){
-                    PlaceBlockWorld(placeX, placeY, placeZ, selectedBlockType);
+                    PlaceBlockWorld(placeX, placeY, placeZ, typeToPlace);
                 }
             }
         }
@@ -370,6 +371,16 @@ namespace fcg
             if(dirComp == 0.0f) return std::numeric_limits<float>::infinity();
             float boundary = step > 0 ? (float)(voxelComp + 1) : (float) voxelComp;
             return (boundary - originComp) / dirComp;
+        }
+
+        //Se il blocco selezionato e' un tronco, restituisce la variante con l'asse orientato
+        //lungo la direzione di piazzamento, dedotta da hitFace (la faccia colpita del blocco
+        //bersaglio, stesso indice usato in Blocks::FACE_OFFSETS)
+        static Blocks::BlockType ChangeRotation(Blocks::BlockType selectedType, int hitFace){
+            const auto& offset = Blocks::FACE_OFFSETS[hitFace];
+            if(offset[0] != 0) return Blocks::BlockType::LOGWOODEASTX;
+            if(offset[2] != 0) return Blocks::BlockType::LOGWOODNORTHZ;
+            return Blocks::BlockType::LOGWOOD; //Faccia Top/Bottom: asse Y, comportamento invariato
         }
     };
 }
