@@ -60,7 +60,7 @@ namespace Blocks{
         }
     };
 
-    inline bool isBlockTransparent(BlockType type) {
+    inline bool isBlockTransparent(BlockType type){
         switch(type){
             case BlockType::AIR:
             case BlockType::LEAVES:

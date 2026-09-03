@@ -289,7 +289,7 @@ PlayerInput CapturePlayerInput(){
     input.moveForward  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
     input.moveBackward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
     input.moveLeft     = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
-    input.moveRight     = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
+    input.moveRight    = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
 
     //Lo spazio e il control servono sia per il salto che per il volo libero
     input.jump          = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);

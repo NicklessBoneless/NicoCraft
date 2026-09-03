@@ -19,14 +19,14 @@ namespace fcg{
     private:
         //// Stato temporale ////
         float elapsedTime = 50.0f; //Metà giornata è sempre PI/daylightSpeed*2
-        static constexpr float daylightSpeed = 0.005f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
-        static constexpr float minDaylight = 0.35f;   //Luminosita' minima dei blocchi (notte fonda)
+        static constexpr float daylightSpeed = 0.05f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
+        static constexpr float minDaylight = 0.30f;   //Luminosita' minima dei blocchi (notte fonda)
         static constexpr float maxDaylight = 1.0f;   //Luminosita' massima dei blocchi (pieno giorno)
 
         const glm::vec3 daySky = {0.53f, 0.81f, 0.92f};
         const glm::vec3 nightSky = {0.01f, 0.015f, 0.04f};
-        const float darknessMultiplier = 1.25f;
-        const float lightMultiplier = 1.25f;
+        const float skyColorMultiplier = 0.9f;
+        const float lightMultiplier = 1.00f;
 
         //// Sole e Luna ////
         static constexpr float skyRadius = 90.0f;  //Distanza di Sole/Luna dalla camera
@@ -39,7 +39,7 @@ namespace fcg{
         //// Stelle ////
         static constexpr float starRadius = 95.0f; //Deve restare sotto il farPlane (100.0f) della Camera
         static constexpr float starPointSize = 0.50f;
-        static constexpr float starThreshold = 0.54f;
+        static constexpr float starThreshold = 0.58f;
         GLuint starsVao = 0, starsVbo = 0, starsEbo = 0;
         Shaders starsShader;
         GLint starsViewLoc = -1, starsProjLoc = -1, starsCamPosLoc = -1;
@@ -77,12 +77,19 @@ namespace fcg{
 
         //Fattore di luce globale da applicare ai blocchi del mondo (range [minDaylight, maxDaylight])
         float GetDaylightFactor() const{
-            return minDaylight + (maxDaylight * lightMultiplier - minDaylight) * GetDayNightT();
+            float customT = std::pow(GetDayNightT(), 1.23f);
+            float daylight = glm::mix(minDaylight, maxDaylight * lightMultiplier, customT);
+
+            if(daylight >= maxDaylight) return maxDaylight;
+            if(daylight <= minDaylight) return minDaylight;
+            return daylight;
         }
 
         //Colore corrente del cielo, da passare a glClearColor
         glm::vec3 GetSkyColor() const{
-            return nightSky + (daySky - nightSky * darknessMultiplier) * GetDayNightT();
+            float customT = std::pow(GetDayNightT(), 2.0f);
+            glm::vec3 skyColor = glm::mix(nightSky, daySky, customT);
+            return skyColor;
         }
 
         //Disegna Sole, Luna e stelle. Va chiamato dopo il clear, prima del mondo
@@ -147,20 +154,21 @@ namespace fcg{
             const float localCorners[4][2] = { {-1,-1}, {1,-1}, {1,1}, {-1,1} };
 
             for(int i = 0; i < starCount; i++){
-                float theta = ((float) rand() / RAND_MAX) * 6.2831853f;
-                float height = ((float) rand() / RAND_MAX) * 0.9f + 0.05f;
-                float radius = std::sqrt(1.0f - height * height);
+                //Qui generiamo la posizione delle stelle SULLA MEZZASFERA superiore
+                float theta = ((float) rand() / RAND_MAX) * M_PI * 2;
+                float starY = ((float) rand() / RAND_MAX) * 0.99f + 0.005f;
+                float rangeForThatStarY = std::sqrt(1.0f - starY*starY); //Teorema di pitagora applicato a una sfera
 
-                float dirX = radius * std::cos(theta);
-                float dirY = height;
-                float dirZ = radius * std::sin(theta);
+                //Posizione X e Z randomica con range giusto per quell'altezza
+                float starX = rangeForThatStarY * std::cos(theta); 
+                float starZ = rangeForThatStarY * std::sin(theta);
 
-                float rotation = ((float) rand() / RAND_MAX) * 6.2831853f; //<-- IL NUMERO RANDOMICO: un angolo 0..2*PI per questa stella
+                float rotation = ((float) rand() / RAND_MAX) * M_PI * 2; //Rotazione randomica QUAD da 0 e 359.99... gradi
 
                 uint32_t base = (uint32_t)(vertexData.size() / 6);
                 for(int c = 0; c < 4; c++){
                     vertexData.insert(vertexData.end(), {
-                        dirX, dirY, dirZ,
+                        starX, starY, starZ,
                         localCorners[c][0], localCorners[c][1],
                         rotation //stessa rotazione sui 4 vertici della stessa stella
                     });
@@ -170,17 +178,21 @@ namespace fcg{
 
             starIndexCount = (GLsizei) indices.size();
 
+
             glGenVertexArrays(1, &starsVao);
             glBindVertexArray(starsVao);
 
+            //Coordinate delle stelle passate
             glGenBuffers(1, &starsVbo);
             glBindBuffer(GL_ARRAY_BUFFER, starsVbo);
             glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float), vertexData.data(), GL_STATIC_DRAW);
 
+            //Indici delle stelle
             glGenBuffers(1, &starsEbo);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, starsEbo);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32_t), indices.data(), GL_STATIC_DRAW);
 
+            //Configurazione del VAO
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) 0);
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
@@ -214,8 +226,8 @@ namespace fcg{
             glm::vec3 p2 = center + right * celestialHalfSize + up * celestialHalfSize;
             glm::vec3 p3 = center - right * celestialHalfSize + up * celestialHalfSize;
 
-            float vertices[] = {
-                p0.x, p0.y, p0.z, 0.0f, 0.0f,
+            float vertices[] = { //Posizione, coordivate UV
+                p0.x, p0.y, p0.z, 0.0f, 0.0f, 
                 p1.x, p1.y, p1.z, 1.0f, 0.0f,
                 p2.x, p2.y, p2.z, 1.0f, 1.0f,
                 p0.x, p0.y, p0.z, 0.0f, 0.0f,
@@ -224,7 +236,7 @@ namespace fcg{
             };
 
             glBindBuffer(GL_ARRAY_BUFFER, celestialVbo);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); //Va sovrascrivere il buffer, non lo ricrea da 0.
         }
 
         void DrawSunMoon(Camera& camera, float t){
@@ -242,17 +254,19 @@ namespace fcg{
             glBindVertexArray(celestialVao);
 
             //Sole: alpha alta di giorno, sparisce di notte
-            glm::vec3 sunDir = {glm::cos(angle), glm::sin(angle), 0.0f};
-            glm::vec3 sunUp = glm::normalize(glm::cross(-sunDir, rotationAxis));
-            UpdateCelestialQuad(cameraPos + sunDir * skyRadius, rotationAxis, sunUp);
+            glm::vec3 sunCirclePosition = {glm::cos(angle), glm::sin(angle), 0.0f}; //Posizione sole in un cerchio di r = 1
+            glm::vec3 sunCircleTangent = glm::normalize(glm::cross(-sunCirclePosition, rotationAxis)); //Calcolo del vettore tangente al cerchio
+            glm::vec3 sunActualPosition = cameraPos + sunCirclePosition * skyRadius;
+            UpdateCelestialQuad(sunActualPosition, rotationAxis, sunCircleTangent);
             sf::Texture::bind(&sunTexture);
             glUniform1f(celestialAlphaLoc, 0.0f + t);
             glDrawArrays(GL_TRIANGLES, 0, 6);
 
             //Luna: sempre all'estremo opposto del Sole (angle + PI), alpha alta di notte
-            glm::vec3 moonDir = {glm::cos(angle + 3.14159265f), glm::sin(angle + 3.14159265f), 0.0f};
-            glm::vec3 moonUp = glm::normalize(glm::cross(-moonDir, rotationAxis));
-            UpdateCelestialQuad(cameraPos + moonDir * skyRadius, rotationAxis, moonUp);
+            glm::vec3 moonCirclePosition = {glm::cos(angle + M_PI), glm::sin(angle + M_PI), 0.0f}; //Con cerchio di raggio 1
+            glm::vec3 moonCircleTangent = glm::normalize(glm::cross(-moonCirclePosition, rotationAxis));
+            glm::vec3 moonActualPosition = cameraPos + moonCirclePosition * skyRadius;
+            UpdateCelestialQuad(moonActualPosition, rotationAxis, moonCircleTangent);
             sf::Texture::bind(&moonTexture);
             glUniform1f(celestialAlphaLoc, 1.0f);
             glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -261,13 +275,9 @@ namespace fcg{
             sf::Texture::bind(nullptr);
         }
 
-        void DrawStars(Camera& camera, float t){
-            //Soglia piu' bassa = le stelle iniziano a comparire prima nel crepuscolo,
-            //non solo a notte fonda. 0.2f invece di 0.5f: compaiono gia' quando il cielo
-            //e' scuro al 20% invece di aspettare il 50%
-            
-            float starVisibility = 1.0f-t;
-            starVisibility = starVisibility < starThreshold ? 0.0f : (starVisibility - starThreshold) / (1.0f - starThreshold);
+        void DrawStars(Camera& camera, float t){       
+            float starVisibility = 1.0f-t; //Valore attuale di visibilità delle stelle, da comparare a starThreshold
+            starVisibility = starVisibility < starThreshold ? (0.0f) : (starVisibility - starThreshold) / (1.0f - starThreshold);
             if(starVisibility <= 0.0f) return;
 
             starsShader.use();
@@ -278,7 +288,7 @@ namespace fcg{
             glUniform1f(starsAlphaLoc, starVisibility);
 
             glUniform1f(starsRadiusLoc, starRadius);
-            glUniform1f(starsSizeLoc, starPointSize); //rinominato concettualmente da "pointSize" a "starSize"
+            glUniform1f(starsSizeLoc, starPointSize); //Rinominato concettualmente da "pointSize" a "starSize"
 
             glBindVertexArray(starsVao);
             glDrawElements(GL_TRIANGLES, starIndexCount, GL_UNSIGNED_INT, 0);
