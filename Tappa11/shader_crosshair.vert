@@ -1,11 +1,11 @@
 #version 410 core
 
-layout (location = 0) in vec2 aPos;
+layout (location = 0) in vec2 vertexPosition;
 
 uniform float aspectRatio;
 
 void main(){
-    vec2 pos = aPos;
+    vec2 pos = vertexPosition;
     pos.x /= aspectRatio; //Corregge la distorsione dovuta al rapporto larghezza/altezza
     gl_Position = vec4(pos, 0.0, 1.0);
 }

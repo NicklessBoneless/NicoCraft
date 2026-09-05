@@ -1,21 +1,21 @@
 #version 410 core
 
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec2 aTexCoord;
-layout (location = 2) in float aTexLayer;
-layout (location = 3) in float aBrightness;
+layout (location = 0) in vec3 vertexPosition;
+layout (location = 1) in vec2 UVCoordinates;
+layout (location = 2) in float texture;
+layout (location = 3) in float brightness;
 
-out vec2 TexCoord;
-out float TexLayer;
-out float Brightness;
+out vec2 outUVCoordinates;
+out float outTexture;
+out float outBrightness;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
 void main(){
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-    TexCoord = aTexCoord;
-    TexLayer = aTexLayer;
-    Brightness = aBrightness;
+    gl_Position = projection * view * model * vec4(vertexPosition, 1.0);
+    outUVCoordinates = UVCoordinates;
+    outTexture = texture;
+    outBrightness = brightness;
 }

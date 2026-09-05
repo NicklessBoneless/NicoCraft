@@ -18,16 +18,17 @@ namespace fcg{
     class Sky{
     private:
         //// Stato temporale ////
-        float elapsedTime = 50.0f; //Metà giornata è sempre PI/daylightSpeed*2
-        static constexpr float daylightSpeed = 0.05f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
+        float elapsedTime = 00.0f; //Metà giornata è sempre PI/daylightSpeed*2
+        int timeSector = 1;
+        static constexpr float daylightSpeed = 0.1f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
         static constexpr float minDaylight = 0.30f;   //Luminosita' minima dei blocchi (notte fonda)
-        static constexpr float maxDaylight = 1.0f;   //Luminosita' massima dei blocchi (pieno giorno)
+        static constexpr float maxDaylight = 1.1f;   //Luminosita' massima dei blocchi (pieno giorno)
 
         const glm::vec3 daySky = {0.53f, 0.81f, 0.92f};
         const glm::vec3 nightSky = {0.01f, 0.015f, 0.04f};
         const float skyColorMultiplier = 0.9f;
-        const float lightMultiplier = 1.00f;
-
+        const float lightMultiplier = 1.2f;
+       
         //// Sole e Luna ////
         static constexpr float skyRadius = 90.0f;  //Distanza di Sole/Luna dalla camera
         static constexpr float celestialHalfSize = 8.0f;  //Meta' lato del quad di Sole/Luna
@@ -64,31 +65,117 @@ namespace fcg{
             Cleanup();
         }
 
-        //Va chiamato una volta per frame, prima di Draw()
+        //Va chiamato una volta per frame
         void Update(float deltaTime){
             elapsedTime += deltaTime;
         }
 
         //t oscilla tra 0 (notte piena) e 1 (giorno pieno)
-        float GetDayNightT() const{
+        float GetDayNightT(){
             float angle = elapsedTime * daylightSpeed;
-            return (glm::sin(angle) + 1.0f) * 0.5f;
+            float t = (glm::sin(angle) + 1.0f) * 0.5f;
+            std::cout<<"timeSector = "<<timeSector<<"\n";
+            if(t >= 0.75f && timeSector == 1){
+                timeSector = 2;
+            }
+            else if(t <= 0.55f && timeSector == 2){
+                timeSector = 3;
+            }
+            else if(t <= 0.25f && timeSector == 3){
+                timeSector = 4;
+            }
+            else if(t < 0.05f && timeSector == 4){
+                timeSector = 5;
+            }
+            else if(t >= 0.45f && timeSector == 5){
+                timeSector = 1;
+            }
+            return t;
         }
 
         //Fattore di luce globale da applicare ai blocchi del mondo (range [minDaylight, maxDaylight])
-        float GetDaylightFactor() const{
-            float customT = std::pow(GetDayNightT(), 1.23f);
-            float daylight = glm::mix(minDaylight, maxDaylight * lightMultiplier, customT);
+        float GetDaylightFactor(){
+            float t = GetDayNightT();
+            float daylight = minDaylight;
 
-            if(daylight >= maxDaylight) return maxDaylight;
-            if(daylight <= minDaylight) return minDaylight;
+            switch(timeSector){
+                case 1:{ //ALBA (t = 0.4 a 0.75): salita rapida della luce
+                    float tNorm = (t - 0.45f) / (0.75f - 0.45f);
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    float fastT = std::sqrt(tNorm); //Radice per salita ripida iniziale
+                    daylight = glm::mix(minDaylight, maxDaylight, fastT);
+                    break;
+                }
+                case 2:{ //GIORNO PIENO: luce costante al massimo
+                    daylight = maxDaylight;
+                    break;
+                }
+                case 3:{ //TRAMONTO (t = 0.6 a 0.25): discesa della luce
+                    float tNorm = (0.55f - t) / (0.55f - 0.25f);
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    float fastT = std::pow(tNorm, 2.0f); //Stessa curva usata per il colore nel tramonto
+                    daylight = glm::mix(maxDaylight, minDaylight, fastT);
+                    break;
+                }
+                case 4:{ //PRIMA NOTTE: gia' al minimo, resta costante
+                    daylight = minDaylight;
+                    break;
+                }
+                case 5:{ //NOTTE FONDA: costante al minimo
+                    daylight = minDaylight;
+                    break;
+                }
+                default:
+                break;
+            }
             return daylight;
         }
 
         //Colore corrente del cielo, da passare a glClearColor
-        glm::vec3 GetSkyColor() const{
-            float customT = std::pow(GetDayNightT(), 2.0f);
-            glm::vec3 skyColor = glm::mix(nightSky, daySky, customT);
+        glm::vec3 GetSkyColor() {
+            float t = GetDayNightT();
+
+            glm::vec3 three4Day   = glm::mix(nightSky, daySky, 0.75f);
+            glm::vec3 three4Night = glm::mix(nightSky, daySky, 0.25f);
+            glm::vec3 skyColor    = daySky;
+
+            switch (timeSector){
+                case 1:{ //ALBA ESPONENZIALE (t = 0.5 a 0.75)
+                    float tNorm = (t - 0.45f) / (0.75f - 0.45f);
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    float expT = std::pow(tNorm, 2.0f);
+                    skyColor = glm::mix(three4Night, daySky, expT); //Parte da three4Night (fine settore 5) e arriva a daySky (inizio settore 2)
+                    break;
+                }
+                case 2: { //GIORNO PIENO (t > 0.75)
+                    float tNorm = (t - 0.55f) / (0.75f - 0.55f);
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    skyColor = glm::mix(three4Day, daySky, tNorm);
+                    break;
+                }
+                case 3: { //TRAMONTO ESPONENZIALE (t < 0.55)
+                    float tNorm = (0.55f - t) / (0.55f - 0.25f);
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    float expSunsetT = std::pow(tNorm, 2.0f);
+                    skyColor = glm::mix(three4Day, three4Night, expSunsetT);
+                    break;
+                }
+                case 4: { //PRIMA NOTTE (t < 0.25)
+                    float tNorm = (0.25f - t) / 0.25f;
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    skyColor = glm::mix(three4Night, nightSky, tNorm);
+                    break;
+                }
+                case 5: { //NOTTE FONDA (t > 0.01)
+                    float tNorm = t/0.45f;
+                    tNorm = glm::clamp(tNorm, 0.0f, 1.0f);
+                    skyColor = glm::mix(nightSky, three4Night, tNorm);
+                    break;
+                }
+                default:
+                    skyColor = daySky;
+                    break;
+            }
             return skyColor;
         }
 
