@@ -18,9 +18,9 @@ namespace fcg{
     class Sky{
     private:
         //// Stato temporale ////
-        float elapsedTime = 00.0f; //Metà giornata è sempre PI/daylightSpeed*2
+        float elapsedTime = 20.0f; //Metà giornata è sempre PI/daylightSpeed*2
         int timeSector = 1;
-        static constexpr float daylightSpeed = 0.1f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
+        static constexpr float daylightSpeed = 0.005f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
         static constexpr float minDaylight = 0.30f;   //Luminosita' minima dei blocchi (notte fonda)
         static constexpr float maxDaylight = 1.1f;   //Luminosita' massima dei blocchi (pieno giorno)
 
@@ -74,7 +74,7 @@ namespace fcg{
         float GetDayNightT(){
             float angle = elapsedTime * daylightSpeed;
             float t = (glm::sin(angle) + 1.0f) * 0.5f;
-            std::cout<<"timeSector = "<<timeSector<<"\n";
+            //std::cout<<"timeSector = "<<timeSector<<"\n";
             if(t >= 0.75f && timeSector == 1){
                 timeSector = 2;
             }
