@@ -17,10 +17,10 @@ cmake --build build
 
 ## Esecuzione
 
-Gli eseguibili vanno lanciati dalla cartella `build/` (o comunque mantenendo la struttura del repository), perché ogni tappa carica le risorse condivise con il percorso relativo `../Resources/`:
+Gli eseguibili vanno lanciati dalla cartella `Executables/` (o comunque mantenendo la struttura del repository), perché ogni tappa carica le risorse condivise con il percorso relativo `../Resources/`:
 
 ```bash
-cd build
+cd Executables
 ./Tappa01
 ./Tappa02
 ...
