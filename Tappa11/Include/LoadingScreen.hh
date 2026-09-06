@@ -12,11 +12,7 @@
 namespace fcg{
 
     //Disegna UNA schermata di caricamento e la presenta subito a video (window.display()).
-    //La generazione del mondo (World: chunk + mesh) e la costruzione di Renderer (shader,
-    //texture) sono sincrone e bloccano il thread principale: chiamando questa funzione
-    //appena PRIMA di quelle chiamate, l'utente vede un feedback immediato invece di uno
-    //schermo bloccato per la durata della generazione. Se l'immagine manca, mostra solo
-    //il testo (stesso spirito dei fallback gia' usati altrove nel progetto)
+    //Se l'immagine manca, mostra solo il testo
     inline void DrawLoadingScreen(sf::RenderWindow& window, const std::string& resourcesDir){
         sf::Font font;
         bool fontLoaded = font.openFromFile(resourcesDir + "pixelFont.ttf");

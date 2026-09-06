@@ -7,17 +7,14 @@
 
 namespace fcg{
 
-    //Preferenze persistite su file tra un avvio e l'altro. La risoluzione NON viene mai
-    //applicata a video mentre il programma e' in esecuzione (eviterebbe di dover
-    //ricreare finestra e contesto OpenGL): viene solo salvata qui e riletta all'avvio
-    //successivo, cosi' la finestra nasce gia' alla dimensione scelta
+    //Opzioni persistenti su file
     struct Settings{
         int width = 1920;
         int height = 1080;
         float fov = 90.0f;
     };
 
-    //Se il file non esiste ancora (prima esecuzione) ritorna i valori di default
+    //Se il file non esiste ancora, allora salva i valori di default
     inline Settings LoadSettings(const std::string& path){
         Settings settings;
 
@@ -32,9 +29,12 @@ namespace fcg{
             std::string key = line.substr(0, separator);
             std::string value = line.substr(separator + 1);
 
-            if(key == "width") settings.width = std::stoi(value);
-            else if(key == "height") settings.height = std::stoi(value);
-            else if(key == "fov") settings.fov = std::stof(value);
+            if(key == "width") 
+                settings.width = std::stoi(value);
+            else if(key == "height") 
+                settings.height = std::stoi(value);
+            else if(key == "fov") 
+                settings.fov = std::stof(value);
         }
 
         return settings;

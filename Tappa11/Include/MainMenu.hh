@@ -24,12 +24,9 @@ namespace fcg{
         enum class MenuAction{ None, GenerateWorld, Exit, FovChanged, ResolutionChanged };
 
     private:
-        enum class Screen{ Main, Options };
+        enum class Screen{ Main, Options }; //Stati del menu pricipale
 
-        sf::Font font; //Dichiarato PRIMA dei sf::Text: i membri si inizializzano nell'ordine
-                       //di dichiarazione (non della initializer list), quindi quando i
-                       //sf::Text (e OptionsPanel, che referenzia 'font') vengono costruiti
-                       //'font' e' gia' pronto
+        sf::Font font; //Font che sarà utilizzato da tutti i pulsanti e testi
 
         sf::Text titleText;
         sf::Text generateButtonText;
@@ -122,7 +119,7 @@ namespace fcg{
             if(currentScreen == Screen::Main){
                 sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
                 if(generateButtonShape.getGlobalBounds().contains(mouse)) return MenuAction::GenerateWorld;
-                if(optionsButtonShape.getGlobalBounds().contains(mouse)){
+                if(optionsButtonShape.getGlobalBounds().contains(mouse)){ //Facciamo apparire le opzioni
                     currentScreen = Screen::Options;
                     return MenuAction::None;
                 }

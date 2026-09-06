@@ -9,12 +9,6 @@
 #include <string>
 
 namespace fcg{
-
-    //Pannello "Opzioni" riutilizzabile: FOV e risoluzione (entrambi coi pulsanti -/+),
-    //piu' un tasto "Indietro". E' un componente, non una schermata a se stante: chi lo
-    //usa (MainMenu, PauseMenu) decide quando mostrarlo e cosa fare del tasto Indietro.
-    //Il cambio di risoluzione NON si applica mai a video: resta solo in memoria (e va
-    //salvato su file da chi possiede il pannello) per essere applicato al prossimo avvio
     class OptionsPanel{
     public:
         enum class Action{ None, Back, FovChanged, ResolutionChanged };
@@ -68,8 +62,7 @@ namespace fcg{
         const sf::Color buttonHoverColor = sf::Color(95, 95, 125);
 
     public:
-        //'font' deve restare valido per tutta la vita di questo oggetto: e' il chiamante
-        //(MainMenu, PauseMenu) a possederlo, cosi' il font si carica una volta sola
+        //Font, Fov , WidthxHeight
         OptionsPanel(sf::Font& font, float initialFov, int initialWidth, int initialHeight) :
             titleText(font, "OPZIONI", 52),
             fovLabelText(font, "FOV", 20),
