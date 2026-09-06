@@ -47,14 +47,14 @@ namespace fcg{
         void Jump(IWorld& world){
             if(!onGround) return;
             float headroom = GetHeadroom(world);
-            // Se lo spazio sopra la testa è inferiore a 0.25 blocchi (es. tunnel 2x1)
-            if (headroom < 0.2f) {
+            //Se lo spazio sopra la testa è inferiore a 0.25 blocchi (es. tunnel 2x1)
+            if(headroom < 0.2f){
                 //Impostiamo una velocità iniziale ridotta proporzionale allo spazio rimasto,
-                //sufficiente per dare una sensazione di molla/spinta dolce senza impattare violentemente.
+                //sufficiente per dare una sensazione di molla/spinta dolce senza impattare violentemente il soffitto.
                 velocity.y = std::min(jumpSpeed * 0.25f, std::sqrt(2.0f * gravity * headroom * 0.8f));
-            } else {
+            }else
                 velocity.y = jumpSpeed;
-            }
+            
             onGround = false;  
         }
 
@@ -149,28 +149,25 @@ namespace fcg{
         }
 
         float GetHeadroom(IWorld& world) const {
-            // Effettuiamo un test veloce: se a 0.2 unità sopra la testa c'è già collisione,
-            // misuriamo lo spazio libero a passi di 0.05f.
+            //Effettuiamo un test veloce: 
+            //Se a 0.2 unità sopra la testa c'è già collisione, misuriamo lo spazio libero a passi di 0.05f.
             glm::vec3 testPos = position;
             testPos.y += ceilingCheckEpsilon;
 
             if(!CollidesAt(testPos, world)){
-                return ceilingCheckEpsilon; // C'è abbastanza spazio per un salto normale o parziale senza urtare subito
+                return ceilingCheckEpsilon; //C'è abbastanza spazio per un salto normale o parziale senza urtare subito
             }
 
-            // Se c'è collisione a 0.2f, troviamo la massima distanza percorribile senza compenetrazione
+            //Se c'è collisione a 0.2f, troviamo la massima distanza percorribile senza compenetrazione
             float step = 0.05f;
             float currentOffset = 0.0f;
 
-            while (currentOffset + step < 0.2f) {
+            while (currentOffset + step < 0.2f){
                 glm::vec3 probe = position;
                 probe.y += currentOffset + step;
-                if (CollidesAt(probe, world)) {
-                    break;
-                }
+                if(CollidesAt(probe, world)) break;
                 currentOffset += step;
             }
-
             return currentOffset;
         }
     };

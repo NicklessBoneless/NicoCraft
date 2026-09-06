@@ -97,10 +97,8 @@ namespace fcg
     private:
         //Metodo helper che isola il polling di SFML e l'aggiornamento fisico
         void NormalMove(float deltaTime, fcg::IWorld& world, const PlayerInput& input){
-            if(input.jump){
+            if(input.jump) 
                 physics.Jump(world);
-            }
-            
             glm::vec3 horizontalVelocity = camera.getHorizontalMovement(input) * moveSpeed;
             physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
             CheckPlayerPosition();
@@ -108,7 +106,7 @@ namespace fcg
         }
 
         void CheckPlayerPosition(){
-            //std::cerr << "feetY=" << physics.GetFeetPosition().y << std::endl; //DEBUG temporaneo
+            //std::cerr << "feetY=" << physics.GetFeetPosition().y << std::endl; //DEBUG
             if(physics.GetFeetPosition().y < MinimumYaxis){
                 SpawnPlayer();
             }

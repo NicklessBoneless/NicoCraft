@@ -25,8 +25,8 @@ namespace fcg{
     };
 
     //Hotbar in basso allo schermo: 5 slot selezionabili da tastiera (Num1-Num5), ognuno mostra
-    //un'icona isometrica pseudo-3D del blocco. Disegnata via sf::RenderWindow, mixata con OpenGL
-    //tramite pushGLStates()/popGLStates() (chiamati fuori da questa classe, in NicoCraft.cc)
+    //un'icona isometrica pseudo-3D del blocco. 
+    //Disegnata via sf::RenderWindow, mixata con OpenGL tramite pushGLStates()/popGLStates() (chiamati fuori da questa classe, in NicoCraft.cc)
     class Hotbar{
     private:
         std::vector<HotbarSlot> slots;
@@ -43,10 +43,10 @@ namespace fcg{
         static constexpr float slotSize = 72.0f;
         static constexpr float slotPadding = 0.0f;
         static constexpr float slotMargin = 20.0f;  //Distanza dal bordo inferiore dello schermo
-        static constexpr float iconMargin = 10.0f;   //Margine tra il bordo dello slot e l'icona
+        static constexpr float iconMargin = 10.0f;  //Margine tra il bordo dello slot e l'icona
 
     public:
-        //resourcesDir e' il path relativo alle risorse (es. "../Resources/"), stesso usato per le altre texture
+        //resourcesDir è il path relativo alle risorse (es. "../Resources/"), stesso usato per le altre texture
         Hotbar(const std::string& resourcesDir){
             slots = {
                 {{Blocks::BlockType::GRASS}},

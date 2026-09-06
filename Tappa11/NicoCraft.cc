@@ -338,15 +338,13 @@ int main(){
     bool programRunning = true;
 
     while(programRunning){
+        //Main Menù
         if(state == GameState::MainMenu){
             HandleMenuEvents(window, *mainMenu, state, programRunning);
             if(!programRunning) break;
-
+            //Appena preme sul pulsante genera mondo
             if(state == GameState::Playing){
-                //Transizione menu -> gioco: qui, e SOLO qui, nascono Player, Renderer,
-                //Hotbar, World (chunk + mesh compresi) e PauseMenu. Renderer e World sono
-                //sincroni e bloccano il thread principale: mostriamo la loading screen
-                //PRIMA di iniziare, cosi' non resta uno schermo bloccato durante l'attesa
+                //Inializzati Player, Renderer,Hotbar, World (chunk + mesh), PauseMenu.
                 fcg::DrawLoadingScreen(window, res);
 
                 player = std::make_unique<fcg::Player>();
@@ -389,7 +387,7 @@ int main(){
                 continue;
             }
 
-            mainMenu->UpdateHover(sf::Mouse::getPosition(window));
+            mainMenu->UpdateHover(sf::Mouse::getPosition(window)); //Cambia il colore dei pulsanti
 
             window.clear(sf::Color(18, 18, 26));
             window.pushGLStates();
@@ -399,6 +397,7 @@ int main(){
             continue;
         }
 
+        //Game Paused
         if(state == GameState::Paused){
             HandlePauseEvents(window, *pauseMenu, *player, state, programRunning);
             if(!programRunning) break;
@@ -413,11 +412,9 @@ int main(){
                 continue;
             }
 
+            //Si torna al menu principale:
             if(state == GameState::MainMenu){
-                //Si torna al menu principale: distruggiamo tutto cio' che serviva solo
-                //per giocare, World compreso. Da qui in poi non c'e' piu' nulla da
-                //renderizzare finche' non si preme di nuovo "Genera Mondo"
-                player.reset();
+                //Chiamiamo i decostruttori di ciascuno, e inizializziamo a nullptr
                 renderer.reset();
                 hotbar.reset();
                 world.reset();
@@ -427,7 +424,7 @@ int main(){
                 window.setMouseCursorGrabbed(false);
 
                 //Ricostruita dalle preferenze salvate, cosi' riflette eventuali modifiche
-                //fatte nel pannello Opzioni della pausa
+                //Fatte nel pannello Opzioni della pausa
                 fcg::Settings currentSettings = fcg::LoadSettings(settingsPath);
                 mainMenu = std::make_unique<fcg::MainMenu>(res, currentSettings.fov, currentSettings.width, currentSettings.height);
                 mainMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
@@ -449,12 +446,11 @@ int main(){
             continue;
         }
 
-        //// state == GameState::Playing ////
+        //Playing in game
         HandleEvents(window, *player, *hotbar,*compass, windowCenter, state, programRunning);
         if(!programRunning) break;
 
-        if(state == GameState::Paused){
-            //Esc appena premuto: apri l'overlay, libera il cursore, non processare input di gioco
+        if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
             pauseMenu->Reset();
             window.setMouseCursorVisible(true);
             window.setMouseCursorGrabbed(false);

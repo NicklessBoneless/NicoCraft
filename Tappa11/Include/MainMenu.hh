@@ -13,18 +13,14 @@
 #include "OptionsPanel.hh"
 
 namespace fcg{
-
-    //Menu principale: schermata Main (titolo, Genera Mondo, Opzioni, Esci) e schermata
-    //Options (delegata al componente condiviso OptionsPanel, lo stesso usato dalla pausa).
-    //Disegnato in puro SFML 2D, nessuna dipendenza da OpenGL/3D: chi chiama Draw() deve
-    //avvolgerla in window.pushGLStates()/popGLStates() se nel frame lo stato OpenGL
-    //(depth test ecc.) e' gia' stato toccato, esattamente come si fa per Hotbar
+    //Menu principale
+    //Disegnato in puro SFML 2D, nessuna dipendenza da OpenGL/3D.
     class MainMenu{
     public:
         enum class MenuAction{ None, GenerateWorld, Exit, FovChanged, ResolutionChanged };
 
     private:
-        enum class Screen{ Main, Options }; //Stati del menu pricipale
+        enum class Screen{ Main, Options }; //Stati del menu principale
 
         sf::Font font; //Font che sarà utilizzato da tutti i pulsanti e testi
 
@@ -53,7 +49,7 @@ namespace fcg{
         const sf::Color buttonHoverColor = sf::Color(95, 95, 125);
 
     public:
-        //resourcesDir e' il path relativo alle risorse condivise (es. "../Resources/").
+        //resourcesDir è il path relativo alle risorse condivise (es. "../Resources/").
         //initialFov/initialWidth/initialHeight arrivano dal file di preferenze (Settings.hh)
         MainMenu(const std::string& resourcesDir, float initialFov, int initialWidth, int initialHeight) :
             titleText(LoadFont(resourcesDir), "NicoCraft", 64),
@@ -112,9 +108,9 @@ namespace fcg{
             }
         }
 
-        //Da chiamare quando arriva un click sinistro. Gestisce da sola la navigazione
-        //Main <-> Options; ritorna solo le azioni che il chiamante deve applicare
-        //all'esterno (creare il mondo, uscire, salvare le preferenze)
+        //Da chiamare quando arriva un click sinistro. 
+        //Gestisce solo la navigazione Main <-> Options; 
+        //Ritorna solo le azioni che il chiamante deve applicare all'esterno (creare il mondo, uscire, salvare le preferenze)
         MenuAction HandleClick(sf::Vector2i mousePos){
             if(currentScreen == Screen::Main){
                 sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
@@ -141,6 +137,7 @@ namespace fcg{
             }
         }
 
+        //Disegniamo i pulsanti
         void Draw(sf::RenderWindow& window){
             if(currentScreen == Screen::Main){
                 window.draw(titleText);

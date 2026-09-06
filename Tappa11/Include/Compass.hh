@@ -9,9 +9,8 @@
 
 namespace fcg{
 
-    //Scritta in alto a destra con il punto cardinale approssimato verso cui guarda il
+    //Scritta in alto a sinistra con il punto cardinale approssimato verso cui guarda il
     //player, dedotto dallo yaw della Camera. Solo le 4 direzioni principali (N/S/E/O),
-    //nessuna diagonale: sufficiente per orientarsi nel mondo
     class Compass{
     private:
         sf::Font font;

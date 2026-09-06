@@ -13,11 +13,8 @@
 //Modificati i pulsanti delle impostazioni
 
 namespace fcg{
-    //Overlay di pausa (ESC durante il gioco): scurisce lo schermo con un riquadro
-    //semi-trasparente e mostra Ritorna al gioco / Opzioni / (Menu Principale, Esci dal
-    //gioco sulla stessa riga, piu' piccoli). Il chiamante NON deve leggere alcun input
-    //di gioco mentre questo overlay e' attivo: e' lui a garantirlo semplicemente non
-    //chiamando le funzioni di update del gioco mentre lo stato e' Paused
+    //Overlay di pausa (ESC durante il gioco) semi-trasparente.
+    //Il tempo viene messo in pausa e il gioco non prende input per il player
     class PauseMenu{
     public:
         enum class MenuAction{ None, Resume, BackToMainMenu, QuitGame, FovChanged, ResolutionChanged };
@@ -66,8 +63,8 @@ namespace fcg{
             optionsButtonText(font, "Opzioni", 22),
             mainMenuButtonText(font, "Menu Principale", 18),
             quitButtonText(font, "Esci dal gioco", 18),
-            optionsPanel(font, initialFov, initialWidth, initialHeight)
-        {
+            optionsPanel(font, initialFov, initialWidth, initialHeight){
+
             dimBackground.setFillColor(sf::Color(0, 0, 0, 170));
 
             titleText.setFillColor(sf::Color::White);

@@ -21,47 +21,40 @@ namespace Blocks
             }
 
         public:
-            Chunk() : blocks(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z, BlockType::AIR) {}
+            Chunk() : blocks(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z, BlockType::AIR){}
 
-            bool InBounds(int x, int y, int z) const
-            {
+            bool InBounds(int x, int y, int z) const{
                 return x >= 0 && x < CHUNK_SIZE_X && y >= 0 && y < CHUNK_SIZE_Y && z >= 0 && z < CHUNK_SIZE_Z;
             }
 
-            BlockType Get(int x, int y, int z) const
-            {
+            BlockType Get(int x, int y, int z) const{
                 if(!InBounds(x, y, z))
-                    return BlockType::AIR; // fuori dal chunk = aria (bordo visibile)
+                    return BlockType::AIR; //Se fuori dal chunk == aria (allora bordo visibile)
                 return blocks[Index(x, y, z)];
             }
 
-            void Set(int x, int y, int z, BlockType type)
-            {
+            void Set(int x, int y, int z, BlockType type){
                 if(InBounds(x, y, z))
                     blocks[Index(x, y, z)] = type;
             }
 
-            bool IsSolid(int x, int y, int z) const
-            {
+            bool IsSolid(int x, int y, int z) const{
                 return Get(x, y, z) != BlockType::AIR;
             }
 
-            bool IsTransparent(int x, int y, int z) const
-            {
+            bool IsTransparent(int x, int y, int z) const{
                 return isBlockTransparent(Get(x, y, z));
             }
     };
 
-    struct Vertex
-    {
+    struct Vertex{
         float x, y, z;
         float u, v;
         float texture;
         float brightness;
     };
 
-    struct MeshData
-    {
+    struct MeshData{
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
     };
@@ -143,8 +136,7 @@ namespace Blocks
     public:
         ~ChunkMesh() { Clean(); }
 
-        void Upload(const MeshData& mesh)
-        {
+        void Upload(const MeshData& mesh){
             Clean();
             indexCount = static_cast<GLsizei>(mesh.indices.size());
             if(indexCount == 0) return;
@@ -172,16 +164,14 @@ namespace Blocks
             glBindVertexArray(0);
         }
 
-        void Draw() const
-        {
+        void Draw() const{
             if(indexCount == 0) return;
             glBindVertexArray(vao);
             glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
         }
 
-        void Clean()
-        {
+        void Clean(){
             if(vao){ glDeleteVertexArrays(1, &vao); vao = 0; }
             if(vbo){ glDeleteBuffers(1, &vbo); vbo = 0; }
             if(ebo){ glDeleteBuffers(1, &ebo); ebo = 0; }

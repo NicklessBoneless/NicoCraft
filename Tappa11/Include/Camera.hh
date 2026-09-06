@@ -81,9 +81,7 @@ namespace fcg
         }
 
         //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
-        //Usa SOLO le prime 4 celle del binding array (W,S,D,A): Space/LControl (se presenti,
-        //per il noclip) vengono ignorati a prescindere, cosi' non c'e' rischio di introdurre
-        //una componente Y "fantasma" quando questa funzione viene chiamata durante la camminata normale
+        //Usa SOLO le prime 4 celle del binding array (W,A,S,D)
         glm::vec3 computeHorizontalMovement(const PlayerInput& input, bool isNoClip) const{
             float yawRad = glm::radians(yawDeg);
             glm::vec3 forward = {glm::sin(yawRad), 0.0f, -glm::cos(yawRad)};

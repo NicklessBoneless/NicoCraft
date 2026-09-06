@@ -9,8 +9,7 @@
 #include <glm/vec3.hpp>
 
 namespace Blocks{
-    enum class BlockType : uint8_t
-    {
+    enum class BlockType : uint8_t{
         AIR = 0,
         DIRT,
         GRASS,
@@ -23,8 +22,7 @@ namespace Blocks{
         LOGWOODEASTX
     };
 
-    enum class BlockFace : uint8_t
-    {
+    enum class BlockFace : uint8_t{
         Front = 0, // +Z
         Back,      // -Z
         Left,      // -X
@@ -34,8 +32,7 @@ namespace Blocks{
     };
 
     // Identificatori chiari per ogni layer nell'array di texture
-    enum class TextureIndex : uint32_t
-    {
+    enum class TextureIndex : uint32_t{
         MISSING = 0,
         DIRT,
         GRASS_TOP,
@@ -51,8 +48,7 @@ namespace Blocks{
         GLASS,
     };
 
-    struct Block
-    {
+    struct Block{
         BlockType type = BlockType::AIR;
 
         bool isSolid() const {
@@ -72,8 +68,7 @@ namespace Blocks{
     }
 
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
-    inline uint32_t getTextureIndex(BlockType type, BlockFace face)
-    {
+    inline uint32_t getTextureIndex(BlockType type, BlockFace face){
         switch(type) {
         case BlockType::GRASS:
             if(face == BlockFace::Bottom) return static_cast<uint32_t>(TextureIndex::DIRT);
@@ -109,7 +104,7 @@ namespace Blocks{
             if(face == BlockFace::Bottom)
                 return static_cast<uint32_t>(TextureIndex::LOG_SIDEFLIP); 
             if(face == BlockFace::Right)
-                 return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); //Left
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); //Left
             return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
             
         case BlockType::LEAVES:
@@ -124,7 +119,7 @@ namespace Blocks{
     }
 
     // Gestione delle Texture Array OpenGL [GL_TEXTURE_2D_ARRAY]
-    class TextureArray {
+    class TextureArray{
     private:
         GLuint textureID = 0;
 
@@ -162,9 +157,9 @@ namespace Blocks{
             glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, textureSize, textureSize, numberOfTextures, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             // Carica ogni singola immagine e la copia nel rispettivo layer z
-            for(GLsizei textureIndex = 0; textureIndex < numberOfTextures; textureIndex++) {
+            for(GLsizei textureIndex = 0; textureIndex < numberOfTextures; textureIndex++){
                 sf::Image img;
-                if(!img.loadFromFile(res + fileNames[textureIndex])) {
+                if(!img.loadFromFile(res + fileNames[textureIndex])){
                     std::cerr << "Errore nel caricamento della texture: " << res + fileNames[textureIndex] << std::endl;
                     std::cerr << "Eseguo fallback!\n";
                     if(!img.loadFromFile(res + fileNames[0])) {
@@ -185,7 +180,7 @@ namespace Blocks{
                 }
             }
 
-            // Filtraggio stile pixel-art (Minecraft)
+            //Filtraggio pixel-art
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -195,14 +190,12 @@ namespace Blocks{
             glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
         }
 
-        void Bind(GLuint unit = 0) const
-        {
+        void Bind(GLuint unit = 0) const{
             glActiveTexture(GL_TEXTURE0 + unit);
             glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
         }
 
-        void Clean()
-        {
+        void Clean(){
             if(textureID != 0) {
                 glDeleteTextures(1, &textureID);
                 textureID = 0;

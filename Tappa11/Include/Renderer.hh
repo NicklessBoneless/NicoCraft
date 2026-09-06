@@ -40,16 +40,17 @@ namespace fcg{
             Locations();
         }
 
-        //Disegna un frame completo: cielo (Sole/Luna/stelle), mondo, outline del blocco
-        //puntato (se presente), crosshair. deltaTime fa avanzare il ciclo giorno/notte
+        //Disegna un frame completo: 
+        //Cielo (Sole/Luna/stelle), Mondo, Outline del blocco puntato, crosshair. 
+        //DeltaTime fa avanzare il ciclo giorno/notte
         void Draw(const World& world, Camera& camera, const RaycastHit& target, float deltaTime){
-            sky.Update(deltaTime);
+            sky.Update(deltaTime); //Update del cielo
 
             glm::vec3 skyColor = sky.GetSkyColor();
             glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            sky.Draw(camera);
+            sky.Draw(camera); //Draw del cielo
 
             worldShader.use();
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);

@@ -51,7 +51,7 @@ namespace fcg
         }
 
         //Lancia un raggio da 'origin' lungo 'direction' (non serve normalizzata) e restituisce
-        //il primo blocco solido incontrato entro 'maxDistance', con voxel traversal DDA
+        //Il primo blocco solido incontrato entro 'maxDistance', con voxel traversal DDA
         RaycastHit RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance){
             RaycastHit result;
 
@@ -103,7 +103,6 @@ namespace fcg
                     enteredFace = stepZ > 0 ? 1 : 0; //+Z -> Back(1), -Z -> Front(0)
                 }
             }
-
             return result;
         }
 
@@ -169,9 +168,6 @@ namespace fcg
         }
 
         //Traduce l'input in coda sul Player (break/place) in modifiche effettive al mondo.
-        //E' logica di dominio (manipola i blocchi), non orchestrazione: per questo vive qui
-        //e non in NicoCraft.cc
-        //Traduce l'input in coda sul Player (break/place) in modifiche effettive al mondo.
         void ProcessBlockInteractions(Player& player, RaycastHit& target, Blocks::BlockType selectedBlockType){
             bool wantBreak = player.ConsumeBreakBlock();
             bool wantPlace = player.ConsumePlaceBlock();
@@ -194,8 +190,8 @@ namespace fcg
             }
         }
 
-        //Controlla se e' solido il blocco a coordinate MONDO, individuando da solo il chunk giusto.
-        //Override di fcg::IWorld: e' cosi' che PlayerPhysics interroga il mondo senza conoscere World
+        //Controlla se è solido il blocco in coordinate MONDO, individuando da solo il chunk corretto.
+        //Override di fcg::IWorld: è così che PlayerPhysics interroga il mondo senza conoscere World
         bool IsSolidAtWorld(int worldX, int worldY, int worldZ) override{
             if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
                 return false;
@@ -232,6 +228,7 @@ namespace fcg
             }
         }
 
+        //Genera gli alberi
         void GenerateTrees(Blocks::Chunk& chunk){
             const int SURFACE = Blocks::CHUNK_SIZE_Y * 0.5;
             const int MIN_TREE_DISTANCE = 3; //Distanza minima (in blocchi) tra due tronchi
@@ -267,8 +264,7 @@ namespace fcg
             }
         }
 
-        //Controlla se (x,z) e' entro minDistance da un tronco gia' piazzato (distanza euclidea al quadrato,
-        //per evitare la sqrt)
+        //Controlla se (x,z) sono entro minDistance da un tronco già piazzato
         static bool IsTooCloseToOtherTree(int x, int z, const std::vector<std::pair<int,int>>& treePositions, int minDistance){
             int minDistanceSquared = minDistance * minDistance;
             for(const auto& pos : treePositions){
@@ -279,6 +275,7 @@ namespace fcg
             return false;
         }
 
+        //Generiamo tutti i chunk
         void GenerateAllChunks(){
             for(int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++){
                 for(int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++){
@@ -337,9 +334,9 @@ namespace fcg
         }
 
         //Controlla se e' solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
-        //rispetto al chunk (chunkX, chunkZ), guardando nel chunk vicino se necessario
+        //Rispetto al chunk (chunkX, chunkZ), guardando nel chunk vicino se necessario
         bool IsTransparentWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
-            //Y non e' suddiviso in chunk: se esce sopra/sotto e' semplicemente aria
+            //Y non è suddiviso in chunk
             if(localY < 0 || localY >= Blocks::CHUNK_SIZE_Y){
                 return true;
             }
@@ -358,8 +355,8 @@ namespace fcg
             return neighbor->IsTransparent(wrappedX, localY, wrappedZ);
         }
 
-        //Divisione intera "verso il basso" (floor): serve perche' l'operatore % di C++
-        //tronca verso zero, non verso -infinito, e con coordinate negative darebbe risultati sbagliati
+        //Divisione intera "verso il basso" (floor): serve perché l'operatore % (modulo) di C++
+        //tronca verso '0', non verso -infinito, e con coordinate negative darebbe risultati sbagliati
         static int FloorDiv(int a, int b){
             int d = a / b;
             int r = a % b;
