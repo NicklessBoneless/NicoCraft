@@ -55,8 +55,7 @@ Nessuna tappa richiede argomenti da riga di comando.
 Tappa11 introduce un **menu principale** e una **schermata di pausa**, entrambi navigabili col mouse:
 
 - All'avvio compare il **Menu Principale**: *Genera Mondo* (avvia la partita), *Opzioni* (FOV e risoluzione), *Esci*
-- **Esc**, durante il gioco, non chiude più il programma ma apre il **menu di Pausa**: *Ritorna al gioco*, *Opzioni*, *Menu Principale*, *Esci dal gioco*
-- Nel pannello **Opzioni** (raggiungibile sia dal menu principale che dalla pausa): pulsanti `-`/`+` per il FOV e `<`/`>` per la risoluzione, più *Indietro*
-- Tutte le interazioni con i menu avvengono con il **tasto sinistro del mouse**; il cursore è visibile e libero mentre un menu è attivo, e torna catturato (invisibile) durante il gioco
+- **Esc**, durante il gioco, apre il **menu di Pausa**: *Ritorna al gioco*, *Opzioni*, *Menu Principale*, *Esci dal gioco*
+- Tutte le interazioni con i menu avvengono con il **tasto sinistro del mouse**; il cursore è visibile e libero mentre un menu è attivo, e torna catturato (invisibile) durante il gioco.
 
 I comandi di gioco veri e propri (WASD, salto, sprint, noclip, hotbar, rompi/piazza blocco) restano identici a quelli di Tappa10.
