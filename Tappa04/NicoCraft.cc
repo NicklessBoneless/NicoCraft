@@ -460,7 +460,7 @@ public:
         return (boundary - originComp) / dirComp;
     }
 
-    //Controlla se e' solido il blocco a coordinate MONDO, individuando da solo il chunk giusto
+    //Controlla se è solido il blocco da coordinate MONDO a locali, individuando da solo il chunk giusto
     bool IsSolidAtWorld(int worldX, int worldY, int worldZ){
         if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
             return false;
