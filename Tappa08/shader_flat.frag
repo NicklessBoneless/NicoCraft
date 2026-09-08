@@ -9,7 +9,7 @@ uniform sampler2DArray textureArray;
 
 void main()
 {
-    vec4 texColor = texture(textureArray, vec3(TexCoord, TexLayer));
+    vec4 texColor = texture(textureArray, vec3(outUvCoordinates, outTextureIndex));
 
     //Alpha test: scarta i pixel trasparenti invece di disegnarli neri.
     //Niente blending necessario: la trasparenza delle foglie e' binaria (o c'e' o non c'e')
