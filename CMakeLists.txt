@@ -3,7 +3,14 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum policy version for al
 
 project(NicoCraft LANGUAGES CXX)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/Executables)
+
+#Necessario per i generatori multi-configurazione (Visual Studio, Xcode): altrimenti
+#aggiungono da soli una sottocartella per configurazione (Debug/ o Release/)
+foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_SOURCE_DIR}/Executables)
+endforeach()
 
 include(FetchContent)
 
@@ -42,8 +49,6 @@ find_package(OpenGL REQUIRED)
 if(APPLE)
     find_library(CORE_GRAPHICS_LIB CoreGraphics REQUIRED)
 endif()
-
-
 
 ###############################
 ### Sorgenti e Tappe 1-10   ###
