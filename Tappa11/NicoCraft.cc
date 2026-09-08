@@ -353,7 +353,7 @@ int main(){
 
                 renderer = std::make_unique<fcg::Renderer>(
                     std::vector<fcg::ShaderFiles>{
-                        {"world",     dir + "shader_flat.vert",     dir + "shader_flat.frag"},
+                        {"world",     dir + "block_shader.vert",     dir + "block_shader.frag"},
                         {"crosshair", dir + "shader_crosshair.vert", dir + "shader_crosshair.frag"},
                         {"outline",   dir + "shader_outline.vert",   dir + "shader_outline.frag"},
                     },
