@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "rawmouse.hh"
 #include "./Include/Player.hh"
 #include "./Include/World.hh"
 #include "./Include/Renderer.hh"
@@ -73,12 +74,11 @@ public:
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar,fcg::Compass& compass, sf::Vector2i& windowCenter){
+void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar, fcg::Compass& compass){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
     hotbar.SetWindowSize(resized.size.x, resized.size.y);
-    compass.SetWindowSize(resized.size.x,resized.size.y);
-    windowCenter = {(int)(resized.size.x / 2), (int)(resized.size.y / 2)};
+    compass.SetWindowSize(resized.size.x, resized.size.y);
 }
 
 ////////////////////
@@ -191,15 +191,18 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
 //Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
 //Esc che ora apre la pausa invece di chiudere il programma
-void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar,fcg::Compass& compass ,sf::Vector2i& windowCenter, GameState& state, bool& programRunning){
+void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            Handle(*resized, player.getCamera(), hotbar,compass, windowCenter);
+            Handle(*resized, player.getCamera(), hotbar, compass);
             return;
+        }
+        if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>()){
+            rawMouse.event(*rawMoved); //RawMouse aggiunto
         }
 
         if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
@@ -240,7 +243,6 @@ void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar,f
                 case sf::Keyboard::Scancode::Num9:
                     hotbar.SetSelected(6);
                     break;
-
                 default:
                     break; //Ignora gli altri tasti
             }
@@ -274,13 +276,10 @@ void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar,f
     }
 }
 
-void UpdateMouseInput(sf::Window& window, fcg::Camera& camera, const sf::Vector2i& windowCenter){
+void UpdateMouseInput(sf::Window& window, fcg::Camera& camera, fcg::RawMouse& rawMouse){
+    sf::Vector2f delta = rawMouse.delta(); //Va comunque svuotato l'accumulatore ogni frame
     if(window.hasFocus()){
-        sf::Vector2i curMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2i delta = curMousePos - windowCenter;
-
-        camera.Look((float) delta.x, (float) delta.y);
-        sf::Mouse::setPosition(windowCenter, window);
+        camera.Look(delta.x, delta.y);
     }
 }
 
@@ -318,6 +317,7 @@ int main(){
     //Nel menu il cursore resta visibile e libero, per poter cliccare sui tasti
     window.setMouseCursorVisible(true);
     window.setMouseCursorGrabbed(false);
+    fcg::RawMouse rawMouse;
 
     //Player, Renderer, Hotbar, World e PauseMenu nascono tutti insieme, solo alla
     //pressione di "Genera Mondo": prima di quel momento non esiste nessuna risorsa di
@@ -331,8 +331,6 @@ int main(){
     std::unique_ptr<fcg::Compass> compass;
 
     fcg::RaycastHit target; //Ultimo blocco puntato: resta "congelato" mentre si e' in pausa
-
-    sf::Vector2i windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
 
     sf::Clock clock;
     bool programRunning = true;
@@ -379,8 +377,7 @@ int main(){
 
                 window.setMouseCursorVisible(false);
                 window.setMouseCursorGrabbed(true);
-                windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
-                sf::Mouse::setPosition(windowCenter, window);
+                
 
                 target = fcg::RaycastHit{};
                 clock.restart(); //Evita un deltaTime enorme dovuto al tempo passato nel menu
@@ -406,8 +403,6 @@ int main(){
                 //Ripresa: riaggancia il mouse esattamente come all'ingresso in Playing
                 window.setMouseCursorVisible(false);
                 window.setMouseCursorGrabbed(true);
-                windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
-                sf::Mouse::setPosition(windowCenter, window);
                 clock.restart();
                 continue;
             }
@@ -447,7 +442,7 @@ int main(){
         }
 
         //Playing in game
-        HandleEvents(window, *player, *hotbar,*compass, windowCenter, state, programRunning);
+        HandleEvents(window, *player, *hotbar,*compass,rawMouse, state, programRunning);
         if(!programRunning) break;
 
         if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
@@ -462,7 +457,7 @@ int main(){
         PlayerInput currentInput = CapturePlayerInput();
         player->UpdatePosition(deltaTime, *world, currentInput);
 
-        UpdateMouseInput(window, player->getCamera(), windowCenter);
+        UpdateMouseInput(window, player->getCamera(), rawMouse);
 
         target = world->RaycastBlock(
             player->getCamera().getPosition(),
