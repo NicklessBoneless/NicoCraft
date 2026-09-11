@@ -48,6 +48,7 @@ find_package(OpenGL REQUIRED)
 #find coregraphics for raw mouse events in macos
 if(APPLE)
     find_library(CORE_GRAPHICS_LIB CoreGraphics REQUIRED)
+    target_link_libraries(common INTERFACE ${CORE_GRAPHICS_LIB})
 endif()
 
 ###############################

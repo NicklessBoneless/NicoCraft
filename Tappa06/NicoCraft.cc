@@ -7,6 +7,7 @@
 #include <cmath>
 #include <limits>
 
+#include "rawmouse.hh"
 #include "./Include/Blocks.hh" //Messo per primo per dipendenze
 #include "./Include/Chunk.hh"
 #include "./Include/Crosshair.hh"
@@ -631,10 +632,9 @@ std::vector<keyBindings> KeyBindingsActions(Player& player){
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, Camera& camera, sf::Vector2i& windowCenter){
+void Handle(const sf::Event::Resized& resized, Camera& camera){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
-    windowCenter = { (int)(resized.size.x / 2), (int)(resized.size.y / 2) };
 }
 
 ////////////////////
@@ -651,13 +651,13 @@ void CheckBinding(sf::Keyboard::Scancode scancode, bool isPressed, const std::ve
 }
 
 
-void HandleEvents(sf::Window& window, Player& player,sf::Vector2i& windowCenter, const std::vector<keyBindings>& keyBinds, bool& ProgramRunning) {
-    while (const std::optional event = window.pollEvent()) {
+void HandleEvents(sf::Window& window, Player& player,fcg::RawMouse& rawMouse, const std::vector<keyBindings>& keyBinds, bool& ProgramRunning) {
+    while(const std::optional event = window.pollEvent()) {
         if(event->is<sf::Event::Closed>()) 
             ProgramRunning = false;
 
         else if (const auto* resized = event->getIf<sf::Event::Resized>()) 
-            Handle(*resized, player.getCamera(), windowCenter);
+            Handle(*resized, player.getCamera());
 
         else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
             CheckBinding(keyPressed->scancode, true, keyBinds);  // Tasto premuto
@@ -673,16 +673,15 @@ void HandleEvents(sf::Window& window, Player& player,sf::Vector2i& windowCenter,
                 player.QueuePlaceBlock();
             }
         }
+        else if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>())
+            rawMouse.event(*rawMoved);
     }
 }
 
-void UpdateMouseInput(sf::Window& window, Camera& camera, const sf::Vector2i& windowCenter){
+void UpdateMouseInput(sf::Window& window, Camera& camera, fcg::RawMouse& rawMouse){
     if(window.hasFocus()) {
-        sf::Vector2i curMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2i delta = curMousePos - windowCenter;
-
-        camera.Look((float)delta.x, (float)delta.y);
-        sf::Mouse::setPosition(windowCenter, window);
+        sf::Vector2f delta = rawMouse.delta();
+        camera.Look(delta.x, delta.y);
     }
 }
 
@@ -698,8 +697,7 @@ int main(){
     //Prendiamo e centriamo il cursore per la camera FPS
     window.setMouseCursorVisible(false);
     window.setMouseCursorGrabbed(true);
-    sf::Vector2i windowCenter = { (int) (window.getSize().x / 2), (int) (window.getSize().y / 2) };
-    sf::Mouse::setPosition(windowCenter, window);
+    fcg::RawMouse rawMouse;
 
     //Carichiamo la shader di base del mondo 3D
     fcg::Shaders shaders(dir + "shader_flat.vert", dir + "shader_flat.frag");
@@ -725,13 +723,13 @@ int main(){
     
     while(programRunning){
         //Controllo input Tastiera e click del mouse
-        HandleEvents(window,scene.player,windowCenter,keyBindings,programRunning);
+        HandleEvents(window,scene.player,rawMouse,keyBindings,programRunning);
 
         float deltaTime = clock.restart().asSeconds();
         scene.player.Move(deltaTime);
 
         //Mouse Input
-        UpdateMouseInput(window,scene.player.getCamera(),windowCenter);
+        UpdateMouseInput(window,scene.player.getCamera(),rawMouse);
 
         //RayCast dalla camera: individua il blocco puntato PRIMA di disegnare,
         //cosi' un'eventuale rottura e' visibile nello stesso frame

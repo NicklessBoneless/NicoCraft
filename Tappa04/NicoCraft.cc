@@ -7,10 +7,12 @@
 #include <cmath>
 #include <limits>
 
+#include "rawmouse.hh"
 #include "./Include/Blocks.hh" //Messo per primo per dipendenze
 #include "./Include/Chunk.hh"
 #include "./Include/Crosshair.hh"
 #include "./Include/BlockOutline.hh"
+
 
 const std::string dir = "../Tappa04/";
 const std::string res = "../Resources/";
@@ -527,29 +529,29 @@ void CheckBinding(sf::Keyboard::Scancode scancode, bool isPressed, const std::ve
 }
 
 
-void HandleEvents(sf::Window& window, Camera& camera, const std::vector<keyBindings>& keyBinds, bool& running) {
-    while (const std::optional event = window.pollEvent()) {
-        if(event->is<sf::Event::Closed>()) 
+void HandleEvents(sf::Window& window, Camera& camera, const std::vector<keyBindings>& keyBinds, bool& running, fcg::RawMouse& rawMouse){
+    while(const std::optional event = window.pollEvent()){
+        if(event->is<sf::Event::Closed>())
             running = false;
 
-        else if (const auto* resized = event->getIf<sf::Event::Resized>()) 
+        else if(const auto* resized = event->getIf<sf::Event::Resized>())
             Handle(*resized, camera);
 
-        else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
-            CheckBinding(keyPressed->scancode, true, keyBinds);  // Tasto premuto
-        
-        else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) 
-            CheckBinding(keyReleased->scancode, false, keyBinds); // Tasto rilasciato
+        else if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
+            CheckBinding(keyPressed->scancode, true, keyBinds);
+
+        else if(const auto* keyReleased = event->getIf<sf::Event::KeyReleased>())
+            CheckBinding(keyReleased->scancode, false, keyBinds);
+
+        else if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>())
+            rawMouse.event(*rawMoved);
     }
 }
 
-void UpdateMouseInput(sf::Window& window, Camera& camera, const sf::Vector2i& windowCenter){
-    if(window.hasFocus()) {
-        sf::Vector2i curMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2i delta = curMousePos - windowCenter;
-
-        camera.Look((float)delta.x, (float)delta.y);
-        sf::Mouse::setPosition(windowCenter, window);
+void UpdateMouseInput(sf::Window& window,Camera& camera, fcg::RawMouse& rawMouse){
+    sf::Vector2f delta = rawMouse.delta(); //Va comunque svuotato l'accumulatore ogni frame
+    if(window.hasFocus()){
+        camera.Look(delta.x, delta.y);
     }
 }
 
@@ -565,8 +567,7 @@ int main(){
     //Prendiamo e centriamo il cursore per la camera FPS
     window.setMouseCursorVisible(false);
     window.setMouseCursorGrabbed(true);
-    sf::Vector2i windowCenter = { (int) (window.getSize().x / 2), (int) (window.getSize().y / 2) };
-    sf::Mouse::setPosition(windowCenter, window);
+    fcg::RawMouse rawMouse;
 
     //Carichiamo la shader di base del mondo 3D
     fcg::Shaders shaders(dir + "shader_flat.vert", dir + "shader_flat.frag");
@@ -591,13 +592,13 @@ int main(){
     
     while(running){
         //Controllo input Tastiera
-        HandleEvents(window,scene.camera,keyBindings,running);
+        HandleEvents(window,scene.camera,keyBindings,running,rawMouse);
 
         float deltaTime = clock.restart().asSeconds();
         scene.camera.Move(deltaTime);
 
         //Mouse Input
-        UpdateMouseInput(window,scene.camera,windowCenter);
+        UpdateMouseInput(window,scene.camera,rawMouse);
 
         //Disegno il mondo 3D
         scene.Draw(shaders);

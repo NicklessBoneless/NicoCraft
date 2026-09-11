@@ -3,6 +3,7 @@
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/Image.hpp>
 
+#include "rawmouse.hh"
 #include "./Include/Player.hh"
 #include "./Include/World.hh"
 #include "./Include/Renderer.hh"
@@ -58,25 +59,27 @@ private:
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, sf::Vector2i& windowCenter){
+void Handle(const sf::Event::Resized& resized,fcg::Camera& camera){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
-    windowCenter = {(int)(resized.size.x / 2), (int)(resized.size.y / 2)};
 }
 
 ////////////////////
 // AUX Functions  //
 ////////////////////
 
-void HandleEvents(sf::Window& window, fcg::Player& player, sf::Vector2i& windowCenter, bool& programRunning){
+void HandleEvents(sf::Window& window, fcg::Player& player,fcg::RawMouse& rawMouse, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            Handle(*resized, player.getCamera(), windowCenter);
+            Handle(*resized, player.getCamera());
             return;
+        }
+        if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>()){
+            rawMouse.event(*rawMoved);
         }
 
         if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
@@ -116,13 +119,10 @@ void HandleEvents(sf::Window& window, fcg::Player& player, sf::Vector2i& windowC
     }
 }
 
-void UpdateMouseInput(sf::Window& window, fcg::Camera& camera, const sf::Vector2i& windowCenter){
+void UpdateMouseInput(sf::Window& window, fcg::Camera& camera, fcg::RawMouse& rawMouse){
     if(window.hasFocus()){
-        sf::Vector2i curMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2i delta = curMousePos - windowCenter;
-
-        camera.Look((float) delta.x, (float) delta.y);
-        sf::Mouse::setPosition(windowCenter, window);
+        sf::Vector2f delta = rawMouse.delta();
+        camera.Look(delta.x, delta.y);
     }
 }
 
@@ -153,8 +153,7 @@ int main(){
     //Prendiamo e centriamo il cursore per la camera FPS
     window.setMouseCursorVisible(false);
     window.setMouseCursorGrabbed(true);
-    sf::Vector2i windowCenter = {(int)(window.getSize().x / 2), (int)(window.getSize().y / 2)};
-    sf::Mouse::setPosition(windowCenter, window);
+    fcg::RawMouse rawMouse;
 
     //Player e camera
     fcg::Player player;
@@ -189,7 +188,7 @@ int main(){
 
     while(programRunning){
         //Eventi standard (chiusura finestra, toggle, click singoli)
-        HandleEvents(window, player, windowCenter, programRunning);
+        HandleEvents(window, player, rawMouse, programRunning);
 
         float deltaTime = clock.restart().asSeconds();
 
@@ -200,7 +199,7 @@ int main(){
         player.UpdatePosition(deltaTime, world, currentInput);
 
         //Mouse Input
-        UpdateMouseInput(window, player.getCamera(), windowCenter);
+        UpdateMouseInput(window, player.getCamera(), rawMouse);
 
         //Raycast (Guardiamo il Blocco?)
         fcg::RaycastHit target = world.RaycastBlock(
