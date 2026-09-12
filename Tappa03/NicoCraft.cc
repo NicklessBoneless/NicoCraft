@@ -402,7 +402,7 @@ std::vector<keyBindings> ActionsKeyBindings(Scene& scene){
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, Camera& camera){
+void HandleResize(const sf::Event::Resized& resized, Camera& camera){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
 }
@@ -437,7 +437,7 @@ int main(){
             if(event->is<sf::Event::Closed>())
                 running = false;
             else if(const auto* resized = event->getIf<sf::Event::Resized>())
-                Handle(*resized, scene.camera);
+                HandleResize(*resized, scene.camera);
             else if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
                 for(const auto& binding : bindings){
                     if(keyPressed->scancode == binding.key && binding.PressKey){
