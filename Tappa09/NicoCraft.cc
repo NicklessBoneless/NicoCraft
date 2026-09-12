@@ -60,7 +60,7 @@ private:
 // SFML Callbacks //
 ////////////////////
 
-void Handle(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar){
+void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Hotbar& hotbar){
     glViewport(0, 0, resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
     hotbar.SetWindowSize(resized.size.x, resized.size.y);
@@ -77,7 +77,7 @@ void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar,f
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            Handle(*resized, player.getCamera(), hotbar);
+            HandleResize(*resized, player.getCamera(), hotbar);
             return;
         }
         if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>()){
