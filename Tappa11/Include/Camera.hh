@@ -134,28 +134,34 @@ namespace fcg
             return fovDegrees;
         }
 
-        glm::mat4 ViewProjection(){
+        void ViewProjection(){
             float nearPlane = 0.1f;
             float farPlane = 100.0f;
 
             glm::mat4 ry = fcg::rotation_y(yawDeg);
             glm::mat4 rx = fcg::rotation_x(pitchDeg);
             glm::mat4 t  = fcg::translation(-cameraPos.x, -cameraPos.y, -cameraPos.z);
-
+ 
             viewMatrix = rx * ry * t;
 
             float perspectiveA = (farPlane + nearPlane) / (nearPlane - farPlane);
             float perspectiveB = 2.0f * farPlane * nearPlane / (nearPlane - farPlane);
             float focalDistance = 1.0f / glm::tan(glm::radians(fovDegrees / 2.0f));
 
-            projMatrix = glm::mat4(
+            projMatrix = glm::mat4( //Colonne - Righe
                 focalDistance,  0.0,                     0.0,          0.0,
                 0.0,            focalDistance * aspectRatio, 0.0,       0.0,
                 0.0,            0.0,                     perspectiveA, -1.0,
                 0.0,            0.0,                     perspectiveB,  0.0
             );
 
-            return projMatrix * viewMatrix;
+            /*
+                Riga colonna
+                focalDistance , 0.0 , 0.0 , 0.0
+                0.0           , focalDistance      , 0,0         , 0.0
+                0.0           , perspectiveA, perspectiveB       , 0.0
+                0.0           , -1.0               , 0.0         , 0.0
+            */
         }
     };
 }

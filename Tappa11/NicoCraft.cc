@@ -191,13 +191,15 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
 //Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
 //Esc che ora apre la pausa invece di chiudere il programma
-void HandleEvents(sf::Window& window, fcg::Player& player, fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
+void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
+            sf::View view = sf::View({0.0f, 0.0f}, {(float)resized->size.x,(float)resized->size.y});
+            window.setView(view);
             HandleResize(*resized, player.getCamera(), hotbar, compass);
             return;
         }

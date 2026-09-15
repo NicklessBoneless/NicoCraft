@@ -53,6 +53,8 @@ namespace fcg{
             sky.Draw(camera); //Draw del cielo
 
             worldShader.use();
+
+            //Passiamo la matrice Projection e la View block_shader.vert (Uniform)
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, &camera.projMatrix[0][0]);
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &camera.viewMatrix[0][0]);
             glUniform1f(daylightLoc, sky.GetDaylightFactor());
