@@ -70,51 +70,51 @@ namespace Blocks{
     // Mappa (TipoBlocco, Faccia) -> Indice della texture nel Texture Array
     inline uint32_t getTextureIndex(BlockType type, BlockFace face){
         switch(type) {
-        case BlockType::GRASS:
-            if(face == BlockFace::Bottom) return static_cast<uint32_t>(TextureIndex::DIRT);
-            if(face == BlockFace::Top)    return static_cast<uint32_t>(TextureIndex::GRASS_TOP);
-            return static_cast<uint32_t>(TextureIndex::GRASS_SIDE);
+            case BlockType::GRASS:
+                if(face == BlockFace::Bottom) return static_cast<uint32_t>(TextureIndex::DIRT);
+                if(face == BlockFace::Top)    return static_cast<uint32_t>(TextureIndex::GRASS_TOP);
+                return static_cast<uint32_t>(TextureIndex::GRASS_SIDE);
+            
+            case BlockType::DIRT:
+                return static_cast<uint32_t>(TextureIndex::DIRT);
+
+            case BlockType::STONE:
+                return static_cast<uint32_t>(TextureIndex::STONE);
+
+            case BlockType::PLANK:
+                return static_cast<uint32_t>(TextureIndex::PLANK);
         
-        case BlockType::DIRT:
-            return static_cast<uint32_t>(TextureIndex::DIRT);
+            case BlockType::LOGWOOD:
+                if(face == BlockFace::Top || face == BlockFace::Bottom) 
+                    return static_cast<uint32_t>(TextureIndex::LOG_TOP);
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDE);
 
-        case BlockType::STONE:
-            return static_cast<uint32_t>(TextureIndex::STONE);
+            case BlockType::LOGWOODEASTX:
+                if(face == BlockFace::Right || face == BlockFace::Left)
+                    return static_cast<uint32_t>(TextureIndex::LOG_TOP);
+                if(face == BlockFace::Top || face == BlockFace::Bottom || face == BlockFace::Front)
+                    return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); 
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
 
-        case BlockType::PLANK:
-            return static_cast<uint32_t>(TextureIndex::PLANK);
-    
-        case BlockType::LOGWOOD:
-            if(face == BlockFace::Top || face == BlockFace::Bottom) 
-                return static_cast<uint32_t>(TextureIndex::LOG_TOP);
-            return static_cast<uint32_t>(TextureIndex::LOG_SIDE);
+            case BlockType::LOGWOODNORTHZ:
+                if(face == BlockFace::Front || face == BlockFace::Back)
+                    return static_cast<uint32_t>(TextureIndex::LOG_TOP);
+                if(face == BlockFace::Top)
+                    return static_cast<uint32_t>(TextureIndex::LOG_SIDE); 
+                if(face == BlockFace::Bottom)
+                    return static_cast<uint32_t>(TextureIndex::LOG_SIDEFLIP); 
+                if(face == BlockFace::Right)
+                    return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); //Left
+                return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
+                
+            case BlockType::LEAVES:
+                return static_cast<uint32_t>(TextureIndex::LEAVES);
 
-        case BlockType::LOGWOODEASTX:
-            if(face == BlockFace::Right || face == BlockFace::Left)
-                return static_cast<uint32_t>(TextureIndex::LOG_TOP);
-            if(face == BlockFace::Top || face == BlockFace::Bottom || face == BlockFace::Front)
-                return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); 
-            return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
-
-        case BlockType::LOGWOODNORTHZ:
-            if(face == BlockFace::Front || face == BlockFace::Back)
-                return static_cast<uint32_t>(TextureIndex::LOG_TOP);
-            if(face == BlockFace::Top)
-                return static_cast<uint32_t>(TextureIndex::LOG_SIDE); 
-            if(face == BlockFace::Bottom)
-                return static_cast<uint32_t>(TextureIndex::LOG_SIDEFLIP); 
-            if(face == BlockFace::Right)
-                return static_cast<uint32_t>(TextureIndex::LOG_SIDERIGHTROT); //Left
-            return static_cast<uint32_t>(TextureIndex::LOG_SIDELEFTROT);
-            
-        case BlockType::LEAVES:
-            return static_cast<uint32_t>(TextureIndex::LEAVES);
-
-        case BlockType::GLASS:
-            return static_cast<uint32_t>(TextureIndex::GLASS);
-            
-        default:
-            return static_cast<uint32_t>(TextureIndex::MISSING); 
+            case BlockType::GLASS:
+                return static_cast<uint32_t>(TextureIndex::GLASS);
+                
+            default:
+                return static_cast<uint32_t>(TextureIndex::MISSING); 
         }
     }
 
@@ -146,7 +146,7 @@ namespace Blocks{
         TextureArray() = default;
         ~TextureArray() { Clean(); }
 
-        // Carica una lista di percorsi immagini e le impila nella Texture Array
+        //Carica una lista di percorsi immagini e le aggiunge al Texture Array
         void LoadTextures(const std::string& res) {
             GLsizei numberOfTextures = static_cast<GLsizei>(fileNames.size());
 
@@ -168,7 +168,7 @@ namespace Blocks{
                     }
                 }
 
-                // Necessario per non avere le texture capovolte
+                //Necessario per non avere le texture capovolte
                 img.flipVertically();
 
                 //Copia la texture nella posizione textureIndex dell'array di OpenGL
@@ -181,11 +181,17 @@ namespace Blocks{
             }
 
             //Filtraggio pixel-art
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            //Filtro di minificazione, in caso di minificazione campiona il pixel più vicino
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR); 
+
+            //Filtro di magnificazione, in caso di magnificazione mantiene i pixel della texture così come sono senza sfumare
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST); 
+
+            //Se le coordinate UV vanno oltre -0.0 o 1.0 garantisce che la texture venga ripetuta
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
+            //Genera automaticamente tutti i livelli di mipmap necessari
             glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
             glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
         }

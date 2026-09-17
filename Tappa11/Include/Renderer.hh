@@ -100,6 +100,7 @@ namespace fcg{
             projLoc     = glGetUniformLocation(worldShader.program, "projection");
             daylightLoc = glGetUniformLocation(worldShader.program, "daylightFactor");
 
+            //Array delle texture viene passato come uniform al fragmentshader.
             GLint samplerLoc = glGetUniformLocation(worldShader.program, "textureArray");
             glUniform1i(samplerLoc, 0);
         }

@@ -95,9 +95,9 @@ namespace Blocks
                         int nz = z + FACE_OFFSETS[i][2];
 
                         bool IsNeighborTransparent = false;
-                        if(chunk.InBounds(nx, ny, nz))
+                        if(chunk.InBounds(nx, ny, nz)) //Blocco dentro i confini del chunk?
                             IsNeighborTransparent = chunk.IsTransparent(nx, ny, nz);
-                        else //Out of bounds
+                        else //Out of bounds, blocco fuori dai confini del chunk?
                             IsNeighborTransparent = isNeighborTransparent(nx, ny, nz);
 
                         if(!IsNeighborTransparent){
@@ -113,7 +113,7 @@ namespace Blocks
                                 x + FACE_VERTICES[i][v][0], 
                                 y + FACE_VERTICES[i][v][1], 
                                 z + FACE_VERTICES[i][v][2],
-                                FACE_UV[v][0], 
+                                FACE_UV[v][0], //
                                 FACE_UV[v][1], 
                                 texture,
                                 brightness

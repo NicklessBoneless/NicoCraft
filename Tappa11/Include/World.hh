@@ -333,7 +333,7 @@ namespace fcg
             instance.mesh.Upload(meshData);
         }
 
-        //Controlla se e' solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
+        //Controlla se è solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
         //Rispetto al chunk (chunkX, chunkZ), guardando nel chunk vicino se necessario
         bool IsTransparentWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
             //Y non è suddiviso in chunk
@@ -346,7 +346,7 @@ namespace fcg
 
             Blocks::Chunk* neighbor = GetChunkAt(neighborChunkX, neighborChunkZ);
             if(!neighbor){
-                return true; //Bordo del mondo: nessun chunk vicino. Renderizza.
+                return true; //Bordo del mondo: nessun chunk vicino. Allora Renderizza.
             }
 
             int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;

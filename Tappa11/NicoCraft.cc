@@ -139,9 +139,10 @@ void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, GameSta
     }
 }
 
-//Eventi durante lo stato Paused: Esc riprende il gioco, click sui tasti dell'overlay.
-//FOV viene applicato subito alla Camera per un'anteprima live, la risoluzione no
-//(si applichera' al prossimo avvio, vedi Settings.hh)
+/*
+    Eventi durante lo stato Paused: Esc riprende il gioco, click sui tasti dell'overlay.
+    FOV viene applicato subito alla Camera per un'anteprima live, la risoluzione no (si applichera' al prossimo avvio in "Settings.hh")
+*/
 void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Player& player, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
@@ -348,7 +349,7 @@ int main(){
                 fcg::DrawLoadingScreen(window, res);
 
                 player = std::make_unique<fcg::Player>();
-                player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y); //Aspect Ratio
                 player->getCamera().SetFov(mainMenu->GetFov());
 
                 renderer = std::make_unique<fcg::Renderer>(
@@ -476,7 +477,7 @@ int main(){
         hotbar->Draw(window);
         compass->Draw(window);
         window.popGLStates();
-
+        
         window.display();
     }
 

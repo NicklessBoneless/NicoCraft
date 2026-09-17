@@ -31,7 +31,7 @@ namespace fcg{
         PlayerPhysics(glm::vec3 startFeetPosition) : position(startFeetPosition) {}
 
         //'world' e' l'interfaccia astratta (vedi IWorld.hh): PlayerPhysics non sa e non le
-        //interessa che dietro ci sia una World o altro, sa solo che puo' chiederle "e' solido questo blocco?"
+        //interessa che dietro ci sia una World o altro, sa solo che puo' chiederle "è solido questo blocco?"
         void UpdatePlayerPosition(float deltaTime, IWorld& world, glm::vec3 horizontalVelocity){
             if(!onGround){
                 velocity.y -= gravity * deltaTime;
@@ -77,12 +77,13 @@ namespace fcg{
             onGround = false;
         }
 
-        bool OccupiesBlock(int worldX, int worldY, int worldZ) const{
-            int minX = (int) std::floor(position.x - halfWidth);
-            int maxX = (int) std::floor(position.x + halfWidth);
-            int minY = (int) std::floor(position.y);
-            int maxY = (int) std::floor(position.y + height);
-            int minZ = (int) std::floor(position.z - halfWidth);
+        //Controlla se il giocatore sta già occupando quel blocco con la sua posizione salvata.
+        bool OccupiesBlock(int worldX, int worldY, int worldZ) const{ 
+            int minX = (int) std::floor(position.x - halfWidth); 
+            int maxX = (int) std::floor(position.x + halfWidth); 
+            int minY = (int) std::floor(position.y); 
+            int maxY = (int) std::floor(position.y + height); 
+            int minZ = (int) std::floor(position.z - halfWidth); 
             int maxZ = (int) std::floor(position.z + halfWidth);
 
             bool X = (worldX >= minX && worldX <= maxX);
