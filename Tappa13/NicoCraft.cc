@@ -79,11 +79,10 @@ public:
 // SFML Callbacks //
 ////////////////////
 
-void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Renderer& renderer, fcg::Compass& compass){
+void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Renderer& renderer){
     glViewport(0, 0, resized.size.x, resized.size.y);
     renderer.SetWindowSize(resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
-    compass.SetWindowSize(resized.size.x, resized.size.y);
 }
 
 ////////////////////
@@ -200,6 +199,8 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 //Esc che ora apre la pausa invece di chiudere il programma
 void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer, fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
+        ImGui::SFML::ProcessEvent(window, *event);
+
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
@@ -207,7 +208,7 @@ void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& 
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
             sf::View view = sf::View({0.0f, 0.0f}, {(float)resized->size.x,(float)resized->size.y});
             window.setView(view);
-            HandleResize(*resized, player.getCamera(), renderer, compass);
+            HandleResize(*resized, player.getCamera(), renderer);
             return;
         }
         if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>()){
@@ -318,6 +319,13 @@ int main(){
     Setup setup(startupSettings.width, startupSettings.height);
     sf::RenderWindow& window = setup.window;
 
+    if(!ImGui::SFML::Init(window, {(float) window.getSize().x, (float) window.getSize().y})){
+        std::cerr << "Failure: could not init ImGui::SFML." << std::endl;
+        return 1;
+    }
+    ImGui_ImplOpenGL3_Init("#version 410 core");
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
     GameState state = GameState::MainMenu;
 
     std::unique_ptr<fcg::MainMenu> mainMenu = std::make_unique<fcg::MainMenu>(res, startupSettings.fov, startupSettings.width, startupSettings.height);
@@ -373,11 +381,8 @@ int main(){
 
                 renderer->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
 
-                compass = std::make_unique<fcg::Compass>(res);
-                compass->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
-               
+                compass = std::make_unique<fcg::Compass>(res);               
                 hotbar = std::make_unique<fcg::Hotbar>();
-
                 world = std::make_unique<fcg::World>();
 
                 pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
@@ -391,7 +396,6 @@ int main(){
                 window.setMouseCursorVisible(false);
                 window.setMouseCursorGrabbed(true);
                 
-
                 target = fcg::RaycastHit{};
                 clock.restart(); //Evita un deltaTime enorme dovuto al tempo passato nel menu
                 continue;
@@ -456,6 +460,8 @@ int main(){
         HandleEvents(window, *player, *renderer, *hotbar, *compass, rawMouse, state, programRunning);
         if(!programRunning) break;
 
+        
+
         if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
             pauseMenu->Reset();
             window.setMouseCursorVisible(true);
@@ -481,12 +487,17 @@ int main(){
         renderer->Draw(*world, player->getCamera(), target, *hotbar, deltaTime);
         compass->Update(player->getCamera().GetYaw());
 
-        window.pushGLStates();
-        compass->Draw(window);
-        window.popGLStates();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui::SFML::Update(window, sf::seconds(deltaTime));
+        compass->Draw();
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         
         window.display();
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::SFML::Shutdown();
 
     return 0;
 }

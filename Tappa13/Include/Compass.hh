@@ -1,57 +1,49 @@
 #ifndef COMPASS_HH
 #define COMPASS_HH
 
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/Graphics/Text.hpp>
-#include <SFML/Graphics/Font.hpp>
-#include <iostream>
+#include <imgui.h>
+#include <cmath>
 #include <string>
 
 namespace fcg{
 
-    //Scritta in alto a sinistra con il punto cardinale approssimato verso cui guarda il
-    //player, dedotto dallo yaw della Camera. Solo le 4 direzioni principali (N/S/E/O),
+    //Overlay ImGui in alto a sinistra con il punto cardinale approssimato verso cui guarda il
+    //player, dedotto dallo yaw della Camera. Solo le 4 direzioni principali (N/S/E/O)
     class Compass{
     private:
-        sf::Font font;
-        sf::Text directionText;
-
-        int windowWidth = 1920;
+        std::string direction = "South";
+        ImFont* compassFont;
         static constexpr float marginTop = 20.0f;
         static constexpr float marginLeft = 20.0f;
 
     public:
-        Compass(const std::string& resourcesDir) :
-            directionText(LoadFont(resourcesDir), "South", 26)
-        {
-            directionText.setFillColor(sf::Color::White);
-            Layout();
-        }
-
-        void SetWindowSize(int width, int height){
-            windowWidth = width;
-            Layout();
+        Compass(const std::string& res){
+            ImGuiIO& io = ImGui::GetIO();
+            std::string fontStr = res + "pixelFont.ttf";
+            const char* s = fontStr.c_str();
+            compassFont = io.Fonts->AddFontFromFileTTF(s, 24.0f);
         }
 
         //yawDeg viene da Camera::GetYaw(). Va richiamata una volta per frame prima di Draw()
         void Update(float yawDeg){
-            directionText.setString(DirectionLabel(yawDeg));
-            Layout(); //La stringa cambia larghezza (N vs NE, qui sempre 1 lettera, ma per sicurezza)
+            direction = DirectionLabel(yawDeg);
         }
 
-        void Draw(sf::RenderWindow& window){
-            window.draw(directionText);
+        //Va chiamata tra ImGui_ImplOpenGL3_NewFrame()/ImGui::SFML::Update() e ImGui::Render()
+        void Draw(){
+            ImGui::SetNextWindowPos(ImVec2(marginLeft, marginTop));
+            ImGui::SetNextWindowBgAlpha(0.0f);
+
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize;
+
+            ImGui::Begin("Compass", nullptr, flags);
+            ImGui::PushFont(compassFont);
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", direction.c_str());
+            ImGui::PopFont();
+            ImGui::End();
         }
 
     private:
-        sf::Font& LoadFont(const std::string& resourcesDir){
-            if(!font.openFromFile(resourcesDir + "pixelFont.ttf")){
-                std::cerr << "Errore (Compass): impossibile caricare pixelFont.ttf, impossibile continuare." << std::endl;
-                exit(1);
-            }
-            return font;
-        }
-
         //A yaw=0 il forward della Camera e' -Z (vedi Camera::GetForward): -Z=Nord, +X=Est,
         //+Z=Sud, -X=Ovest. 4 fasce da 90 gradi centrate sui multipli di 90
         static std::string DirectionLabel(float yawDeg){
@@ -62,13 +54,6 @@ namespace fcg{
             if(normalized < 135.0f) return "Ovest";
             if(normalized < 225.0f) return "North";
             return "East";
-        }
-
-        void Layout(){
-            directionText.setPosition({
-                marginLeft,
-                marginTop
-            });
         }
     };
 }
