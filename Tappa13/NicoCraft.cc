@@ -155,9 +155,7 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
             glViewport(0, 0, resized->size.x, resized->size.y);
-            pauseMenu.SetWindowSize(resized->size.x, resized->size.y);
-            renderer.SetWindowSize(resized->size.x, resized->size.y);
-            camera.SetWindowSize(resized->size.x, resized->size.y);
+            HandleResize(*resized,camera,renderer,pauseMenu);
             return;
         }
 
