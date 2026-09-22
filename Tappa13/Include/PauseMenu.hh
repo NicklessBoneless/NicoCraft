@@ -1,20 +1,15 @@
 #ifndef PAUSE_MENU_HH
 #define PAUSE_MENU_HH
 
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/Graphics/RectangleShape.hpp>
-#include <SFML/Graphics/Text.hpp>
-#include <SFML/Graphics/Font.hpp>
-#include <SFML/System/Vector2.hpp>
+#include <imgui.h>
 #include <iostream>
 #include <string>
 #include "OptionsPanel.hh"
 
-//Modificati i pulsanti delle impostazioni
-
 namespace fcg{
-    //Overlay di pausa (ESC durante il gioco) semi-trasparente.
-    //Il tempo viene messo in pausa e il gioco non prende input per il player
+    //Overlay di pausa, riscritto in ImGui immediate-mode (era puro SFML 2D).
+    //Draw() va chiamata una volta per frame, tra ImGui_ImplOpenGL3_NewFrame()/
+    //ImGui::SFML::Update() e ImGui::Render(): legge l'input e disegna nello stesso passo
     class PauseMenu{
     public:
         enum class MenuAction{ None, Resume, BackToMainMenu, QuitGame, FovChanged, ResolutionChanged };
@@ -22,20 +17,8 @@ namespace fcg{
     private:
         enum class Screen{ Pause, Options };
 
-        sf::Font font; //Dichiarato PRIMA dei sf::Text, stesso motivo di MainMenu
-
-        sf::RectangleShape dimBackground; //Scurisce il mondo "congelato" dietro l'overlay
-
-        sf::Text titleText;
-        sf::Text resumeButtonText;
-        sf::Text optionsButtonText;
-        sf::Text mainMenuButtonText;
-        sf::Text quitButtonText;
-
-        sf::RectangleShape resumeButtonShape;
-        sf::RectangleShape optionsButtonShape;
-        sf::RectangleShape mainMenuButtonShape;
-        sf::RectangleShape quitButtonShape;
+        static constexpr float baseFontSize = 24.0f;
+        ImFont* font = nullptr; //Dichiarato PRIMA di optionsPanel, stesso trucco di MainMenu
 
         OptionsPanel optionsPanel;
 
@@ -51,45 +34,15 @@ namespace fcg{
         static constexpr float rowGap = 26.0f;
         static constexpr float smallRowGap = 16.0f;
 
-        const sf::Color buttonIdleColor = sf::Color(55, 55, 70);
-        const sf::Color buttonHoverColor = sf::Color(95, 95, 125);
-        const sf::Color quitButtonIdleColor = sf::Color(90, 45, 45);
-        const sf::Color quitButtonHoverColor = sf::Color(140, 60, 60);
-
     public:
-        PauseMenu(const std::string& resourcesDir, float initialFov, int initialWidth, int initialHeight) :
-            titleText(LoadFont(resourcesDir), "PAUSA", 56),
-            resumeButtonText(font, "Ritorna al gioco", 22),
-            optionsButtonText(font, "Opzioni", 22),
-            mainMenuButtonText(font, "Menu Principale", 18),
-            quitButtonText(font, "Esci dal gioco", 18),
-            optionsPanel(font, initialFov, initialWidth, initialHeight){
-
-            dimBackground.setFillColor(sf::Color(0, 0, 0, 170));
-
-            titleText.setFillColor(sf::Color::White);
-            resumeButtonText.setFillColor(sf::Color::White);
-            optionsButtonText.setFillColor(sf::Color::White);
-            mainMenuButtonText.setFillColor(sf::Color::White);
-            quitButtonText.setFillColor(sf::Color::White);
-
-            resumeButtonShape.setSize({bigButtonWidth, bigButtonHeight});
-            optionsButtonShape.setSize({bigButtonWidth, bigButtonHeight});
-            mainMenuButtonShape.setSize({smallButtonWidth, smallButtonHeight});
-            quitButtonShape.setSize({smallButtonWidth, smallButtonHeight});
-
-            resumeButtonShape.setFillColor(buttonIdleColor);
-            optionsButtonShape.setFillColor(buttonIdleColor);
-            mainMenuButtonShape.setFillColor(buttonIdleColor);
-            quitButtonShape.setFillColor(quitButtonIdleColor);
-
-            Layout();
+        PauseMenu(const std::string& resourcesDir, float initialFov, int initialWidth, int initialHeight) : optionsPanel(LoadFont(resourcesDir), initialFov, initialWidth, initialHeight){
         }
 
+        //Va richiamata all'avvio e ad ogni sf::Event::Resized
         void SetWindowSize(int width, int height){
             windowWidth = width;
             windowHeight = height;
-            Layout();
+            optionsPanel.SetWindowSize(width, height, height * 0.10f);
         }
 
         //Va richiamata ogni volta che si apre l'overlay (ESC): cosi' riparte sempre dalla
@@ -110,120 +63,115 @@ namespace fcg{
             return optionsPanel.GetResolutionHeight();
         }
 
-        void UpdateHover(sf::Vector2i mousePos){
+        //Disegna l'overlay e ritorna l'azione da applicare all'esterno (riprendere,
+        //tornare al menu, uscire, salvare le preferenze); la navigazione Pause <-> Options resta interna
+        MenuAction Draw(){
+            MenuAction result = MenuAction::None;
+
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.667f)); //Scurisce il mondo "congelato" dietro
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+            ImGui::SetNextWindowSize(ImVec2((float) windowWidth, (float) windowHeight));
+
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar;
+
+            ImGui::Begin("PauseMenu", nullptr, flags);
+            ImGui::PushFont(font);
+
             if(currentScreen == Screen::Pause){
-                sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
-                resumeButtonShape.setFillColor(resumeButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-                optionsButtonShape.setFillColor(optionsButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-                mainMenuButtonShape.setFillColor(mainMenuButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-                quitButtonShape.setFillColor(quitButtonShape.getGlobalBounds().contains(mouse) ? quitButtonHoverColor : quitButtonIdleColor);
+                result = DrawPauseScreen();
             }
             else{
-                optionsPanel.UpdateHover(mousePos);
-            }
-        }
-
-        MenuAction HandleClick(sf::Vector2i mousePos){
-            if(currentScreen == Screen::Pause){
-                sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
-                if(resumeButtonShape.getGlobalBounds().contains(mouse)) return MenuAction::Resume;
-                if(optionsButtonShape.getGlobalBounds().contains(mouse)){
-                    currentScreen = Screen::Options;
-                    return MenuAction::None;
+                OptionsPanel::Action action = optionsPanel.Draw();
+                switch(action){
+                    case OptionsPanel::Action::Back:
+                        currentScreen = Screen::Pause;
+                        break;
+                    case OptionsPanel::Action::FovChanged:
+                        result = MenuAction::FovChanged;
+                        break;
+                    case OptionsPanel::Action::ResolutionChanged:
+                        result = MenuAction::ResolutionChanged;
+                        break;
+                    default:
+                        break;
                 }
-                if(mainMenuButtonShape.getGlobalBounds().contains(mouse)) return MenuAction::BackToMainMenu;
-                if(quitButtonShape.getGlobalBounds().contains(mouse)) return MenuAction::QuitGame;
-                return MenuAction::None;
             }
 
-            OptionsPanel::Action action = optionsPanel.HandleClick(mousePos);
-            switch(action){
-                case OptionsPanel::Action::Back:
-                    currentScreen = Screen::Pause;
-                    return MenuAction::None;
-                case OptionsPanel::Action::FovChanged:
-                    return MenuAction::FovChanged;
-                case OptionsPanel::Action::ResolutionChanged:
-                    return MenuAction::ResolutionChanged;
-                default:
-                    return MenuAction::None;
-            }
-        }
-
-        void Draw(sf::RenderWindow& window){
-            window.draw(dimBackground);
-
-            if(currentScreen == Screen::Pause){
-                window.draw(titleText);
-
-                window.draw(resumeButtonShape);
-                window.draw(resumeButtonText);
-
-                window.draw(optionsButtonShape);
-                window.draw(optionsButtonText);
-
-                window.draw(mainMenuButtonShape);
-                window.draw(mainMenuButtonText);
-
-                window.draw(quitButtonShape);
-                window.draw(quitButtonText);
-            }
-            else{
-                optionsPanel.Draw(window);
-            }
+            ImGui::PopFont();
+            ImGui::End();
+            ImGui::PopStyleColor();
+            return result;
         }
 
     private:
-        sf::Font& LoadFont(const std::string& resourcesDir){
-            if(!font.openFromFile(resourcesDir + "pixelFont.ttf")){
+        ImFont* LoadFont(const std::string& resourcesDir){
+            ImGuiIO& io = ImGui::GetIO();
+            std::string fontPath = resourcesDir + "pixelFont.ttf";
+            font = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), baseFontSize);
+            if(!font){
                 std::cerr << "Errore (PauseMenu): impossibile caricare pixelFont.ttf, impossibile continuare." << std::endl;
                 exit(1);
             }
             return font;
         }
 
-        void Layout(){
-            dimBackground.setSize({(float) windowWidth, (float) windowHeight});
-            dimBackground.setPosition({0.0f, 0.0f});
+        MenuAction DrawPauseScreen(){
+            MenuAction result = MenuAction::None;
 
-            CenterHorizontally(titleText, windowHeight * 0.22f);
+            DrawTitle();
 
             float centerX = (windowWidth - bigButtonWidth) * 0.5f;
             float resumeY = windowHeight * 0.40f;
             float optionsY = resumeY + bigButtonHeight + rowGap;
             float smallRowY = optionsY + bigButtonHeight + rowGap;
 
-            resumeButtonShape.setPosition({centerX, resumeY});
-            optionsButtonShape.setPosition({centerX, optionsY});
+            ImGui::SetWindowFontScale(22.0f / baseFontSize);
 
-            CenterTextOnButton(resumeButtonText, resumeButtonShape);
-            CenterTextOnButton(optionsButtonText, optionsButtonShape);
+            ImGui::SetCursorPos(ImVec2(centerX, resumeY));
+            if(ImGui::Button("Ritorna al gioco", ImVec2(bigButtonWidth, bigButtonHeight))){
+                result = MenuAction::Resume;
+            }
+
+            ImGui::SetCursorPos(ImVec2(centerX, optionsY));
+            if(ImGui::Button("Opzioni", ImVec2(bigButtonWidth, bigButtonHeight))){
+                currentScreen = Screen::Options;
+            }
+
+            ImGui::SetWindowFontScale(1.0f);
 
             float smallRowWidth = smallButtonWidth * 2.0f + smallRowGap;
             float smallRowStartX = (windowWidth - smallRowWidth) * 0.5f;
 
-            mainMenuButtonShape.setPosition({smallRowStartX, smallRowY});
-            quitButtonShape.setPosition({smallRowStartX + smallButtonWidth + smallRowGap, smallRowY});
+            ImGui::SetWindowFontScale(18.0f / baseFontSize);
 
-            CenterTextOnButton(mainMenuButtonText, mainMenuButtonShape);
-            CenterTextOnButton(quitButtonText, quitButtonShape);
+            ImGui::SetCursorPos(ImVec2(smallRowStartX, smallRowY));
+            if(ImGui::Button("Menu Principale", ImVec2(smallButtonWidth, smallButtonHeight))){
+                result = MenuAction::BackToMainMenu;
+            }
 
-            optionsPanel.SetWindowSize(windowWidth, windowHeight, windowHeight * 0.10f);
+            //Colori distintivi (rosso) per il pulsante di uscita, come nella versione SFML
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.353f, 0.176f, 0.176f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.549f, 0.235f, 0.235f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.549f, 0.235f, 0.235f, 1.0f));
+
+            ImGui::SetCursorPos(ImVec2(smallRowStartX + smallButtonWidth + smallRowGap, smallRowY));
+            if(ImGui::Button("Esci dal gioco", ImVec2(smallButtonWidth, smallButtonHeight))){
+                result = MenuAction::QuitGame;
+            }
+
+            ImGui::PopStyleColor(3);
+            ImGui::SetWindowFontScale(1.0f);
+
+            return result;
         }
 
-        void CenterHorizontally(sf::Text& text, float y){
-            sf::FloatRect bounds = text.getLocalBounds();
-            text.setPosition({(windowWidth - bounds.size.x) * 0.5f - bounds.position.x, y});
-        }
-
-        static void CenterTextOnButton(sf::Text& text, const sf::RectangleShape& button){
-            sf::FloatRect bounds = text.getLocalBounds();
-            sf::Vector2f buttonPos = button.getPosition();
-            sf::Vector2f buttonSize = button.getSize();
-            text.setPosition({
-                buttonPos.x + (buttonSize.x - bounds.size.x) * 0.5f - bounds.position.x,
-                buttonPos.y + (buttonSize.y - bounds.size.y) * 0.5f - bounds.position.y
-            });
+        void DrawTitle(){
+            ImGui::SetWindowFontScale(56.0f / baseFontSize);
+            const char* title = "PAUSA";
+            float textWidth = ImGui::CalcTextSize(title).x;
+            ImGui::SetCursorPos(ImVec2((windowWidth - textWidth) * 0.5f, windowHeight * 0.22f));
+            ImGui::TextUnformatted(title);
+            ImGui::SetWindowFontScale(1.0f);
         }
     };
 }

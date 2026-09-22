@@ -1,14 +1,12 @@
 #ifndef OPTIONS_PANEL_HH
 #define OPTIONS_PANEL_HH
 
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/Graphics/RectangleShape.hpp>
-#include <SFML/Graphics/Text.hpp>
-#include <SFML/Graphics/Font.hpp>
-#include <SFML/System/Vector2.hpp>
+#include <imgui.h>
 #include <string>
 
 namespace fcg{
+    //Pannello Opzioni (FOV + risoluzione), riscritto in ImGui immediate-mode.
+    //Nessuno stato SFML: Draw() legge l'input e disegna nello stesso frame
     class OptionsPanel{
     public:
         enum class Action{ None, Back, FovChanged, ResolutionChanged };
@@ -16,28 +14,13 @@ namespace fcg{
     private:
         struct ResolutionPreset{ int width; int height; };
 
-        sf::Text titleText;
-        sf::Text fovLabelText;
-        sf::Text fovMinusText;
-        sf::Text fovValueText;
-        sf::Text fovPlusText;
-        sf::Text resLabelText;
-        sf::Text resPrevText;
-        sf::Text resValueText;
-        sf::Text resNextText;
-        sf::Text resNoteText;
-        sf::Text backButtonText;
-
-        sf::RectangleShape fovMinusShape;
-        sf::RectangleShape fovPlusShape;
-        sf::RectangleShape resPrevShape;
-        sf::RectangleShape resNextShape;
-        sf::RectangleShape backButtonShape;
+        ImFont* font; //Font base (24px), caricato e posseduto dal chiamante (MainMenu/PauseMenu)
 
         float fov = 90.0f;
         static constexpr float minFov = 60.0f;
         static constexpr float maxFov = 110.0f;
         static constexpr float fovStep = 5.0f;
+        static constexpr float baseFontSize = 24.0f;
 
         static constexpr ResolutionPreset resolutionPresets[] = {
             {1280, 720},
@@ -58,61 +41,17 @@ namespace fcg{
         static constexpr float valueBoxWidth = 260.0f;
         static constexpr float rowSpacing = 16.0f;
 
-        const sf::Color buttonIdleColor = sf::Color(55, 55, 70);
-        const sf::Color buttonHoverColor = sf::Color(95, 95, 125);
-
     public:
-        //Font, Fov , WidthxHeight
-        OptionsPanel(sf::Font& font, float initialFov, int initialWidth, int initialHeight) :
-            titleText(font, "OPZIONI", 52),
-            fovLabelText(font, "FOV", 20),
-            fovMinusText(font, "-", 26),
-            fovValueText(font, "", 24),
-            fovPlusText(font, "+", 26),
-            resLabelText(font, "RISOLUZIONE SCHERMO", 20),
-            resPrevText(font, "<", 26),
-            resValueText(font, "", 24),
-            resNextText(font, ">", 26),
-            resNoteText(font, "Si applica al prossimo avvio", 16),
-            backButtonText(font, "Indietro", 22)
-        {
-            titleText.setFillColor(sf::Color::White);
-            fovLabelText.setFillColor(sf::Color(210, 210, 210));
-            resLabelText.setFillColor(sf::Color(210, 210, 210));
-            resNoteText.setFillColor(sf::Color(160, 160, 160));
-            fovMinusText.setFillColor(sf::Color::White);
-            fovValueText.setFillColor(sf::Color::White);
-            fovPlusText.setFillColor(sf::Color::White);
-            resPrevText.setFillColor(sf::Color::White);
-            resValueText.setFillColor(sf::Color::White);
-            resNextText.setFillColor(sf::Color::White);
-            backButtonText.setFillColor(sf::Color::White);
-
-            backButtonShape.setSize({buttonWidth, buttonHeight});
-            fovMinusShape.setSize({smallButtonSize, smallButtonSize});
-            fovPlusShape.setSize({smallButtonSize, smallButtonSize});
-            resPrevShape.setSize({smallButtonSize, smallButtonSize});
-            resNextShape.setSize({smallButtonSize, smallButtonSize});
-
-            backButtonShape.setFillColor(buttonIdleColor);
-            fovMinusShape.setFillColor(buttonIdleColor);
-            fovPlusShape.setFillColor(buttonIdleColor);
-            resPrevShape.setFillColor(buttonIdleColor);
-            resNextShape.setFillColor(buttonIdleColor);
-
+        OptionsPanel(ImFont* font, float initialFov, int initialWidth, int initialHeight) : font(font){
             fov = Clamp(initialFov);
             currentResIndex = FindResolutionIndex(initialWidth, initialHeight);
-
-            Layout();
         }
 
-        //y0 e' l'offset verticale da cui inizia il pannello: permette a MainMenu e
-        //PauseMenu di posizionarlo in punti diversi dello schermo
+        //y0 e' l'offset verticale da cui inizia il pannello
         void SetWindowSize(int width, int height, float y0 = 0.0f){
             windowWidth = width;
             windowHeight = height;
             topY = y0;
-            Layout();
         }
 
         float GetFov() const{
@@ -127,58 +66,19 @@ namespace fcg{
             return resolutionPresets[currentResIndex].height;
         }
 
-        void UpdateHover(sf::Vector2i mousePos){
-            sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
-            fovMinusShape.setFillColor(fovMinusShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-            fovPlusShape.setFillColor(fovPlusShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-            resPrevShape.setFillColor(resPrevShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-            resNextShape.setFillColor(resNextShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-            backButtonShape.setFillColor(backButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-        }
+        //Va chiamata dentro il blocco ImGui::Begin/End del chiamante, una volta per frame
+        Action Draw(){
+            Action result = Action::None;
 
-        Action HandleClick(sf::Vector2i mousePos){
-            sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
+            ImGui::PushFont(font);
 
-            if(backButtonShape.getGlobalBounds().contains(mouse)) return Action::Back;
-            if(fovMinusShape.getGlobalBounds().contains(mouse)){
-                AdjustFov(-fovStep);
-                return Action::FovChanged;
-            }
-            if(fovPlusShape.getGlobalBounds().contains(mouse)){
-                AdjustFov(fovStep);
-                return Action::FovChanged;
-            }
-            if(resPrevShape.getGlobalBounds().contains(mouse)){
-                CycleResolution(-1);
-                return Action::ResolutionChanged;
-            }
-            if(resNextShape.getGlobalBounds().contains(mouse)){
-                CycleResolution(1);
-                return Action::ResolutionChanged;
-            }
-            return Action::None;
-        }
+            DrawTitle();
+            if(DrawFovRow()) result = Action::FovChanged;
+            if(DrawResolutionRow()) result = Action::ResolutionChanged;
+            if(DrawBackButton()) result = Action::Back;
 
-        void Draw(sf::RenderWindow& window){
-            window.draw(titleText);
-
-            window.draw(fovLabelText);
-            window.draw(fovMinusShape);
-            window.draw(fovMinusText);
-            window.draw(fovValueText);
-            window.draw(fovPlusShape);
-            window.draw(fovPlusText);
-
-            window.draw(resLabelText);
-            window.draw(resPrevShape);
-            window.draw(resPrevText);
-            window.draw(resValueText);
-            window.draw(resNextShape);
-            window.draw(resNextText);
-            window.draw(resNoteText);
-
-            window.draw(backButtonShape);
-            window.draw(backButtonText);
+            ImGui::PopFont();
+            return result;
         }
 
     private:
@@ -197,68 +97,109 @@ namespace fcg{
 
         void AdjustFov(float delta){
             fov = Clamp(fov + delta);
-            UpdateFovValueText();
         }
 
         void CycleResolution(int direction){
             currentResIndex = ((currentResIndex + direction) % resolutionPresetCount + resolutionPresetCount) % resolutionPresetCount;
-            UpdateResValueText();
         }
 
-        void UpdateFovValueText(){
-            fovValueText.setString(std::to_string((int) fov));
-            CenterTextInBounds(fovValueText, fovMinusShape.getPosition().x + smallButtonSize + rowSpacing, fovMinusShape.getPosition().y, valueBoxWidth, smallButtonSize);
+        void DrawTitle(){
+            ImGui::SetWindowFontScale(52.0f / baseFontSize);
+            const char* title = "OPZIONI";
+            float textWidth = ImGui::CalcTextSize(title).x;
+            ImGui::SetCursorPos(ImVec2((windowWidth - textWidth) * 0.5f, topY));
+            ImGui::TextUnformatted(title);
+            ImGui::SetWindowFontScale(1.0f);
         }
 
-        void UpdateResValueText(){
-            resValueText.setString(std::to_string(GetResolutionWidth()) + " x " + std::to_string(GetResolutionHeight()));
-            CenterTextInBounds(resValueText, resPrevShape.getPosition().x + smallButtonSize + rowSpacing, resPrevShape.getPosition().y, valueBoxWidth, smallButtonSize);
-        }
-
-        void Layout(){
-            CenterHorizontally(titleText, topY);
-
+        bool DrawFovRow(){
+            bool changed = false;
             float rowWidth = smallButtonSize * 2.0f + valueBoxWidth + rowSpacing * 2.0f;
             float rowStartX = (windowWidth - rowWidth) * 0.5f;
-
             float fovRowY = topY + 130.0f;
-            fovMinusShape.setPosition({rowStartX, fovRowY});
-            fovPlusShape.setPosition({rowStartX + smallButtonSize + rowSpacing + valueBoxWidth + rowSpacing, fovRowY});
-            CenterHorizontally(fovLabelText, fovRowY - 40.0f);
-            CenterTextOnButton(fovMinusText, fovMinusShape);
-            CenterTextOnButton(fovPlusText, fovPlusShape);
 
+            ImGui::SetWindowFontScale(20.0f / baseFontSize);
+            const char* label = "FOV";
+            ImGui::SetCursorPos(ImVec2((windowWidth - ImGui::CalcTextSize(label).x) * 0.5f, fovRowY - 40.0f));
+            ImGui::TextUnformatted(label);
+
+            ImGui::SetWindowFontScale(26.0f / baseFontSize);
+            ImGui::SetCursorPos(ImVec2(rowStartX, fovRowY));
+            if(ImGui::Button("-", ImVec2(smallButtonSize, smallButtonSize))){
+                AdjustFov(-fovStep);
+                changed = true;
+            }
+
+            ImGui::SetWindowFontScale(1.0f);
+            std::string fovValue = std::to_string((int) fov);
+            float valueBoxX = rowStartX + smallButtonSize + rowSpacing;
+            ImVec2 textSize = ImGui::CalcTextSize(fovValue.c_str());
+            ImGui::SetCursorPos(ImVec2(valueBoxX + (valueBoxWidth - textSize.x) * 0.5f, fovRowY + (smallButtonSize - textSize.y) * 0.5f));
+            ImGui::TextUnformatted(fovValue.c_str());
+
+            ImGui::SetWindowFontScale(26.0f / baseFontSize);
+            ImGui::SetCursorPos(ImVec2(valueBoxX + valueBoxWidth + rowSpacing, fovRowY));
+            if(ImGui::Button("+", ImVec2(smallButtonSize, smallButtonSize))){
+                AdjustFov(fovStep);
+                changed = true;
+            }
+
+            ImGui::SetWindowFontScale(1.0f);
+            return changed;
+        }
+
+        bool DrawResolutionRow(){
+            bool changed = false;
+            float rowWidth = smallButtonSize * 2.0f + valueBoxWidth + rowSpacing * 2.0f;
+            float rowStartX = (windowWidth - rowWidth) * 0.5f;
+            float fovRowY = topY + 130.0f;
             float resRowY = fovRowY + smallButtonSize + 80.0f;
-            resPrevShape.setPosition({rowStartX, resRowY});
-            resNextShape.setPosition({rowStartX + smallButtonSize + rowSpacing + valueBoxWidth + rowSpacing, resRowY});
-            CenterHorizontally(resLabelText, resRowY - 40.0f);
-            CenterTextOnButton(resPrevText, resPrevShape);
-            CenterTextOnButton(resNextText, resNextShape);
-            CenterHorizontally(resNoteText, resRowY + smallButtonSize + 12.0f);
 
+            ImGui::SetWindowFontScale(20.0f / baseFontSize);
+            const char* label = "RISOLUZIONE SCHERMO";
+            ImGui::SetCursorPos(ImVec2((windowWidth - ImGui::CalcTextSize(label).x) * 0.5f, resRowY - 40.0f));
+            ImGui::TextUnformatted(label);
+
+            ImGui::SetWindowFontScale(26.0f / baseFontSize);
+            ImGui::SetCursorPos(ImVec2(rowStartX, resRowY));
+            if(ImGui::Button("<", ImVec2(smallButtonSize, smallButtonSize))){
+                CycleResolution(-1);
+                changed = true;
+            }
+
+            ImGui::SetWindowFontScale(1.0f);
+            std::string resValue = std::to_string(GetResolutionWidth()) + " x " + std::to_string(GetResolutionHeight());
+            float valueBoxX = rowStartX + smallButtonSize + rowSpacing;
+            ImVec2 textSize = ImGui::CalcTextSize(resValue.c_str());
+            ImGui::SetCursorPos(ImVec2(valueBoxX + (valueBoxWidth - textSize.x) * 0.5f, resRowY + (smallButtonSize - textSize.y) * 0.5f));
+            ImGui::TextUnformatted(resValue.c_str());
+
+            ImGui::SetWindowFontScale(26.0f / baseFontSize);
+            ImGui::SetCursorPos(ImVec2(valueBoxX + valueBoxWidth + rowSpacing, resRowY));
+            if(ImGui::Button(">", ImVec2(smallButtonSize, smallButtonSize))){
+                CycleResolution(1);
+                changed = true;
+            }
+
+            ImGui::SetWindowFontScale(16.0f / baseFontSize);
+            const char* note = "Si applica al prossimo avvio";
+            ImGui::SetCursorPos(ImVec2((windowWidth - ImGui::CalcTextSize(note).x) * 0.5f, resRowY + smallButtonSize + 12.0f));
+            ImGui::TextUnformatted(note);
+
+            ImGui::SetWindowFontScale(1.0f);
+            return changed;
+        }
+
+        bool DrawBackButton(){
+            float fovRowY = topY + 130.0f;
+            float resRowY = fovRowY + smallButtonSize + 80.0f;
             float backY = resRowY + smallButtonSize + 70.0f;
-            backButtonShape.setPosition({(windowWidth - buttonWidth) * 0.5f, backY});
-            CenterTextOnButton(backButtonText, backButtonShape);
 
-            UpdateFovValueText();
-            UpdateResValueText();
-        }
-
-        void CenterHorizontally(sf::Text& text, float y){
-            sf::FloatRect bounds = text.getLocalBounds();
-            text.setPosition({(windowWidth - bounds.size.x) * 0.5f - bounds.position.x, y});
-        }
-
-        static void CenterTextOnButton(sf::Text& text, const sf::RectangleShape& button){
-            CenterTextInBounds(text, button.getPosition().x, button.getPosition().y, button.getSize().x, button.getSize().y);
-        }
-
-        static void CenterTextInBounds(sf::Text& text, float x, float y, float width, float height){
-            sf::FloatRect bounds = text.getLocalBounds();
-            text.setPosition({
-                x + (width - bounds.size.x) * 0.5f - bounds.position.x,
-                y + (height - bounds.size.y) * 0.5f - bounds.position.y
-            });
+            ImGui::SetWindowFontScale(22.0f / baseFontSize);
+            ImGui::SetCursorPos(ImVec2((windowWidth - buttonWidth) * 0.5f, backY));
+            bool clicked = ImGui::Button("Indietro", ImVec2(buttonWidth, buttonHeight));
+            ImGui::SetWindowFontScale(1.0f);
+            return clicked;
         }
     };
 }

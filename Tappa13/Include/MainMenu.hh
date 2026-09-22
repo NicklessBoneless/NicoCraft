@@ -1,38 +1,24 @@
 #ifndef MAIN_MENU_HH
 #define MAIN_MENU_HH
 
-//Modificato menu principale e posizione scritte
-
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/Graphics/RectangleShape.hpp>
-#include <SFML/Graphics/Text.hpp>
-#include <SFML/Graphics/Font.hpp>
-#include <SFML/System/Vector2.hpp>
+#include <imgui.h>
 #include <iostream>
 #include <string>
 #include "OptionsPanel.hh"
 
 namespace fcg{
-    //Menu principale
-    //Disegnato in puro SFML 2D, nessuna dipendenza da OpenGL/3D.
+    //Menu principale, riscritto in ImGui immediate-mode (era puro SFML 2D).
+    //Draw() va chiamata una volta per frame, tra ImGui_ImplOpenGL3_NewFrame()/
+    //ImGui::SFML::Update() e ImGui::Render(): legge l'input e disegna nello stesso passo
     class MainMenu{
     public:
         enum class MenuAction{ None, GenerateWorld, Exit, FovChanged, ResolutionChanged };
 
     private:
-        enum class Screen{ Main, Options }; //Stati del menu principale
+        enum class Screen{ Main, Options };
 
-        sf::Font font; //Font che sarà utilizzato da tutti i pulsanti e testi
-
-        sf::Text titleText;
-        sf::Text generateButtonText;
-        sf::Text optionsButtonText;
-        sf::Text exitButtonText;
-        sf::Text commandsText;
-
-        sf::RectangleShape generateButtonShape;
-        sf::RectangleShape optionsButtonShape;
-        sf::RectangleShape exitButtonShape;
+        static constexpr float baseFontSize = 24.0f;
+        ImFont* font = nullptr;
 
         OptionsPanel optionsPanel;
 
@@ -45,43 +31,17 @@ namespace fcg{
         static constexpr float buttonHeight = 80.0f;
         static constexpr float buttonSpacing = 26.0f;
 
-        const sf::Color buttonIdleColor = sf::Color(55, 55, 70);
-        const sf::Color buttonHoverColor = sf::Color(95, 95, 125);
-
     public:
-        //resourcesDir è il path relativo alle risorse condivise (es. "../Resources/").
+        //resourcesDir e' il path relativo alle risorse condivise (es. "../Resources/").
         //initialFov/initialWidth/initialHeight arrivano dal file di preferenze (Settings.hh)
-        MainMenu(const std::string& resourcesDir, float initialFov, int initialWidth, int initialHeight) :
-            titleText(LoadFont(resourcesDir), "NicoCraft", 64),
-            generateButtonText(font, "Genera Mondo", 22),
-            optionsButtonText(font, "Opzioni", 22),
-            exitButtonText(font, "Esci", 22),
-            commandsText(font, BuildCommandsString(), 18),
-            optionsPanel(font, initialFov, initialWidth, initialHeight)
-        {
-            titleText.setFillColor(sf::Color::White);
-            generateButtonText.setFillColor(sf::Color::White);
-            optionsButtonText.setFillColor(sf::Color::White);
-            exitButtonText.setFillColor(sf::Color::White);
-
-            commandsText.setFillColor(sf::Color(210, 210, 210));
-            commandsText.setLineSpacing(1.6f);
-
-            generateButtonShape.setSize({buttonWidth, buttonHeight});
-            optionsButtonShape.setSize({buttonWidth, buttonHeight});
-            exitButtonShape.setSize({buttonWidth, buttonHeight});
-            generateButtonShape.setFillColor(buttonIdleColor);
-            optionsButtonShape.setFillColor(buttonIdleColor);
-            exitButtonShape.setFillColor(buttonIdleColor);
-
-            Layout();
+        MainMenu(const std::string& resourcesDir, float initialFov, int initialWidth, int initialHeight) : optionsPanel(LoadFont(resourcesDir), initialFov, initialWidth, initialHeight){
         }
 
         //Va richiamata all'avvio e ad ogni sf::Event::Resized
         void SetWindowSize(int width, int height){
             windowWidth = width;
             windowHeight = height;
-            Layout();
+            optionsPanel.SetWindowSize(width, height, height * 0.10f);
         }
 
         float GetFov() const{
@@ -96,75 +56,106 @@ namespace fcg{
             return optionsPanel.GetResolutionHeight();
         }
 
-        void UpdateHover(sf::Vector2i mousePos){
+        //Disegna il menu e ritorna l'azione da applicare all'esterno (creare il mondo,
+        //uscire, salvare le preferenze); la navigazione Main <-> Options resta interna
+        MenuAction Draw(){
+            MenuAction result = MenuAction::None;
+
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+            ImGui::SetNextWindowSize(ImVec2((float) windowWidth, (float) windowHeight));
+
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar;
+
+            ImGui::Begin("MainMenu", nullptr, flags);
+            ImGui::PushFont(font);
+
             if(currentScreen == Screen::Main){
-                sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
-                generateButtonShape.setFillColor(generateButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-                optionsButtonShape.setFillColor(optionsButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
-                exitButtonShape.setFillColor(exitButtonShape.getGlobalBounds().contains(mouse) ? buttonHoverColor : buttonIdleColor);
+                result = DrawMainScreen();
             }
             else{
-                optionsPanel.UpdateHover(mousePos);
-            }
-        }
-
-        //Da chiamare quando arriva un click sinistro. 
-        //Gestisce solo la navigazione Main <-> Options; 
-        //Ritorna solo le azioni che il chiamante deve applicare all'esterno (creare il mondo, uscire, salvare le preferenze)
-        MenuAction HandleClick(sf::Vector2i mousePos){
-            if(currentScreen == Screen::Main){
-                sf::Vector2f mouse((float) mousePos.x, (float) mousePos.y);
-                if(generateButtonShape.getGlobalBounds().contains(mouse)) return MenuAction::GenerateWorld;
-                if(optionsButtonShape.getGlobalBounds().contains(mouse)){ //Facciamo apparire le opzioni
-                    currentScreen = Screen::Options;
-                    return MenuAction::None;
+                OptionsPanel::Action action = optionsPanel.Draw();
+                switch(action){
+                    case OptionsPanel::Action::Back:
+                        currentScreen = Screen::Main;
+                        break;
+                    case OptionsPanel::Action::FovChanged:
+                        result = MenuAction::FovChanged;
+                        break;
+                    case OptionsPanel::Action::ResolutionChanged:
+                        result = MenuAction::ResolutionChanged;
+                        break;
+                    default:
+                        break;
                 }
-                if(exitButtonShape.getGlobalBounds().contains(mouse)) return MenuAction::Exit;
-                return MenuAction::None;
             }
 
-            OptionsPanel::Action action = optionsPanel.HandleClick(mousePos);
-            switch(action){
-                case OptionsPanel::Action::Back:
-                    currentScreen = Screen::Main;
-                    return MenuAction::None;
-                case OptionsPanel::Action::FovChanged:
-                    return MenuAction::FovChanged;
-                case OptionsPanel::Action::ResolutionChanged:
-                    return MenuAction::ResolutionChanged;
-                default:
-                    return MenuAction::None;
-            }
-        }
-
-        //Disegniamo i pulsanti
-        void Draw(sf::RenderWindow& window){
-            if(currentScreen == Screen::Main){
-                window.draw(titleText);
-
-                window.draw(generateButtonShape);
-                window.draw(generateButtonText);
-
-                window.draw(optionsButtonShape);
-                window.draw(optionsButtonText);
-
-                window.draw(exitButtonShape);
-                window.draw(exitButtonText);
-
-                window.draw(commandsText);
-            }
-            else{
-                optionsPanel.Draw(window);
-            }
+            ImGui::PopFont();
+            ImGui::End();
+            return result;
         }
 
     private:
-        sf::Font& LoadFont(const std::string& resourcesDir){
-            if(!font.openFromFile(resourcesDir + "pixelFont.ttf")){
+        //Chiamato dall'initializer list PRIMA di optionsPanel (font e' dichiarato sopra
+        //di essa nella classe): imposta this->font e lo ritorna per passarlo al costruttore
+        //di OptionsPanel, stesso trucco gia' usato nella versione SFML originale
+        ImFont* LoadFont(const std::string& resourcesDir){
+            ImGuiIO& io = ImGui::GetIO();
+            std::string fontPath = resourcesDir + "pixelFont.ttf";
+            font = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), baseFontSize);
+            if(!font){
                 std::cerr << "Errore (MainMenu): impossibile caricare pixelFont.ttf, impossibile continuare." << std::endl;
                 exit(1);
             }
             return font;
+        }
+
+        MenuAction DrawMainScreen(){
+            MenuAction result = MenuAction::None;
+
+            DrawTitle();
+
+            float centerX = (windowWidth - buttonWidth) * 0.5f;
+            float generateY = windowHeight * 0.34f;
+            float optionsY = generateY + buttonHeight + buttonSpacing;
+            float exitY = optionsY + buttonHeight + buttonSpacing;
+
+            ImGui::SetWindowFontScale(22.0f / baseFontSize);
+
+            ImGui::SetCursorPos(ImVec2(centerX, generateY));
+            if(ImGui::Button("Genera Mondo", ImVec2(buttonWidth, buttonHeight))){
+                result = MenuAction::GenerateWorld;
+            }
+
+            ImGui::SetCursorPos(ImVec2(centerX, optionsY));
+            if(ImGui::Button("Opzioni", ImVec2(buttonWidth, buttonHeight))){
+                currentScreen = Screen::Options;
+            }
+
+            ImGui::SetCursorPos(ImVec2(centerX, exitY));
+            if(ImGui::Button("Esci", ImVec2(buttonWidth, buttonHeight))){
+                result = MenuAction::Exit;
+            }
+
+            ImGui::SetWindowFontScale(1.0f);
+
+            DrawCommands();
+            return result;
+        }
+
+        void DrawTitle(){
+            ImGui::SetWindowFontScale(64.0f / baseFontSize);
+            const char* title = "NicoCraft";
+            float textWidth = ImGui::CalcTextSize(title).x;
+            ImGui::SetCursorPos(ImVec2((windowWidth - textWidth) * 0.5f, windowHeight * 0.10f));
+            ImGui::TextUnformatted(title);
+            ImGui::SetWindowFontScale(1.0f);
+        }
+
+        void DrawCommands(){
+            ImGui::SetWindowFontScale(18.0f / baseFontSize);
+            ImGui::SetCursorPos(ImVec2(40.0f, windowHeight - 340.0f));
+            ImGui::TextUnformatted(BuildCommandsString().c_str());
+            ImGui::SetWindowFontScale(1.0f);
         }
 
         static std::string BuildCommandsString(){
@@ -180,42 +171,6 @@ namespace fcg{
                 "- Vai giu' (noclip) : LCTRL\n"
                 "- Toggle noclip : F\n"
                 "- Pausa : ESC\n";
-        }
-
-        void Layout(){
-            CenterHorizontally(titleText, windowHeight * 0.10f);
-
-            float centerX = (windowWidth - buttonWidth) * 0.5f;
-            float generateY = windowHeight * 0.34f;
-            float optionsY = generateY + buttonHeight + buttonSpacing;
-            float exitY = optionsY + buttonHeight + buttonSpacing;
-
-            generateButtonShape.setPosition({centerX, generateY});
-            optionsButtonShape.setPosition({centerX, optionsY});
-            exitButtonShape.setPosition({centerX, exitY});
-
-            CenterTextOnButton(generateButtonText, generateButtonShape);
-            CenterTextOnButton(optionsButtonText, optionsButtonShape);
-            CenterTextOnButton(exitButtonText, exitButtonShape);
-
-            commandsText.setPosition({40.0f, windowHeight - 340.0f});
-
-            optionsPanel.SetWindowSize(windowWidth, windowHeight, windowHeight * 0.10f);
-        }
-
-        void CenterHorizontally(sf::Text& text, float y){
-            sf::FloatRect bounds = text.getLocalBounds();
-            text.setPosition({(windowWidth - bounds.size.x) * 0.5f - bounds.position.x, y});
-        }
-
-        static void CenterTextOnButton(sf::Text& text, const sf::RectangleShape& button){
-            sf::FloatRect bounds = text.getLocalBounds();
-            sf::Vector2f buttonPos = button.getPosition();
-            sf::Vector2f buttonSize = button.getSize();
-            text.setPosition({
-                buttonPos.x + (buttonSize.x - bounds.size.x) * 0.5f - bounds.position.x,
-                buttonPos.y + (buttonSize.y - bounds.size.y) * 0.5f - bounds.position.y
-            });
         }
     };
 }

@@ -6,6 +6,8 @@
 #include <imgui_impl_opengl3.h>
 
 #include <SFML/Window.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/View.hpp>
 #include <SFML/Graphics/Image.hpp>
 #include <memory>
 #include <vector>
@@ -42,7 +44,7 @@ sf::ContextSettings CreateContextSettings(){
     settings.depthBits   = 32;
     settings.stencilBits = 8;
     settings.antiAliasingLevel = 4;
-    settings.attributeFlags = sf::ContextSettings::Attribute::Default;
+    settings.attributeFlags = sf::ContextSettings::Attribute::Core;
     settings.majorVersion = 4;
     settings.minorVersion = 1;
     return settings;
@@ -99,11 +101,22 @@ void PersistSettings(float fov, int width, int height){
     fcg::SaveSettings(settingsPath, settings);
 }
 
-//Eventi durante lo stato MainMenu: resize, Esc per uscire, click sinistro sui tasti del
-//menu (Genera Mondo/Opzioni/Esci nella schermata principale, FOV/risoluzione/Indietro
-//in quella Opzioni)
-void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, GameState& state, bool& programRunning){
+//Ricostruisce la texture font di ImGui: va richiamata ogni volta che un font viene
+//aggiunto con AddFontFromFileTTF DOPO che ImGui::SFML::Init() ha gia' caricato quello di
+//default, altrimenti il renderer OpenGL3 resta agganciato alla vecchia texture (invalida)
+void RebuildFontAtlas(){
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Build();
+    ImGui_ImplOpenGL3_CreateFontsTexture();
+}
+
+//Eventi durante lo stato MainMenu: chiusura finestra, resize, Esc per uscire.
+//I click sui pulsanti sono gestiti da ImGui: l'azione risultante si legge dal
+//valore di ritorno di MainMenu::Draw(), chiamato in main()
+void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
+        ImGui::SFML::ProcessEvent(window, *event);
+
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
@@ -121,25 +134,6 @@ void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, GameSta
                 return;
             }
         }
-        else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
-            if(mousePressed->button == sf::Mouse::Button::Left){
-                fcg::MainMenu::MenuAction action = mainMenu.HandleClick(mousePressed->position);
-                switch(action){
-                    case fcg::MainMenu::MenuAction::GenerateWorld:
-                        state = GameState::Playing;
-                        return;
-                    case fcg::MainMenu::MenuAction::Exit:
-                        programRunning = false;
-                        return;
-                    case fcg::MainMenu::MenuAction::FovChanged:
-                    case fcg::MainMenu::MenuAction::ResolutionChanged:
-                        PersistSettings(mainMenu.GetFov(), mainMenu.GetResolutionWidth(), mainMenu.GetResolutionHeight());
-                        break;
-                    default:
-                        break; //None: navigazione interna gia' gestita da HandleClick
-                }
-            }
-        }
     }
 }
 
@@ -147,8 +141,12 @@ void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, GameSta
     Eventi durante lo stato Paused: Esc riprende il gioco, click sui tasti dell'overlay.
     FOV viene applicato subito alla Camera per un'anteprima live, la risoluzione no (si applichera' al prossimo avvio in "Settings.hh")
 */
-void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Player& player, fcg::Renderer& renderer, GameState& state, bool& programRunning){
+//Eventi durante lo stato Paused: chiusura finestra, resize, Esc per riprendere.
+//I click dell'overlay li gestisce ImGui: l'azione si legge da PauseMenu::Draw()
+void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Renderer& renderer, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
+        ImGui::SFML::ProcessEvent(window, *event);
+
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
             return;
@@ -165,31 +163,6 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
             if(keyPressed->scancode == sf::Keyboard::Scancode::Escape){
                 state = GameState::Playing; //Esc durante la pausa: riprendi
                 return;
-            }
-        }
-        else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
-            if(mousePressed->button == sf::Mouse::Button::Left){
-                fcg::PauseMenu::MenuAction action = pauseMenu.HandleClick(mousePressed->position);
-                switch(action){
-                    case fcg::PauseMenu::MenuAction::Resume:
-                        state = GameState::Playing;
-                        return;
-                    case fcg::PauseMenu::MenuAction::BackToMainMenu:
-                        state = GameState::MainMenu;
-                        return;
-                    case fcg::PauseMenu::MenuAction::QuitGame:
-                        programRunning = false;
-                        return;
-                    case fcg::PauseMenu::MenuAction::FovChanged:
-                        player.getCamera().SetFov(pauseMenu.GetFov());
-                        PersistSettings(pauseMenu.GetFov(), pauseMenu.GetResolutionWidth(), pauseMenu.GetResolutionHeight());
-                        break;
-                    case fcg::PauseMenu::MenuAction::ResolutionChanged:
-                        PersistSettings(pauseMenu.GetFov(), pauseMenu.GetResolutionWidth(), pauseMenu.GetResolutionHeight());
-                        break;
-                    default:
-                        break;
-                }
             }
         }
     }
@@ -330,6 +303,7 @@ int main(){
 
     std::unique_ptr<fcg::MainMenu> mainMenu = std::make_unique<fcg::MainMenu>(res, startupSettings.fov, startupSettings.width, startupSettings.height);
     mainMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+    RebuildFontAtlas();
 
     //Nel menu il cursore resta visibile e libero, per poter cliccare sui tasti
     window.setMouseCursorVisible(true);
@@ -350,109 +324,146 @@ int main(){
     fcg::RaycastHit target; //Ultimo blocco puntato: resta "congelato" mentre si e' in pausa
 
     sf::Clock clock;
+    sf::Clock imguiClock; //Dt per ImGui::SFML::Update() nei menu (MainMenu/Paused)
     bool programRunning = true;
 
     while(programRunning){
         //Main Menù
         if(state == GameState::MainMenu){
-            HandleMenuEvents(window, *mainMenu, state, programRunning);
+            HandleMenuEvents(window, *mainMenu, programRunning);
             if(!programRunning) break;
-            //Appena preme sul pulsante genera mondo
-            if(state == GameState::Playing){
-                //Inializzati Player, Renderer,Hotbar, World (chunk + mesh), PauseMenu.
-                fcg::DrawLoadingScreen(window, res);
 
-                player = std::make_unique<fcg::Player>();
-                player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y); //Aspect Ratio
-                player->getCamera().SetFov(mainMenu->GetFov());
+            glClearColor(18.0f / 255.0f, 18.0f / 255.0f, 26.0f / 255.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                renderer = std::make_unique<fcg::Renderer>(
-                    std::vector<fcg::ShaderFiles>{
-                        {"world"    , dirShaders + "block_shader.vert"    , dirShaders + "block_shader.frag"},
-                        {"crosshair", dirShaders + "shader_crosshair.vert", dirShaders + "shader_crosshair.frag"},
-                        {"outline"  , dirShaders + "shader_outline.vert"  , dirShaders + "shader_outline.frag"},
-                        {"hotbar"   , dirShaders + "shader_hotbar.vert"   , dirShaders + "shader_hotbar.frag"},
-                        {"sky"      , dirShaders + "shader_sky.vert"      , dirShaders + "shader_sky.frag"},
-                        {"stars"    , dirShaders + "shader_stars.vert"    , dirShaders + "shader_stars.frag"}
-                    },
-                    res,
-                    TEXTUREPIXELSIZE,
-                    dirShaders);
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui::SFML::Update(window, imguiClock.restart());
+            fcg::MainMenu::MenuAction action = mainMenu->Draw();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-                renderer->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+            window.display();
 
-                compass = std::make_unique<fcg::Compass>(res);               
-                hotbar = std::make_unique<fcg::Hotbar>();
-                world = std::make_unique<fcg::World>();
+            switch(action){
+                case fcg::MainMenu::MenuAction::GenerateWorld:{
+                    //Inizializza Player, Renderer, Hotbar, World (chunk + mesh), PauseMenu.
+                    fcg::DrawLoadingScreen(window, res);
 
-                pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
-                pauseMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    player = std::make_unique<fcg::Player>();
+                    player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    player->getCamera().SetFov(mainMenu->GetFov());
 
-                glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per gl_PointSize nel vertex shader delle stelle
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glEnable(GL_DEPTH_TEST);
+                    renderer = std::make_unique<fcg::Renderer>(
+                        std::vector<fcg::ShaderFiles>{
+                            {"world"    , dirShaders + "block_shader.vert"    , dirShaders + "block_shader.frag"},
+                            {"crosshair", dirShaders + "shader_crosshair.vert", dirShaders + "shader_crosshair.frag"},
+                            {"outline"  , dirShaders + "shader_outline.vert"  , dirShaders + "shader_outline.frag"},
+                            {"hotbar"   , dirShaders + "shader_hotbar.vert"   , dirShaders + "shader_hotbar.frag"},
+                            {"sky"      , dirShaders + "shader_sky.vert"      , dirShaders + "shader_sky.frag"},
+                            {"stars"    , dirShaders + "shader_stars.vert"    , dirShaders + "shader_stars.frag"}
+                        },
+                        res,
+                        TEXTUREPIXELSIZE,
+                        dirShaders);
 
-                window.setMouseCursorVisible(false);
-                window.setMouseCursorGrabbed(true);
-                
-                target = fcg::RaycastHit{};
-                clock.restart(); //Evita un deltaTime enorme dovuto al tempo passato nel menu
-                continue;
+                    renderer->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+
+                    compass = std::make_unique<fcg::Compass>(res);
+                    hotbar = std::make_unique<fcg::Hotbar>();
+                    world = std::make_unique<fcg::World>();
+
+                    pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
+                    pauseMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    RebuildFontAtlas();
+
+                    glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per gl_PointSize nel vertex shader delle stelle
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_BACK);
+                    glEnable(GL_DEPTH_TEST);
+
+                    window.setMouseCursorVisible(false);
+                    window.setMouseCursorGrabbed(true);
+
+                    target = fcg::RaycastHit{};
+                    state = GameState::Playing;
+                    clock.restart(); //Evita un deltaTime enorme dovuto al tempo passato nel menu
+                    break;
+                }
+                case fcg::MainMenu::MenuAction::Exit:
+                    programRunning = false;
+                    break;
+                case fcg::MainMenu::MenuAction::FovChanged:
+                case fcg::MainMenu::MenuAction::ResolutionChanged:
+                    PersistSettings(mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
+                    break;
+                default:
+                    break;
             }
 
-            mainMenu->UpdateHover(sf::Mouse::getPosition(window)); //Cambia il colore dei pulsanti
-
-            window.clear(sf::Color(18, 18, 26));
-            window.pushGLStates();
-            mainMenu->Draw(window);
-            window.popGLStates();
-            window.display();
             continue;
         }
 
         //Game Paused
         if(state == GameState::Paused){
-            HandlePauseEvents(window, *pauseMenu, *player, *renderer, state, programRunning);
+            HandlePauseEvents(window, *pauseMenu, *renderer, state, programRunning);
             if(!programRunning) break;
 
-            if(state == GameState::Playing){
-                //Ripresa: riaggancia il mouse esattamente come all'ingresso in Playing
+            if(state == GameState::Playing){ //Esc: ripresa immediata, senza disegnare l'overlay
                 window.setMouseCursorVisible(false);
                 window.setMouseCursorGrabbed(true);
                 clock.restart();
                 continue;
             }
 
-            //Si torna al menu principale:
-            if(state == GameState::MainMenu){
-                //Chiamiamo i decostruttori di ciascuno, e inizializziamo a nullptr
-                renderer.reset();
-                world.reset();
-                hotbar.reset();
-                pauseMenu.reset();
-
-                window.setMouseCursorVisible(true);
-                window.setMouseCursorGrabbed(false);
-
-                //Ricostruita dalle preferenze salvate, cosi' riflette eventuali modifiche
-                //Fatte nel pannello Opzioni della pausa
-                fcg::Settings currentSettings = fcg::LoadSettings(settingsPath);
-                mainMenu = std::make_unique<fcg::MainMenu>(res, currentSettings.fov, currentSettings.width, currentSettings.height);
-                mainMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
-                continue;
-            }
-
-            pauseMenu->UpdateHover(sf::Mouse::getPosition(window));
-
-            clock.restart(); //Scarta il tempo passato in pausa: alla ripresa niente salti di deltaTime
-
             renderer->Draw(*world, player->getCamera(), target, *hotbar, 0.0f); //Mondo "congelato": il ciclo giorno/notte non avanza
-            window.pushGLStates();
-            pauseMenu->Draw(window);
-            window.popGLStates();
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui::SFML::Update(window, imguiClock.restart());
+            fcg::PauseMenu::MenuAction action = pauseMenu->Draw();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             window.display();
+
+            switch(action){
+                case fcg::PauseMenu::MenuAction::Resume:
+                    window.setMouseCursorVisible(false);
+                    window.setMouseCursorGrabbed(true);
+                    clock.restart();
+                    state = GameState::Playing;
+                    break;
+                case fcg::PauseMenu::MenuAction::BackToMainMenu:{
+                    renderer.reset();
+                    world.reset();
+                    hotbar.reset();
+                    pauseMenu.reset();
+
+                    window.setMouseCursorVisible(true);
+                    window.setMouseCursorGrabbed(false);
+
+                    //Ricostruita dalle preferenze salvate, cosi' riflette eventuali modifiche
+                    //fatte nel pannello Opzioni della pausa
+                    fcg::Settings currentSettings = fcg::LoadSettings(settingsPath);
+                    mainMenu = std::make_unique<fcg::MainMenu>(res, currentSettings.fov, currentSettings.width, currentSettings.height);
+                    mainMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    RebuildFontAtlas();
+                    state = GameState::MainMenu;
+                    break;
+                }
+                case fcg::PauseMenu::MenuAction::QuitGame:
+                    programRunning = false;
+                    break;
+                case fcg::PauseMenu::MenuAction::FovChanged:
+                    player->getCamera().SetFov(pauseMenu->GetFov());
+                    PersistSettings(pauseMenu->GetFov(), pauseMenu->GetResolutionWidth(), pauseMenu->GetResolutionHeight());
+                    break;
+                case fcg::PauseMenu::MenuAction::ResolutionChanged:
+                    PersistSettings(pauseMenu->GetFov(), pauseMenu->GetResolutionWidth(), pauseMenu->GetResolutionHeight());
+                    break;
+                default:
+                    break;
+            }
+
             continue;
         }
 

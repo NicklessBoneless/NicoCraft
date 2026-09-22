@@ -343,21 +343,22 @@ namespace fcg{
             glm::vec3 sunCircleTangent = glm::normalize(glm::cross(-sunCirclePosition, rotationAxis)); //Calcolo del vettore tangente al cerchio
             glm::vec3 sunActualPosition = cameraPos + sunCirclePosition * skyRadius;
             UpdateCelestialQuad(sunActualPosition, rotationAxis, sunCircleTangent);
-            sf::Texture::bind(&sunTexture);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, sunTexture.getNativeHandle());
             glUniform1f(celestialAlphaLoc, 0.0f + t);
             glDrawArrays(GL_TRIANGLES, 0, 6);
 
             //Luna: sempre all'estremo opposto del Sole (angle + PI), alpha alta di notte
-            glm::vec3 moonCirclePosition = {glm::cos(angle + M_PI), glm::sin(angle + M_PI), 0.0f}; //Con cerchio di raggio 1
+            glm::vec3 moonCirclePosition = {glm::cos(angle + M_PI), glm::sin(angle + M_PI), 0.0f};
             glm::vec3 moonCircleTangent = glm::normalize(glm::cross(-moonCirclePosition, rotationAxis));
             glm::vec3 moonActualPosition = cameraPos + moonCirclePosition * skyRadius;
             UpdateCelestialQuad(moonActualPosition, rotationAxis, moonCircleTangent);
-            sf::Texture::bind(&moonTexture);
+            glBindTexture(GL_TEXTURE_2D, moonTexture.getNativeHandle());
             glUniform1f(celestialAlphaLoc, 1.0f);
             glDrawArrays(GL_TRIANGLES, 0, 6);
 
             glBindVertexArray(0);
-            sf::Texture::bind(nullptr);
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         void DrawStars(Camera& camera, float t){       
