@@ -25,8 +25,9 @@ namespace fcg{
         Blocks::TextureArray textureArray;
         fcg::Crosshair crosshair;
         fcg::BlockOutline outline;
+        fcg::HotbarRenderer hotbarRenderer;
         fcg::Sky sky;
-        fcg::Hotbar hotbar;
+        
 
         GLint modelLoc = -1, viewLoc = -1, projLoc = -1, daylightLoc = -1;
 
@@ -39,8 +40,8 @@ namespace fcg{
             worldShader(FindShaderFiles(shaderSets, "world").vertexFile,FindShaderFiles(shaderSets, "world").fragmentFile),
             crosshair(FindShaderFiles(shaderSets, "crosshair").vertexFile,FindShaderFiles(shaderSets, "crosshair").fragmentFile),
             outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile),
-            sky(res,FindShaderFiles(shaderSets, "sky"),FindShaderFiles(shaderSets, "stars")),
-            hotbar(res,FindShaderFiles(shaderSets, "hotbar").vertexFile,FindShaderFiles(shaderSets, "hotbar").fragmentFile)
+            hotbarRenderer(res, FindShaderFiles(shaderSets, "hotbar")),
+            sky(res,FindShaderFiles(shaderSets, "sky"),FindShaderFiles(shaderSets, "stars"))
         {
             InitializeTextures(res);
             Locations();
@@ -49,7 +50,7 @@ namespace fcg{
         //Disegna un frame completo: 
         //Cielo (Sole/Luna/stelle), Mondo, Outline del blocco puntato, crosshair, hotbar. 
         //DeltaTime fa avanzare il ciclo giorno/notte
-        void Draw(const World& world, Camera& camera, const RaycastHit& target, float deltaTime){
+        void Draw(const World& world, Camera& camera, const RaycastHit& target, const Hotbar& hotbar, float deltaTime){
             sky.Update(deltaTime); //Update del cielo
 
             glm::vec3 skyColor = sky.GetSkyColor();
@@ -83,7 +84,7 @@ namespace fcg{
             }
 
             crosshair.Draw(camera.GetAspectRatio());
-            hotbar.Draw(windowWidth, windowHeight);
+            hotbarRenderer.Draw(hotbar, windowWidth, windowHeight);
         }
 
         //Va richiamata all'avvio e ad ogni sf::Event::Resized
@@ -99,15 +100,6 @@ namespace fcg{
         int GetWindowHeight() const{
             return windowHeight;
         }
-
-        Blocks::BlockType GetSelectedHotbarBlockType(){
-            return hotbar.GetSelectedBlockType();
-        }
-
-        fcg::Hotbar& GetHotbar(){
-            return hotbar;
-        }
-
 
     private:
         static const ShaderFiles& FindShaderFiles(const std::vector<ShaderFiles>& shaderSets, const std::string& name){

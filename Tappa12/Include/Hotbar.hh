@@ -18,42 +18,21 @@ namespace fcg{
         Blocks::BlockType blockType;
     };
 
-    //Stato runtime di un singolo slot (per ora solo la definizione statica, pronto per espansioni future)
     struct HotbarSlot{
         HotbarSlotDefinition definition;
     };
 
     /*
-        Hotbar in basso allo schermo: slot selezionabili da tastiera (Num1-Num7), ognuno mostra
-        un'icona isometrica pseudo-3D del blocco.
-        Disegnata interamente con OpenGL Core (shader dedicato), senza SFML per il rendering.
-        Va chiamata Draw() DOPO il rendering del mondo.
+        Stato puro della Hotbar: quali blocchi contiene e quale slot e' selezionato.
+        Nessuna dipendenza da OpenGL: la parte grafica vive in HotbarRenderer, piu' in basso in questo file
     */
     class Hotbar{
     private:
         std::vector<HotbarSlot> slots;
         int selectedIndex = 0;
 
-        Shaders shader;
-        GLuint vao = 0, vbo = 0;
-        GLint screenSizeLoc = -1, tintLoc = -1;
-
-        GLuint slotTexture = 0;
-        GLuint slotSelectedTexture = 0;
-        std::map<Blocks::BlockType, GLuint> topTextures;
-        std::map<Blocks::BlockType, GLuint> sideTextures;
-        std::vector<GLuint> ownedTextures; //Tutte le texture create, per il Cleanup
-
-        static constexpr float slotSize = 72.0f;
-        static constexpr float slotPadding = 0.0f;
-        static constexpr float slotMargin = 20.0f;  //Distanza dal bordo inferiore dello schermo
-        static constexpr float iconMargin = 10.0f;  //Margine tra il bordo dello slot e l'icona
-
     public:
-        //resourcesDir: path relativo alle risorse (es. "../Resources/"), shaderDir: cartella degli shader della tappa
-        Hotbar(const std::string& resourcesDir, const std::string& vertexFile, const std::string& fragmentFile) :
-            shader(vertexFile, fragmentFile)
-        {
+        Hotbar(){
             slots = {
                 {{Blocks::BlockType::GRASS}},
                 {{Blocks::BlockType::DIRT}},
@@ -63,18 +42,19 @@ namespace fcg{
                 {{Blocks::BlockType::LEAVES}},
                 {{Blocks::BlockType::GLASS}}
             };
-
-            BuildQuadBuffer();
-            Locations();
-            LoadTextures(resourcesDir);
         }
 
-        ~Hotbar(){
-            Cleanup();
+        int GetSlotCount() const{
+            return (int) slots.size();
         }
 
-        Hotbar(const Hotbar&) = delete;
-        Hotbar& operator=(const Hotbar&) = delete;
+        Blocks::BlockType GetBlockTypeAt(int index) const{
+            return slots[index].definition.blockType;
+        }
+
+        int GetSelectedIndex() const{
+            return selectedIndex;
+        }
 
         Blocks::BlockType GetSelectedBlockType() const{
             return slots[selectedIndex].definition.blockType;
@@ -91,8 +71,48 @@ namespace fcg{
             int count = (int) slots.size();
             selectedIndex = ((selectedIndex + delta) % count + count) % count; //Modulo "sicuro" anche per delta negativi
         }
+    };
 
-        void Draw(int windowWidth, int windowHeight){
+    /*
+        Disegna la Hotbar in basso allo schermo (icona isometrica pseudo-3D per slot).
+        Vista OpenGL Core: possiede shader, texture e VAO, ma non lo stato. Legge lo
+        stato da un oggetto Hotbar passato a Draw(), non lo possiede e non lo modifica mai
+    */
+    class HotbarRenderer{
+    private:
+        Shaders shader;
+        GLuint vao = 0, vbo = 0;
+        GLint screenSizeLoc = -1, tintLoc = -1;
+
+        GLuint slotTexture = 0;
+        GLuint slotSelectedTexture = 0;
+        std::map<Blocks::BlockType, GLuint> topTextures;
+        std::map<Blocks::BlockType, GLuint> sideTextures;
+        std::vector<GLuint> ownedTextures; //Tutte le texture create, per il Cleanup
+
+        static constexpr float slotSize = 72.0f;
+        static constexpr float slotPadding = 0.0f;
+        static constexpr float slotMargin = 20.0f;  //Distanza dal bordo inferiore dello schermo
+        static constexpr float iconMargin = 10.0f;  //Margine tra il bordo dello slot e l'icona
+
+    public:
+        //resourcesDir: path relativo alle risorse (es. "../Resources/")
+        HotbarRenderer(const std::string& resourcesDir, const ShaderFiles& shaderFiles) :
+            shader(shaderFiles.vertexFile, shaderFiles.fragmentFile)
+        {
+            BuildQuadBuffer();
+            Locations();
+            LoadTextures(resourcesDir);
+        }
+
+        ~HotbarRenderer(){
+            Cleanup();
+        }
+
+        HotbarRenderer(const HotbarRenderer&) = delete;
+        HotbarRenderer& operator=(const HotbarRenderer&) = delete;
+
+        void Draw(const Hotbar& hotbar, int windowWidth, int windowHeight){
             //Overlay 2D: niente depth test, niente culling (l'asse Y invertito ribalta l'avvolgimento), blending attivo
             glDisable(GL_DEPTH_TEST);
             glDisable(GL_CULL_FACE);
@@ -104,19 +124,19 @@ namespace fcg{
             glActiveTexture(GL_TEXTURE0);
             glBindVertexArray(vao);
 
-            float slotCount = (float) slots.size();
+            int slotCount = hotbar.GetSlotCount();
             float totalWidth = slotCount * slotSize + (slotCount - 1) * slotPadding;
             float startX = ((float) windowWidth - totalWidth) * 0.5f;
             float startY = (float) windowHeight - slotSize - slotMargin;
 
-            for(int i = 0; i < (int) slots.size(); i++){
+            for(int i = 0; i < slotCount; i++){
                 float x = startX + i * (slotSize + slotPadding);
-                bool isSelected = (i == selectedIndex);
+                bool isSelected = (i == hotbar.GetSelectedIndex());
 
                 DrawSlotBackground(x, startY, isSelected);
 
                 float iconSize = slotSize - iconMargin * 2.0f;
-                DrawIsoBlock(slots[i].definition.blockType, x + iconMargin, startY + iconMargin, iconSize);
+                DrawIsoBlock(hotbar.GetBlockTypeAt(i), x + iconMargin, startY + iconMargin, iconSize);
             }
 
             glBindVertexArray(0);

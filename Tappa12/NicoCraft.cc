@@ -193,8 +193,7 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
 //Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
 //Esc che ora apre la pausa invece di chiudere il programma
-void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
-    fcg::Hotbar& hotbar = renderer.GetHotbar();
+void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer, fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         if(event->is<sf::Event::Closed>()){
             programRunning = false;
@@ -332,6 +331,7 @@ int main(){
     std::unique_ptr<fcg::Renderer> renderer;
     std::unique_ptr<fcg::World> world;
     std::unique_ptr<fcg::PauseMenu> pauseMenu;
+    std::unique_ptr<fcg::Hotbar> hotbar;
     std::unique_ptr<fcg::Compass> compass;
 
     fcg::RaycastHit target; //Ultimo blocco puntato: resta "congelato" mentre si e' in pausa
@@ -371,6 +371,8 @@ int main(){
                 compass = std::make_unique<fcg::Compass>(res);
                 compass->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
                
+                hotbar = std::make_unique<fcg::Hotbar>();
+
                 world = std::make_unique<fcg::World>();
 
                 pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
@@ -418,6 +420,7 @@ int main(){
                 //Chiamiamo i decostruttori di ciascuno, e inizializziamo a nullptr
                 renderer.reset();
                 world.reset();
+                hotbar.reset();
                 pauseMenu.reset();
 
                 window.setMouseCursorVisible(true);
@@ -435,8 +438,7 @@ int main(){
 
             clock.restart(); //Scarta il tempo passato in pausa: alla ripresa niente salti di deltaTime
 
-            renderer->Draw(*world, player->getCamera(), target, 0.0f); //Mondo "congelato": il ciclo giorno/notte non avanza
-
+            renderer->Draw(*world, player->getCamera(), target, *hotbar, 0.0f); //Mondo "congelato": il ciclo giorno/notte non avanza
             window.pushGLStates();
             pauseMenu->Draw(window);
             window.popGLStates();
@@ -446,7 +448,7 @@ int main(){
         }
 
         //Playing in game
-        HandleEvents(window, *player, *renderer,*compass,rawMouse, state, programRunning);
+        HandleEvents(window, *player, *renderer, *hotbar, *compass, rawMouse, state, programRunning);
         if(!programRunning) break;
 
         if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
@@ -469,9 +471,9 @@ int main(){
             player->getReach()
         );
 
-        world->ProcessBlockInteractions(*player, target, renderer->GetSelectedHotbarBlockType());
+        world->ProcessBlockInteractions(*player, target, hotbar->GetSelectedBlockType());
 
-        renderer->Draw(*world, player->getCamera(), target, deltaTime);
+        renderer->Draw(*world, player->getCamera(), target, *hotbar, deltaTime);
         compass->Update(player->getCamera().GetYaw());
 
         window.pushGLStates();
