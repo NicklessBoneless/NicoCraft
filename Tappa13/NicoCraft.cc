@@ -81,11 +81,12 @@ public:
 // SFML Callbacks //
 ////////////////////
 
-void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Renderer& renderer){
+void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Renderer& renderer, fcg::PauseMenu& pauseMenu){
     glViewport(0, 0, resized.size.x, resized.size.y);
     renderer.SetWindowSize(resized.size.x, resized.size.y);
     camera.SetWindowSize(resized.size.x, resized.size.y);
-}
+    pauseMenu.SetWindowSize(resized.size.x, resized.size.y);
+}   
 
 ////////////////////
 // AUX Functions  //
@@ -143,7 +144,7 @@ void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, bool& p
 */
 //Eventi durante lo stato Paused: chiusura finestra, resize, Esc per riprendere.
 //I click dell'overlay li gestisce ImGui: l'azione si legge da PauseMenu::Draw()
-void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Renderer& renderer, GameState& state, bool& programRunning){
+void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Renderer& renderer,fcg::Camera& camera, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         ImGui::SFML::ProcessEvent(window, *event);
 
@@ -156,6 +157,7 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
             glViewport(0, 0, resized->size.x, resized->size.y);
             pauseMenu.SetWindowSize(resized->size.x, resized->size.y);
             renderer.SetWindowSize(resized->size.x, resized->size.y);
+            camera.SetWindowSize(resized->size.x, resized->size.y);
             return;
         }
 
@@ -170,7 +172,7 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
 //Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
 //Esc che ora apre la pausa invece di chiudere il programma
-void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer, fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
+void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer,fcg::PauseMenu& pauseMenu ,fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         ImGui::SFML::ProcessEvent(window, *event);
 
@@ -179,9 +181,7 @@ void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& 
             return;
         }
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            sf::View view = sf::View({0.0f, 0.0f}, {(float)resized->size.x,(float)resized->size.y});
-            window.setView(view);
-            HandleResize(*resized, player.getCamera(), renderer);
+            HandleResize(*resized, player.getCamera(), renderer, pauseMenu);
             return;
         }
         if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>()){
@@ -405,7 +405,7 @@ int main(){
 
         //Game Paused
         if(state == GameState::Paused){
-            HandlePauseEvents(window, *pauseMenu, *renderer, state, programRunning);
+            HandlePauseEvents(window, *pauseMenu, *renderer, player->getCamera(), state, programRunning);
             if(!programRunning) break;
 
             if(state == GameState::Playing){ //Esc: ripresa immediata, senza disegnare l'overlay
@@ -468,7 +468,7 @@ int main(){
         }
 
         //Playing in game
-        HandleEvents(window, *player, *renderer, *hotbar, *compass, rawMouse, state, programRunning);
+        HandleEvents(window, *player, *renderer, *pauseMenu,*hotbar, *compass, rawMouse, state, programRunning);
         if(!programRunning) break;
 
         
