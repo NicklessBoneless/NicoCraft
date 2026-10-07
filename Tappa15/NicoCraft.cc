@@ -23,9 +23,9 @@
 #include "./Include/LoadingScreen.hh"
 #include "./Include/Compass.hh"
 
-const std::string dirShaders = "../Tappa13/Shaders/";
+const std::string dirShaders = "../Tappa15/Shaders/";
 const std::string res = "../Resources/";
-const std::string winTitle = "NicoCraft - Tappa13";
+const std::string winTitle = "NicoCraft - Tappa15";
 const int TEXTUREPIXELSIZE = 32;
 
 //File in cui vengono salvate le preferenze (risoluzione, FOV): vive nella cartella da cui
