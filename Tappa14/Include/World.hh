@@ -5,12 +5,14 @@
 #include <cmath>
 #include <limits>
 #include <cstdlib>
+#include <memory>
 
 #include "Blocks.hh"
 #include "Chunk.hh"
 #include "IWorld.hh"
 #include "Player.hh"
 #include "TerrainGenerator.hh"
+#include "PerlinNoise.hh"
 
 namespace fcg
 {
@@ -44,7 +46,7 @@ namespace fcg
         TerrainGenerator terrainGenerator;
 
     public:
-        explicit World(uint32_t seed = 8008) : terrainGenerator(seed){
+        explicit World(uint32_t seed = 23) : terrainGenerator(seed,std::make_unique<PerlinNoise>(seed)){
             chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
             GenerateAllChunks();
             BuildAllMeshes();
@@ -52,6 +54,19 @@ namespace fcg
 
         uint32_t GetSeed() const{
             return terrainGenerator.GetSeed();
+        }
+
+                //Spawn al centro del mondo, appena sopra il blocco piu' alto della colonna
+        //(se c'e' un albero ci si trova sopra la chioma, ma mai incastrati dentro)
+        glm::vec3 FindSpawnPosition(){
+            int spawnX = WORLDSIZECHUNKSX * Blocks::CHUNK_SIZE_X / 2;
+            int spawnZ = WORLDSIZECHUNKSZ * Blocks::CHUNK_SIZE_Z / 2;
+
+            int y = Blocks::CHUNK_SIZE_Y - 1;
+            while(y > 0 && !IsSolidAtWorld(spawnX, y, spawnZ)){
+                y--;
+            }
+            return glm::vec3(spawnX + 0.5f, (float) (y + 2), spawnZ + 0.5f);
         }
 
         const std::vector<ChunkInstance>& GetChunks() const{

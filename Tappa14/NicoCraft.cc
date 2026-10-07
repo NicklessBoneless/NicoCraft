@@ -23,9 +23,9 @@
 #include "./Include/LoadingScreen.hh"
 #include "./Include/Compass.hh"
 
-const std::string dirShaders = "../Tappa13/Shaders/";
+const std::string dirShaders = "../Tappa14/Shaders/";
 const std::string res = "../Resources/";
-const std::string winTitle = "NicoCraft - Tappa13";
+const std::string winTitle = "NicoCraft - Tappa14";
 const int TEXTUREPIXELSIZE = 32;
 
 //File in cui vengono salvate le preferenze (risoluzione, FOV): vive nella cartella da cui
@@ -347,7 +347,8 @@ int main(){
                     //Inizializza Player, Renderer, Hotbar, World (chunk + mesh), PauseMenu.
                     fcg::DrawLoadingScreen(window, res);
 
-                    player = std::make_unique<fcg::Player>();
+                    world = std::make_unique<fcg::World>();
+                    player = std::make_unique<fcg::Player>(world->FindSpawnPosition());
                     player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
                     player->getCamera().SetFov(mainMenu->GetFov());
 
@@ -368,7 +369,6 @@ int main(){
 
                     compass = std::make_unique<fcg::Compass>(res);
                     hotbar = std::make_unique<fcg::Hotbar>();
-                    world = std::make_unique<fcg::World>();
 
                     pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
                     pauseMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);

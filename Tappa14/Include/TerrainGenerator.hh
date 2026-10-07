@@ -2,11 +2,15 @@
 #define TERRAIN_GENERATOR_HH
 
 #include <cstdint>
+#include <algorithm>
+#include <cmath>
+#include <memory>
 #include <random>
 #include <utility>
 #include <vector>
-
+ 
 #include "Chunk.hh"
+#include "Noise.hh"
 
 namespace fcg{
     /*
@@ -18,23 +22,33 @@ namespace fcg{
     class TerrainGenerator{
     private:
         uint32_t seed;
+        std::unique_ptr<Noise> noise;
+        FractalParams terrainParameters;
 
-        static constexpr int flatSurface = Blocks::CHUNK_SIZE_Y / 2;
+        static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 2; //Quota media del terreno
+        static constexpr float heightAmplitude = 14.0f; //Scostamento massimo dalla quota media
+        static constexpr int dirtDepth = 3; //Strati di terra sotto l'erba
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
+        static constexpr int treeClearance = treeTrunkHeight + 2; //Spazio da lasciare sopra il terreno per la chioma
 
     public:
-        explicit TerrainGenerator(uint32_t seed) : seed(seed){}
+        TerrainGenerator(uint32_t seed, std::unique_ptr<Noise> noise, FractalParams terrainParameters = FractalParams{}) : seed(seed), noise(std::move(noise)), terrainParameters(terrainParameters){}
 
         uint32_t GetSeed() const{
             return seed;
         }
 
-        //Quota Y del primo blocco libero sopra il terreno, in coordinate MONDO.
-        //Per ora piatta: nei prossimi passi leggera' la heightmap del rumore
+        /*
+            Quota Y del primo blocco libero sopra il terreno, in coordinate MONDO.
+            Il rumore e' campionato in coordinate mondo (non locali al chunk):
+            cosi' non ci sono cuciture ai bordi tra chunk adiacenti
+        */
         int GetSurfaceHeight(int worldX, int worldZ) const{
-            return flatSurface;
-        }
+            float n = Fractal2D(*noise, (float) worldX, (float) worldZ, terrainParameters);
+            int height = baseHeight + (int) std::floor(n * heightAmplitude);
+            return std::clamp(height, 2, Blocks::CHUNK_SIZE_Y - treeClearance);
+        }     
 
         void GenerateChunk(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
             FillTerrain(chunk, chunkX, chunkZ);
@@ -48,8 +62,8 @@ namespace fcg{
                     int surface = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
                     for(int y = 0; y < surface; y++){
                         if(y == surface - 1) chunk.Set(x, y, z, Blocks::BlockType::GRASS);
-                        else if(y < surface * 0.90) chunk.Set(x, y, z, Blocks::BlockType::STONE);
-                        else chunk.Set(x, y, z, Blocks::BlockType::DIRT);
+                        else if(y >= (surface-1)-dirtDepth) chunk.Set(x, y, z, Blocks::BlockType::DIRT);
+                        else chunk.Set(x, y, z, Blocks::BlockType::STONE);
                     }
                 }
             }
@@ -83,17 +97,21 @@ namespace fcg{
                     }
 
                     for(int y = groundY + 3; y < treeTop + 1; y++){
-                        if(y == treeTop) chunk.Set(x, y, z, Blocks::BlockType::LEAVES);
-                        chunk.Set(x + 1, y, z + 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x - 1, y, z - 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x - 1, y, z + 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x + 1, y, z - 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x + 1, y, z,     Blocks::BlockType::LEAVES);
-                        chunk.Set(x,     y, z + 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x,     y, z - 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x - 1, y, z,     Blocks::BlockType::LEAVES);
+                        for(int dx = -1; dx <= 1; dx++){
+                            for(int dz = -1; dz <= 1; dz++){
+                                if(dx == 0 && dz == 0 && y != treeTop) continue; //Al centro c'e' il tronco
+                                PlaceLeaf(chunk, x + dx, y, z + dz);
+                            }
+                        }
                     }
                 }
+            }
+        }
+
+        //Piazza una foglia solo se la cella è libera: su terreno irregolare non deve scavare le colline vicine
+        static void PlaceLeaf(Blocks::Chunk& chunk, int x, int y, int z){
+            if(chunk.Get(x, y, z) == Blocks::BlockType::AIR){
+                chunk.Set(x, y, z, Blocks::BlockType::LEAVES);
             }
         }
 

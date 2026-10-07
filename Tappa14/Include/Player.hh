@@ -19,17 +19,18 @@ namespace fcg
         bool noclip = false;
         bool breakBlock = false;
         bool placeBlock = false;
+        glm::vec3 spawnPosition = {0.0f,0.f,0.0f};
 
         const float REACH_DISTANCE = 6.0f;
         static constexpr float sprintFovKick = 0.5f;
         static constexpr float MinimumYaxis = -40.0f;
-        static constexpr glm::vec3 spawnPosition = {40.0f,40.f,40.0f};
+        
         static constexpr float spawnYawDeg = 0.0f;
         static constexpr float spawnPitchDeg = 0.0f;
         float moveSpeed = 4.0f;
 
     public:
-        Player() : physics(spawnPosition){
+        explicit Player(glm::vec3 spawn) : physics(spawn), spawnPosition(spawn){
             camera.SetPosition(physics.GetEyePosition());
         }
 
