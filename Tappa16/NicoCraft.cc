@@ -404,6 +404,8 @@ int main(){
             continue;
         }
 
+
+        std::cout<<"State = "<<(int) state<<"\n";
         //Game Paused
         if(state == GameState::Paused){
             HandlePauseEvents(window, *pauseMenu, *renderer, player->getCamera(), state, programRunning);

@@ -26,8 +26,8 @@ namespace fcg{
         FractalParams terrainParameters;
 
         static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 2; //Quota media del terreno
-        static constexpr float heightAmplitude = 14.0f; //Scostamento massimo dalla quota media
-        static constexpr int dirtDepth = 3; //Strati di terra sotto l'erba
+        static constexpr float heightAmplitude = 50.0f; //Scostamento massimo dalla quota media
+        static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
         static constexpr int treeClearance = treeTrunkHeight + 2; //Spazio da lasciare sopra il terreno per la chioma

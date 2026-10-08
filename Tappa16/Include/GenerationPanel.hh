@@ -30,7 +30,6 @@ namespace fcg{
             Action result = Action::None;
 
             //Il menu di pausa occupa tutta la finestra: senza il focus forzato potrebbe coprire il pannello
-            ImGui::SetNextWindowFocus();
             ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_FirstUseEver);
             ImGui::Begin("Generazione terreno", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
