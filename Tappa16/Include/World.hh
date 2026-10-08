@@ -50,7 +50,7 @@ namespace fcg
 
     public:
         explicit World(const TerrainConfig& config = TerrainConfig{}) :
-            currentConfig(config),
+            currentTerrainConfig(config),
             terrainGenerator(config.seed, CreateNoise(config.noiseType, config.seed), config.fractal){
             chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
             GenerateAllChunks();
@@ -58,7 +58,7 @@ namespace fcg
         }
 
         const TerrainConfig& GetConfig() const{
-            return currentConfig;
+            return currentTerrainConfig;
         }
 
         /*
@@ -69,7 +69,7 @@ namespace fcg
         double Regenerate(const TerrainConfig& config){
             auto start = std::chrono::steady_clock::now();
 
-            currentConfig = config;
+            currentTerrainConfig = config;
             terrainGenerator = TerrainGenerator(config.seed, CreateNoise(config.noiseType, config.seed), config.fractal);
 
             for(ChunkInstance& instance : chunks){

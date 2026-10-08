@@ -97,13 +97,6 @@ namespace fcg
             SpawnPlayer();
         }
 
-        //Imposta un nuovo punto di spawn e vi riporta subito il player (usato dopo una rigenerazione del mondo)
-        void RespawnAt(glm::vec3 newSpawn){
-            spawnPosition = newSpawn;
-            SpawnPlayer();
-        }
-
-
         void UpdatePosition(float deltaTime, fcg::IWorld& world, const PlayerInput& input){
             noclip ? camera.NoClipMove(deltaTime, moveSpeed, input) : NormalMove(deltaTime, world, input);
         }
