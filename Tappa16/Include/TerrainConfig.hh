@@ -31,6 +31,7 @@ namespace fcg{
         NoiseType noiseType = NoiseType::Perlin;
         uint32_t seed = 8008;
         FractalParams fractal;
+        float heightAmplitude = 30.0f;
     };
 }
 
