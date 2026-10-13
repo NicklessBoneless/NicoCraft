@@ -51,7 +51,10 @@ namespace fcg
     public:
         explicit World(const TerrainConfig& config = TerrainConfig{}) :
             currentTerrainConfig(config),
-            terrainGenerator(config.seed, CreateNoise(config.noiseType, config.seed), config.fractal){
+            terrainGenerator(config.seed, 
+                CreateNoise(config.noiseType, config.seed), 
+                config.fractal)
+            {
             chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
             GenerateAllChunks();
             BuildAllMeshes();
@@ -333,10 +336,13 @@ namespace fcg
         void GenerateAllChunks(){
             for(int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++){
                 for(int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++){
-                    chunks.emplace_back();
-                    ChunkInstance& instance = chunks.back();
+                    //Aggiungo
+                    chunks.emplace_back(); //Chiama il costruttore di Chunk!
+                    ChunkInstance& instance = chunks.back(); //Prendo il puntatore all'ultimo
+                    //Assegno le coordinate chunk
                     instance.chunkX = chunkX;
                     instance.chunkZ = chunkZ;
+                    //Riempo il chunk
                     terrainGenerator.GenerateChunk(instance.chunk, chunkX, chunkZ);
                 }
             }

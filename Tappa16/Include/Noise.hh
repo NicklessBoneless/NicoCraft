@@ -13,8 +13,12 @@ namespace fcg{
     struct FractalParams{
         int octaves = 4;
         float frequency = 0.02f;
-        float lacunarity = 2.0f;
-        float persistence = 0.5f;
+
+        //Lacunarity: di quanto cresce la frequenza ad ogni ottava
+        float frequencyMultiplier = 2.0f;
+
+        //Persistence: di quanto cala l'ampiezza ad ogni ottava
+        float amplitudeMultiplier = 0.5f;
     };
 
     //Somma di ottave (fBm), normalizzata in [-1, 1]
@@ -24,11 +28,12 @@ namespace fcg{
         float maxAmplitude = 0.0f;
         float frequency = params.frequency;
 
+        //Per ogni x e z ripetiamo per il numero di ottave
         for(int i = 0; i < params.octaves; i++){
             sum += noise.Sample2D(x * frequency, z * frequency) * amplitude;
             maxAmplitude += amplitude;
-            amplitude *= params.persistence;
-            frequency *= params.lacunarity;
+            amplitude *= params.amplitudeMultiplier;
+            frequency *= params.frequencyMultiplier;
         }
         return sum / maxAmplitude;
     }

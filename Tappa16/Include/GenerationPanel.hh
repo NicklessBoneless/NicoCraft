@@ -52,8 +52,8 @@ namespace fcg{
 
             ImGui::SliderInt("Octaves", &config.fractal.octaves, 1, 8);
             ImGui::SliderFloat("Frequency", &config.fractal.frequency, 0.005f, 0.1f, "%.3f");
-            ImGui::SliderFloat("Lacunarity", &config.fractal.lacunarity, 1.5f, 3.5f, "%.2f");
-            ImGui::SliderFloat("Persistence", &config.fractal.persistence, 0.1f, 0.9f, "%.2f");
+            ImGui::SliderFloat("Lacunarity", &config.fractal.frequencyMultiplier, 1.5f, 3.5f, "%.2f");
+            ImGui::SliderFloat("Persistence", &config.fractal.amplitudeMultiplier, 0.1f, 0.9f, "%.2f");
 
             if(ImGui::Button("Rigenera")){
                 result = Action::Regenerate;

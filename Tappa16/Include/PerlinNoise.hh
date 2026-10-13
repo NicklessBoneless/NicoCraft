@@ -10,13 +10,14 @@
 #include "Noise.hh"
 
 namespace fcg{
-    /*
-        Improved Perlin Noise (Perlin 2002) con tabella di permutazione generata dal seed.
-        Il rimescolamento e' un Fisher-Yates fatto a mano con mt19937: std::shuffle non e'
-        riproducibile tra standard library diverse, e per il confronto serve lo stesso mondo ovunque
+    /*  
+    Improved Perlin Noise (Perlin 2002) con tabella di permutazione generata dal seed.
+    Il rimescolamento e' un Fisher-Yates fatto a mano con mt19937: std::shuffle non e'
+    riproducibile tra standard library diverse, e per il confronto serve lo stesso mondo ovunque 
     */
     class PerlinNoise : public Noise{
     private:
+        //Permutazioni 
         std::array<uint8_t, 512> permutation;
 
         //Funzione 6x^{5}-15x^{4}+10x^{3}
@@ -53,8 +54,8 @@ namespace fcg{
             return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
         }
 
-    public:
-        explicit PerlinNoise(uint32_t seed){
+    public: 
+        explicit PerlinNoise(uint32_t seed){ //Inizializza la tabella delle permutazioni
             for(int i = 0; i < 256; i++){
                 permutation[i] = (uint8_t) i;
             }
@@ -74,21 +75,21 @@ namespace fcg{
         float Sample2D(float x, float z) const override{
             float floorX = std::floor(x);
             float floorZ = std::floor(z);
-            int xi = ((int) floorX) & 255;
-            int zi = ((int) floorZ) & 255;
-            float xf = x - floorX;
-            float zf = z - floorZ;
+            int xIndexUnitCell = ((int) floorX) & 255; //Equivalente a % 256, serve perché % da valori negativi
+            int zIndexUnitCell = ((int) floorZ) & 255; //Equivalente a % 256
+            float xLocalCell = x - floorX; //[0,1) 
+            float zLocalCell = z - floorZ; //[0,1)
 
-            float u = Fade(xf);
-            float w = Fade(zf);
+            float u = Fade(xLocalCell);
+            float w = Fade(zLocalCell);
 
-            int aa = permutation[permutation[xi] + zi];
-            int ab = permutation[permutation[xi] + zi + 1];
-            int ba = permutation[permutation[xi + 1] + zi];
-            int bb = permutation[permutation[xi + 1] + zi + 1];
+            int aa = permutation[permutation[xIndexUnitCell] + zIndexUnitCell];
+            int ab = permutation[permutation[xIndexUnitCell] + zIndexUnitCell + 1];
+            int ba = permutation[permutation[xIndexUnitCell + 1] + zIndexUnitCell];
+            int bb = permutation[permutation[xIndexUnitCell + 1] + zIndexUnitCell + 1];
 
-            float x1 = Lerp(u, Gradient2D(aa, xf, zf),        Gradient2D(ba, xf - 1.0f, zf));
-            float x2 = Lerp(u, Gradient2D(ab, xf, zf - 1.0f), Gradient2D(bb, xf - 1.0f, zf - 1.0f));
+            float x1 = Lerp(u, Gradient2D(aa, xLocalCell, zLocalCell),        Gradient2D(ba, xLocalCell - 1.0f, zLocalCell));
+            float x2 = Lerp(u, Gradient2D(ab, xLocalCell, zLocalCell - 1.0f), Gradient2D(bb, xLocalCell - 1.0f, zLocalCell - 1.0f));
 
             return std::clamp(Lerp(w, x1, x2), -1.0f, 1.0f);
         }
@@ -97,30 +98,30 @@ namespace fcg{
             float floorX = std::floor(x);
             float floorY = std::floor(y);
             float floorZ = std::floor(z);
-            int xi = ((int) floorX) & 255;
+            int xIndexUnitCell = ((int) floorX) & 255;
             int yi = ((int) floorY) & 255;
-            int zi = ((int) floorZ) & 255;
-            float xf = x - floorX;
+            int zIndexUnitCell = ((int) floorZ) & 255;
+            float xLocalCell = x - floorX;
             float yf = y - floorY;
-            float zf = z - floorZ;
+            float zLocalCell = z - floorZ;
 
-            float u = Fade(xf);
+            float u = Fade(xLocalCell);
             float v = Fade(yf);
-            float w = Fade(zf);
+            float w = Fade(zLocalCell);
 
-            int a  = permutation[xi] + yi;
-            int aa = permutation[a] + zi;
-            int ab = permutation[a + 1] + zi;
-            int b  = permutation[xi + 1] + yi;
-            int ba = permutation[b] + zi;
-            int bb = permutation[b + 1] + zi;
+            int a  = permutation[xIndexUnitCell] + yi;
+            int aa = permutation[a] + zIndexUnitCell;
+            int ab = permutation[a + 1] + zIndexUnitCell;
+            int b  = permutation[xIndexUnitCell + 1] + yi;
+            int ba = permutation[b] + zIndexUnitCell;
+            int bb = permutation[b + 1] + zIndexUnitCell;
 
             float y1 = Lerp(v,
-                Lerp(u, Gradient3D(permutation[aa], xf, yf, zf),        Gradient3D(permutation[ba], xf - 1.0f, yf, zf)),
-                Lerp(u, Gradient3D(permutation[ab], xf, yf - 1.0f, zf), Gradient3D(permutation[bb], xf - 1.0f, yf - 1.0f, zf)));
+                Lerp(u, Gradient3D(permutation[aa], xLocalCell, yf, zLocalCell),        Gradient3D(permutation[ba], xLocalCell - 1.0f, yf, zLocalCell)),
+                Lerp(u, Gradient3D(permutation[ab], xLocalCell, yf - 1.0f, zLocalCell), Gradient3D(permutation[bb], xLocalCell - 1.0f, yf - 1.0f, zLocalCell)));
             float y2 = Lerp(v,
-                Lerp(u, Gradient3D(permutation[aa + 1], xf, yf, zf - 1.0f),        Gradient3D(permutation[ba + 1], xf - 1.0f, yf, zf - 1.0f)),
-                Lerp(u, Gradient3D(permutation[ab + 1], xf, yf - 1.0f, zf - 1.0f), Gradient3D(permutation[bb + 1], xf - 1.0f, yf - 1.0f, zf - 1.0f)));
+                Lerp(u, Gradient3D(permutation[aa + 1], xLocalCell, yf, zLocalCell - 1.0f),        Gradient3D(permutation[ba + 1], xLocalCell - 1.0f, yf, zLocalCell - 1.0f)),
+                Lerp(u, Gradient3D(permutation[ab + 1], xLocalCell, yf - 1.0f, zLocalCell - 1.0f), Gradient3D(permutation[bb + 1], xLocalCell - 1.0f, yf - 1.0f, zLocalCell - 1.0f)));
 
             return std::clamp(Lerp(w, y1, y2), -1.0f, 1.0f);
         }

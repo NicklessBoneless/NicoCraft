@@ -26,7 +26,7 @@ namespace fcg{
         FractalParams terrainParameters;
 
         static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 2; //Quota media del terreno
-        static constexpr float heightAmplitude = 50.0f; //Scostamento massimo dalla quota media
+        static constexpr float heightAmplitude = 30.0f; //Scostamento massimo dalla quota media
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
@@ -45,13 +45,15 @@ namespace fcg{
             cosi' non ci sono cuciture ai bordi tra chunk adiacenti
         */
         int GetSurfaceHeight(int worldX, int worldZ) const{
-            float n = Fractal2D(*noise, (float) worldX, (float) worldZ, terrainParameters);
-            int height = baseHeight + (int) std::floor(n * heightAmplitude);
+            float MediumElevationValue = Fractal2D(*noise, (float) worldX, (float) worldZ, terrainParameters); //n = [-1,1]
+            int height = baseHeight + (int) std::floor(MediumElevationValue * heightAmplitude);
             return std::clamp(height, 2, Blocks::CHUNK_SIZE_Y - treeClearance);
         }     
 
         void GenerateChunk(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
+            //Riempo il mondo di blocchi
             FillTerrain(chunk, chunkX, chunkZ);
+            //Aggiungo gli alberi e altro
             GenerateTrees(chunk, chunkX, chunkZ);
         }
 

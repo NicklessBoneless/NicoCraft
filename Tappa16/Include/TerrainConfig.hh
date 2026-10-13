@@ -22,8 +22,7 @@ namespace fcg{
 
     inline std::unique_ptr<Noise> CreateNoise(NoiseType type, uint32_t seed){
         switch(type){
-            default:
-                return std::make_unique<PerlinNoise>(seed);
+            default: return std::make_unique<PerlinNoise>(seed);
         }
     }
 
