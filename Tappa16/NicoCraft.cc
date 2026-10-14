@@ -1,0 +1,522 @@
+#define GLAD_GL_IMPLEMENTATION
+#include "glad/gl.h"
+
+#include <imgui-SFML.h>
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+
+#include <SFML/Window.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/View.hpp>
+#include <SFML/Graphics/Image.hpp>
+#include <memory>
+#include <vector>
+
+#include "rawmouse.hh"
+#include "./Include/Player.hh"
+#include "./Include/World.hh"
+#include "./Include/Renderer.hh"
+#include "./Include/Hotbar.hh"
+#include "./Include/MainMenu.hh"
+#include "./Include/PauseMenu.hh"
+#include "./Include/Settings.hh"
+#include "./Include/LoadingScreen.hh"
+#include "./Include/Compass.hh"
+#include "./Include/GenerationPanel.hh"
+
+const std::string dirShaders = "../Tappa16/Shaders/";
+const std::string res = "../Resources/";
+const std::string winTitle = "NicoCraft - Tappa16";
+const int TEXTUREPIXELSIZE = 32;
+
+//File in cui vengono salvate le preferenze (risoluzione, FOV): vive nella cartella da cui
+//viene lanciato l'eseguibile (tipicamente build/), non va quindi consegnato ne' versionato
+const std::string settingsPath = "nicocraft_settings.cfg";
+
+//Stato di alto livello del programma
+enum class GameState{ MainMenu, Playing, Paused };
+
+////////////////////////////
+// OpenGL context settings //
+////////////////////////////
+
+sf::ContextSettings CreateContextSettings(){
+    sf::ContextSettings settings;
+    settings.depthBits   = 32;
+    settings.stencilBits = 8;
+    settings.antiAliasingLevel = 4;
+    settings.attributeFlags = sf::ContextSettings::Attribute::Core;
+    settings.majorVersion = 4;
+    settings.minorVersion = 1;
+    return settings;
+}
+
+/////////////////////////////
+// Window and OpenGL setup //
+/////////////////////////////
+
+class Setup{
+public:
+    sf::RenderWindow window; //Senza usare pointer con new
+
+    //width/height arrivano dal file di preferenze (Settings.hh), letto prima di questa
+    //classe: la finestra nasce gia' alla risoluzione scelta l'ultima volta dall'utente
+    Setup(int width, int height) : window(sf::VideoMode({(unsigned int) width, (unsigned int) height}), winTitle, sf::Style::Default, sf::State::Windowed, CreateContextSettings()){
+        window.setVerticalSyncEnabled(true);
+
+        if(!window.setActive(true)){
+            std::cerr << "Failure: error during SFML OpenGL Activation." << std::endl;
+            exit(1);
+        }
+
+        int version = gladLoadGL(sf::Context::getFunction);
+        if(!version){
+            std::cerr << "Failure: error during glad loading." << std::endl;
+            exit(1);
+        }
+        std::cout << "GLAD GL version: " << GLAD_VERSION_MAJOR(version) << "." << GLAD_VERSION_MINOR(version) << std::endl;
+    }
+};
+
+////////////////////
+// SFML Callbacks //
+////////////////////
+
+void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::Renderer& renderer, fcg::PauseMenu& pauseMenu){
+    glViewport(0, 0, resized.size.x, resized.size.y);
+    renderer.SetWindowSize(resized.size.x, resized.size.y);
+    camera.SetWindowSize(resized.size.x, resized.size.y);
+    pauseMenu.SetWindowSize(resized.size.x, resized.size.y);
+}   
+
+////////////////////
+// AUX Functions  //
+////////////////////
+
+//Salva su file la terna corrente di preferenze: chiamata ad ogni modifica di FOV o
+//risoluzione, sia dal menu principale che dalla pausa
+void PersistSettings(float fov, int width, int height){
+    fcg::Settings settings;
+    settings.fov = fov;
+    settings.width = width;
+    settings.height = height;
+    fcg::SaveSettings(settingsPath, settings);
+}
+
+//Ricostruisce la texture font di ImGui: va richiamata ogni volta che un font viene
+//aggiunto con AddFontFromFileTTF DOPO che ImGui::SFML::Init() ha gia' caricato quello di
+//default, altrimenti il renderer OpenGL3 resta agganciato alla vecchia texture (invalida)
+void RebuildFontAtlas(){
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Build();
+    ImGui_ImplOpenGL3_CreateFontsTexture();
+}
+
+//Eventi durante lo stato MainMenu: chiusura finestra, resize, Esc per uscire.
+//I click sui pulsanti sono gestiti da ImGui: l'azione risultante si legge dal
+//valore di ritorno di MainMenu::Draw(), chiamato in main()
+void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, bool& programRunning){
+    while(const std::optional event = window.pollEvent()){
+        ImGui::SFML::ProcessEvent(window, *event);
+
+        if(event->is<sf::Event::Closed>()){
+            programRunning = false;
+            return;
+        }
+
+        if(const auto* resized = event->getIf<sf::Event::Resized>()){
+            glViewport(0, 0, resized->size.x, resized->size.y);
+            mainMenu.SetWindowSize(resized->size.x, resized->size.y);
+            return;
+        }
+
+        if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
+            if(keyPressed->scancode == sf::Keyboard::Scancode::Escape){
+                programRunning = false;
+                return;
+            }
+        }
+    }
+}
+
+/*
+    Eventi durante lo stato Paused: Esc riprende il gioco, click sui tasti dell'overlay.
+    FOV viene applicato subito alla Camera per un'anteprima live, la risoluzione no (si applichera' al prossimo avvio in "Settings.hh")
+*/
+//Eventi durante lo stato Paused: chiusura finestra, resize, Esc per riprendere.
+//I click dell'overlay li gestisce ImGui: l'azione si legge da PauseMenu::Draw()
+void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Renderer& renderer,fcg::Camera& camera, GameState& state, bool& programRunning){
+    while(const std::optional event = window.pollEvent()){
+        ImGui::SFML::ProcessEvent(window, *event);
+
+        if(event->is<sf::Event::Closed>()){
+            programRunning = false;
+            return;
+        }
+
+        if(const auto* resized = event->getIf<sf::Event::Resized>()){
+            glViewport(0, 0, resized->size.x, resized->size.y);
+            HandleResize(*resized,camera,renderer,pauseMenu);
+            return;
+        }
+
+        if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
+            if(keyPressed->scancode == sf::Keyboard::Scancode::Escape && !ImGui::GetIO().WantTextInput){
+                state = GameState::Playing; //Esc durante la pausa: riprendi
+                return;
+            }
+        }
+    }
+}
+
+//Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
+//Esc che ora apre la pausa invece di chiudere il programma
+void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer,fcg::PauseMenu& pauseMenu ,fcg::Hotbar& hotbar, fcg::Compass& compass, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
+    while(const std::optional event = window.pollEvent()){
+        ImGui::SFML::ProcessEvent(window, *event);
+
+        if(event->is<sf::Event::Closed>()){
+            programRunning = false;
+            return;
+        }
+        if(const auto* resized = event->getIf<sf::Event::Resized>()){
+            HandleResize(*resized, player.getCamera(), renderer, pauseMenu);
+            return;
+        }
+        if(const auto* rawMoved = event->getIf<sf::Event::MouseMovedRaw>()){
+            rawMouse.event(*rawMoved); //RawMouse aggiunto
+        }
+
+        if(const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()){
+            switch(keyPressed->scancode){
+                case sf::Keyboard::Scancode::Escape:
+                    state = GameState::Paused;
+                    return;
+                case sf::Keyboard::Scancode::F:
+                    player.ToggleNoclip();
+                    break;
+                case sf::Keyboard::Scancode::LShift:
+                    player.StartSprint();
+                    break;
+                case sf::Keyboard::Scancode::Num1:
+                    hotbar.SetSelected(0);
+                    break;
+                case sf::Keyboard::Scancode::Num2:
+                    hotbar.SetSelected(1);
+                    break;
+                case sf::Keyboard::Scancode::Num3:
+                    hotbar.SetSelected(2);
+                    break;
+                case sf::Keyboard::Scancode::Num4:
+                    hotbar.SetSelected(3);
+                    break;
+                case sf::Keyboard::Scancode::Num5:
+                    hotbar.SetSelected(4);
+                    break;
+                case sf::Keyboard::Scancode::Num6:
+                    hotbar.SetSelected(5);
+                    break;
+                case sf::Keyboard::Scancode::Num7:
+                    hotbar.SetSelected(6);
+                    break;
+                case sf::Keyboard::Scancode::Num8:
+                    hotbar.SetSelected(6);
+                    break;
+                case sf::Keyboard::Scancode::Num9:
+                    hotbar.SetSelected(6);
+                    break;
+                default:
+                    break; //Ignora gli altri tasti
+            }
+        }
+
+        else if(const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()){
+            if(keyReleased->scancode == sf::Keyboard::Scancode::LShift){
+                player.StopSprint();
+            }
+        }
+
+        else if(const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()){
+            switch(mousePressed->button){
+                case sf::Mouse::Button::Left:
+                    player.QueueBreakBlock();
+                    break;
+                case sf::Mouse::Button::Right:
+                    player.QueuePlaceBlock();
+                    break;
+                default:
+                    break;
+            }
+        }
+        else if(const auto* mouseScrolled = event->getIf<sf::Event::MouseWheelScrolled>()){
+            if(mouseScrolled->wheel == sf::Mouse::Wheel::Vertical){
+                //delta > 0 = rotellina verso l'alto: avanti di uno slot; delta < 0 = indietro
+                int direction = mouseScrolled->delta > 0.0f ? -1 : 1;
+                hotbar.ScrollSelected(direction);
+            }
+        }
+    }
+}
+
+void UpdateMouseInput(sf::Window& window, fcg::Camera& camera, fcg::RawMouse& rawMouse){
+    sf::Vector2f delta = rawMouse.delta(); //Va comunque svuotato l'accumulatore ogni frame
+    if(window.hasFocus()){
+        camera.Look(delta.x, delta.y);
+    }
+}
+
+PlayerInput CapturePlayerInput(){
+    PlayerInput input;
+    input.moveForward  = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
+    input.moveBackward = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S);
+    input.moveLeft     = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A);
+    input.moveRight    = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D);
+
+    //Lo spazio e il control servono sia per il salto che per il volo libero
+    input.jump          = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
+    input.flyUp         = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
+    input.flyDown       = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl);
+
+    return input;
+}
+
+//////////
+// Main //
+//////////
+
+int main(){
+    //// Startup ////
+    fcg::Settings startupSettings = fcg::LoadSettings(settingsPath);
+
+    Setup setup(startupSettings.width, startupSettings.height);
+    sf::RenderWindow& window = setup.window;
+
+    if(!ImGui::SFML::Init(window, {(float) window.getSize().x, (float) window.getSize().y})){
+        std::cerr << "Failure: could not init ImGui::SFML." << std::endl;
+        return 1;
+    }
+    ImGui_ImplOpenGL3_Init("#version 410 core");
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+    GameState state = GameState::MainMenu;
+
+    std::unique_ptr<fcg::MainMenu> mainMenu = std::make_unique<fcg::MainMenu>(res, startupSettings.fov, startupSettings.width, startupSettings.height);
+    mainMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+    RebuildFontAtlas();
+
+    //Nel menu il cursore resta visibile e libero, per poter cliccare sui tasti
+    window.setMouseCursorVisible(true);
+    window.setMouseCursorGrabbed(false);
+    fcg::RawMouse rawMouse;
+
+    //Player, Renderer, Hotbar, World e PauseMenu nascono tutti insieme, solo alla
+    //pressione di "Genera Mondo": prima di quel momento non esiste nessuna risorsa di
+    //gioco, e tornando al menu principale vengono distrutti (vedi ramo Paused->MainMenu),
+    //cosi' il mondo smette letteralmente di essere renderizzato
+    std::unique_ptr<fcg::Player> player;
+    std::unique_ptr<fcg::Renderer> renderer;
+    std::unique_ptr<fcg::World> world;
+    std::unique_ptr<fcg::PauseMenu> pauseMenu;
+    std::unique_ptr<fcg::Hotbar> hotbar;
+    std::unique_ptr<fcg::Compass> compass;
+    std::unique_ptr<fcg::GenerationPanel> generationPanel;
+
+    fcg::RaycastHit target; //Ultimo blocco puntato: resta "congelato" mentre si e' in pausa
+
+    sf::Clock clock;
+    sf::Clock imguiClock; //Dt per ImGui::SFML::Update() nei menu (MainMenu/Paused)
+    bool programRunning = true;
+
+    while(programRunning){
+        //Main Menù
+        if(state == GameState::MainMenu){
+            HandleMenuEvents(window, *mainMenu, programRunning);
+            if(!programRunning) break;
+
+            glClearColor(0.0705f, 0.0705f, 0.1019f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui::SFML::Update(window, imguiClock.restart());
+            fcg::MainMenu::MenuAction action = mainMenu->Draw();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            window.display();
+
+            switch(action){
+                case fcg::MainMenu::MenuAction::GenerateWorld:{
+                    //Inizializza Player, Renderer, Hotbar, World (chunk + mesh), PauseMenu.
+                    fcg::DrawLoadingScreen(window, res);
+
+                    world = std::make_unique<fcg::World>();
+                    player = std::make_unique<fcg::Player>(world->FindSpawnPosition());
+                    player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    player->getCamera().SetFov(mainMenu->GetFov());
+
+                    renderer = std::make_unique<fcg::Renderer>(
+                        std::vector<fcg::ShaderFiles>{
+                            {"world"    , dirShaders + "block_shader.vert"    , dirShaders + "block_shader.frag"},
+                            {"crosshair", dirShaders + "shader_crosshair.vert", dirShaders + "shader_crosshair.frag"},
+                            {"outline"  , dirShaders + "shader_outline.vert"  , dirShaders + "shader_outline.frag"},
+                            {"hotbar"   , dirShaders + "shader_hotbar.vert"   , dirShaders + "shader_hotbar.frag"},
+                            {"sky"      , dirShaders + "shader_sky.vert"      , dirShaders + "shader_sky.frag"},
+                            {"stars"    , dirShaders + "shader_stars.vert"    , dirShaders + "shader_stars.frag"}
+                        },
+                        res,
+                        TEXTUREPIXELSIZE,
+                        dirShaders);
+
+                    renderer->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+
+                    compass = std::make_unique<fcg::Compass>(res);
+                    hotbar = std::make_unique<fcg::Hotbar>();
+
+                    pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
+                    pauseMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    generationPanel = std::make_unique<fcg::GenerationPanel>(world->GetConfig());
+                    RebuildFontAtlas();
+
+                    glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per gl_PointSize nel vertex shader delle stelle
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_BACK);
+                    glEnable(GL_DEPTH_TEST);
+
+                    window.setMouseCursorVisible(false);
+                    window.setMouseCursorGrabbed(true);
+
+                    target = fcg::RaycastHit{};
+                    state = GameState::Playing;
+                    clock.restart(); //Evita un deltaTime enorme dovuto al tempo passato nel menu
+                    break;
+                }
+                case fcg::MainMenu::MenuAction::Exit:
+                    programRunning = false;
+                    break;
+                case fcg::MainMenu::MenuAction::FovChanged:
+                case fcg::MainMenu::MenuAction::ResolutionChanged:
+                    PersistSettings(mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
+                    break;
+                default:
+                    break;
+            }
+
+            continue;
+        }
+
+        //Game Paused
+        if(state == GameState::Paused){
+            HandlePauseEvents(window, *pauseMenu, *renderer, player->getCamera(), state, programRunning);
+            if(!programRunning) break;
+
+            if(state == GameState::Playing){ //Esc: ripresa immediata, senza disegnare l'overlay
+                window.setMouseCursorVisible(false);
+                window.setMouseCursorGrabbed(true);
+                clock.restart();
+                continue;
+            }
+
+            renderer->Draw(*world, player->getCamera(), target, *hotbar, 0.0f); //Mondo "congelato": il ciclo giorno/notte non avanza
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui::SFML::Update(window, imguiClock.restart());
+            fcg::PauseMenu::MenuAction action = pauseMenu->Draw();
+            fcg::GenerationPanel::Action generationAction = generationPanel->Draw();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            window.display();
+
+            if(generationAction == fcg::GenerationPanel::Action::Regenerate){
+                double milliseconds = world->Regenerate(generationPanel->GetConfig());
+                generationPanel->SetLastGenerationMs(milliseconds);
+                player->RespawnAt(world->FindSpawnPosition());
+                target = fcg::RaycastHit{};     
+            }       
+
+            switch(action){
+                case fcg::PauseMenu::MenuAction::Resume:
+                    window.setMouseCursorVisible(false);
+                    window.setMouseCursorGrabbed(true);
+                    clock.restart();
+                    state = GameState::Playing;
+                    break;
+                case fcg::PauseMenu::MenuAction::BackToMainMenu:{
+                    renderer.reset();
+                    world.reset();
+                    hotbar.reset();
+                    pauseMenu.reset();
+                    generationPanel.reset();
+
+                    window.setMouseCursorVisible(true);
+                    window.setMouseCursorGrabbed(false);
+
+                    //Ricostruita dalle preferenze salvate, cosi' riflette eventuali modifiche
+                    //fatte nel pannello Opzioni della pausa
+                    fcg::Settings currentSettings = fcg::LoadSettings(settingsPath);
+                    mainMenu = std::make_unique<fcg::MainMenu>(res, currentSettings.fov, currentSettings.width, currentSettings.height);
+                    mainMenu->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
+                    RebuildFontAtlas();
+                    state = GameState::MainMenu;
+                    break;
+                }
+                case fcg::PauseMenu::MenuAction::QuitGame:
+                    programRunning = false;
+                    break;
+                case fcg::PauseMenu::MenuAction::FovChanged:
+                    player->getCamera().SetFov(pauseMenu->GetFov());
+                    PersistSettings(pauseMenu->GetFov(), pauseMenu->GetResolutionWidth(), pauseMenu->GetResolutionHeight());
+                    break;
+                case fcg::PauseMenu::MenuAction::ResolutionChanged:
+                    PersistSettings(pauseMenu->GetFov(), pauseMenu->GetResolutionWidth(), pauseMenu->GetResolutionHeight());
+                    break;
+                default:
+                    break;
+            }
+
+            continue;
+        }
+
+        //Playing in game
+        HandleEvents(window, *player, *renderer, *pauseMenu,*hotbar, *compass, rawMouse, state, programRunning);
+        if(!programRunning) break;
+
+        if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
+            pauseMenu->Reset();
+            window.setMouseCursorVisible(true);
+            window.setMouseCursorGrabbed(false);
+            continue;
+        }
+
+        float deltaTime = clock.restart().asSeconds();
+
+        PlayerInput currentInput = CapturePlayerInput();
+        player->UpdatePosition(deltaTime, *world, currentInput);
+
+        UpdateMouseInput(window, player->getCamera(), rawMouse);
+
+        target = world->RaycastBlock(
+            player->getCamera().getPosition(),
+            player->getCamera().GetForward(),
+            player->getReach()
+        );
+
+        world->ProcessBlockInteractions(*player, target, hotbar->GetSelectedBlockType());
+
+        renderer->Draw(*world, player->getCamera(), target, *hotbar, deltaTime);
+        compass->Update(player->getCamera().GetYaw());
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui::SFML::Update(window, sf::seconds(deltaTime));
+        compass->Draw();
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        
+        window.display();
+    }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::SFML::Shutdown();
+
+    return 0;
+}
