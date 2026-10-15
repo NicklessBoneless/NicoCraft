@@ -49,13 +49,13 @@ namespace fcg{
         //12 gradienti verso i punti medi degli spigoli del cubo (piu' 4 ripetuti)
         static float Gradient3D(int hash, float x, float y, float z){
             int h = hash & 15;
-            float u = h < 8 ? x : y;
+            float uSmoothedWeight = h < 8 ? x : y;
             float v = h < 4 ? y : ((h == 12 || h == 14) ? x : z);
-            return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+            return ((h & 1) == 0 ? uSmoothedWeight : -uSmoothedWeight) + ((h & 2) == 0 ? v : -v);
         }
 
     public: 
-        explicit PerlinNoise(uint32_t seed){
+        explicit PerlinNoise(uint32_t seed){ //Inizializza la tabella delle permutazioni
             for(int i = 0; i < 256; i++){
                 permutation[i] = (uint8_t) i;
             }
@@ -75,55 +75,70 @@ namespace fcg{
         float Sample2D(float x, float z) const override{
             float floorX = std::floor(x);
             float floorZ = std::floor(z);
-            int xi = ((int) floorX) & 255;
-            int zi = ((int) floorZ) & 255;
-            float xf = x - floorX;
-            float zf = z - floorZ;
+            int xIndexUnitCell = ((int) floorX) & 255; //Equivalente a % 256, serve perché % da valori negativi
+            int zIndexUnitCell = ((int) floorZ) & 255; //Equivalente a % 256
+            float xLocalCell = x - floorX; //[0,1) 
+            float zLocalCell = z - floorZ; //[0,1)
 
-            float u = Fade(xf);
-            float w = Fade(zf);
+            //Coordinate lisce, per rendere le transizioni tra i blocchi più morbide
+            float uSmoothedWeight = Fade(xLocalCell);
+            float wSmoothedWeight = Fade(zLocalCell);
 
-            int aa = permutation[permutation[xi] + zi];
-            int ab = permutation[permutation[xi] + zi + 1];
-            int ba = permutation[permutation[xi + 1] + zi];
-            int bb = permutation[permutation[xi + 1] + zi + 1];
+            //Generiamo l'hash per ogni angolo del quadrato, che poi useremo per scegliere la direzione del vettore
+            int bottomLeft  = permutation[permutation[xIndexUnitCell] + zIndexUnitCell];         //aa
+            int bottomRight = permutation[permutation[xIndexUnitCell + 1] + zIndexUnitCell];     //ba
+            int topLeft     = permutation[permutation[xIndexUnitCell] + zIndexUnitCell + 1];     //ab
+            int topRight    = permutation[permutation[xIndexUnitCell + 1] + zIndexUnitCell + 1]; //bb
 
-            float x1 = Lerp(u, Gradient2D(aa, xf, zf),        Gradient2D(ba, xf - 1.0f, zf));
-            float x2 = Lerp(u, Gradient2D(ab, xf, zf - 1.0f), Gradient2D(bb, xf - 1.0f, zf - 1.0f));
+            //Gradient2D effettua il prodotto scalare 
+            float dotProductBottomLeft = Gradient2D(bottomLeft, xLocalCell, zLocalCell);
+            float dotProductBottomRight = Gradient2D(bottomRight, xLocalCell - 1.0f, zLocalCell);
+            
+            //Rumore bordo inferiore cella, metà sotto
+            //uSmoothedWeight fa da PESO tra [dotProductBottomLeft, dotProductBottomRight]
+            float bottomHalfBlend = Lerp(uSmoothedWeight, dotProductBottomLeft, dotProductBottomRight);
 
-            return std::clamp(Lerp(w, x1, x2), -1.0f, 1.0f);
+            //Prodotto scalare
+            float dotProductTopLeft = Gradient2D(topLeft, xLocalCell, zLocalCell - 1.0f);
+            float dotProductTopRight = Gradient2D(topRight, xLocalCell - 1.0f, zLocalCell - 1.0f);
+
+            //Rumore bordo superiore cella,metà sopra
+            float topHalfBlend = Lerp(uSmoothedWeight, dotProductTopLeft,dotProductTopRight);
+
+            //[-1,1] grazie a clamp
+            return std::clamp(Lerp(wSmoothedWeight, bottomHalfBlend, topHalfBlend), -1.0f, 1.0f); 
         }
 
         float Sample3D(float x, float y, float z) const override{
             float floorX = std::floor(x);
             float floorY = std::floor(y);
             float floorZ = std::floor(z);
-            int xi = ((int) floorX) & 255;
+            int xIndexUnitCell = ((int) floorX) & 255;
             int yi = ((int) floorY) & 255;
-            int zi = ((int) floorZ) & 255;
-            float xf = x - floorX;
+            int zIndexUnitCell = ((int) floorZ) & 255;
+            float xLocalCell = x - floorX;
             float yf = y - floorY;
-            float zf = z - floorZ;
+            float zLocalCell = z - floorZ;
 
-            float u = Fade(xf);
+            float uSmoothedWeight = Fade(xLocalCell);
             float v = Fade(yf);
-            float w = Fade(zf);
+            float wSmoothedWeight = Fade(zLocalCell);
 
-            int a  = permutation[xi] + yi;
-            int aa = permutation[a] + zi;
-            int ab = permutation[a + 1] + zi;
-            int b  = permutation[xi + 1] + yi;
-            int ba = permutation[b] + zi;
-            int bb = permutation[b + 1] + zi;
+            int a  = permutation[xIndexUnitCell] + yi;
+            int bottomLeft = permutation[a] + zIndexUnitCell;
+            int topLeft = permutation[a + 1] + zIndexUnitCell;
+            int b  = permutation[xIndexUnitCell + 1] + yi;
+            int bottomRight = permutation[b] + zIndexUnitCell;
+            int topRight = permutation[b + 1] + zIndexUnitCell;
 
             float y1 = Lerp(v,
-                Lerp(u, Gradient3D(permutation[aa], xf, yf, zf),        Gradient3D(permutation[ba], xf - 1.0f, yf, zf)),
-                Lerp(u, Gradient3D(permutation[ab], xf, yf - 1.0f, zf), Gradient3D(permutation[bb], xf - 1.0f, yf - 1.0f, zf)));
+                Lerp(uSmoothedWeight, Gradient3D(permutation[bottomLeft], xLocalCell, yf, zLocalCell),        Gradient3D(permutation[bottomRight], xLocalCell - 1.0f, yf, zLocalCell)),
+                Lerp(uSmoothedWeight, Gradient3D(permutation[topLeft], xLocalCell, yf - 1.0f, zLocalCell), Gradient3D(permutation[topRight], xLocalCell - 1.0f, yf - 1.0f, zLocalCell)));
             float y2 = Lerp(v,
-                Lerp(u, Gradient3D(permutation[aa + 1], xf, yf, zf - 1.0f),        Gradient3D(permutation[ba + 1], xf - 1.0f, yf, zf - 1.0f)),
-                Lerp(u, Gradient3D(permutation[ab + 1], xf, yf - 1.0f, zf - 1.0f), Gradient3D(permutation[bb + 1], xf - 1.0f, yf - 1.0f, zf - 1.0f)));
+                Lerp(uSmoothedWeight, Gradient3D(permutation[bottomLeft + 1], xLocalCell, yf, zLocalCell - 1.0f),        Gradient3D(permutation[bottomRight + 1], xLocalCell - 1.0f, yf, zLocalCell - 1.0f)),
+                Lerp(uSmoothedWeight, Gradient3D(permutation[topLeft + 1], xLocalCell, yf - 1.0f, zLocalCell - 1.0f), Gradient3D(permutation[topRight + 1], xLocalCell - 1.0f, yf - 1.0f, zLocalCell - 1.0f)));
 
-            return std::clamp(Lerp(w, y1, y2), -1.0f, 1.0f);
+            return std::clamp(Lerp(wSmoothedWeight, y1, y2), -1.0f, 1.0f);
         }
     };
 }

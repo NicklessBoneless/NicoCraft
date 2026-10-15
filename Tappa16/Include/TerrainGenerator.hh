@@ -24,16 +24,20 @@ namespace fcg{
         uint32_t seed;
         std::unique_ptr<Noise> noise;
         FractalParams terrainParameters;
+        float heightAmplitude;
 
         static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 2; //Quota media del terreno
-        static constexpr float heightAmplitude = 30.0f; //Scostamento massimo dalla quota media
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
         static constexpr int treeClearance = treeTrunkHeight + 2; //Spazio da lasciare sopra il terreno per la chioma
 
     public:
-        TerrainGenerator(uint32_t seed, std::unique_ptr<Noise> noise, FractalParams terrainParameters = FractalParams{}) : seed(seed), noise(std::move(noise)), terrainParameters(terrainParameters){}
+        TerrainGenerator(uint32_t seed, std::unique_ptr<Noise> noise, FractalParams terrainParameters = FractalParams{},float heightAmplitude = 30.0f) : 
+        seed(seed), 
+        noise(std::move(noise)), 
+        terrainParameters(terrainParameters),
+        heightAmplitude(heightAmplitude){}
 
         uint32_t GetSeed() const{
             return seed;
@@ -45,8 +49,8 @@ namespace fcg{
             cosi' non ci sono cuciture ai bordi tra chunk adiacenti
         */
         int GetSurfaceHeight(int worldX, int worldZ) const{
-            float n = Fractal2D(*noise, (float) worldX, (float) worldZ, terrainParameters);
-            int height = baseHeight + (int) std::floor(n * heightAmplitude);
+            float MediumElevationValue = Fractal2D(*noise, (float) worldX, (float) worldZ, terrainParameters); //n = [-1,1]
+            int height = baseHeight + (int) std::floor(MediumElevationValue * heightAmplitude);
             return std::clamp(height, 2, Blocks::CHUNK_SIZE_Y - treeClearance);
         }     
 

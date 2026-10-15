@@ -9,7 +9,7 @@
 namespace Blocks
 {
     constexpr int CHUNK_SIZE_X = 16;
-    constexpr int CHUNK_SIZE_Y = 64;
+    constexpr int CHUNK_SIZE_Y = 256;
     constexpr int CHUNK_SIZE_Z = 16;
 
     class Chunk{

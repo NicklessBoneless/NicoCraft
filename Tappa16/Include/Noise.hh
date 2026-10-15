@@ -28,6 +28,7 @@ namespace fcg{
         float maxAmplitude = 0.0f;
         float frequency = params.frequency;
 
+        //Per ogni x e z ripetiamo per il numero di ottave
         for(int i = 0; i < params.octaves; i++){
             sum += noise.Sample2D(x * frequency, z * frequency) * amplitude;
             maxAmplitude += amplitude;
