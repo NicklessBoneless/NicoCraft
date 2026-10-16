@@ -17,6 +17,7 @@ namespace fcg{
     */
     class PerlinNoise : public Noise{
     private:
+        
         //Permutazioni 
         std::array<uint8_t, 512> permutation;
 
@@ -28,6 +29,11 @@ namespace fcg{
             return (6.0f*x5) - (15.0f*x4) + (10.0f*x3);
         }
 
+        /*
+            Interpolazione Lineare 
+            Dati due valori a e b e un peso x tra 0 e 1, 
+            restituisce un valore “a metà strada” tra i due, in proporzione a x.
+        */
         static float Lerp(float x, float a, float b){
             return a + x * (b - a);
         }
@@ -50,24 +56,26 @@ namespace fcg{
         static float Gradient3D(int hash, float x, float y, float z){
             int h = hash & 15;
             float uSmoothedWeight = h < 8 ? x : y;
-            float v = h < 4 ? y : ((h == 12 || h == 14) ? x : z);
-            return ((h & 1) == 0 ? uSmoothedWeight : -uSmoothedWeight) + ((h & 2) == 0 ? v : -v);
+            float vSmoothedWeight = h < 4 ? y : ((h == 12 || h == 14) ? x : z);
+            return ((h & 1) == 0 ? uSmoothedWeight : -uSmoothedWeight) + ((h & 2) == 0 ? vSmoothedWeight : -vSmoothedWeight);
         }
 
     public: 
-        explicit PerlinNoise(uint32_t seed){ //Inizializza la tabella delle permutazioni
-            for(int i = 0; i < 256; i++){
+        explicit PerlinNoise(uint32_t seed){ 
+            //Inizializza la tabella delle permutazioni
+            for(uint16_t i = 0; i < (permutation.max_size() >> 1) ; i++){
                 permutation[i] = (uint8_t) i;
             }
-
+            
+            //Mescoliamo le permutazioni in base al seed scelto!
             std::mt19937 rng(seed);
-            for(int i = 255; i > 0; i--){
+            for(int i = (permutation.max_size() >> 1)-1 ; i > 0 ; i--){
                 int j = (int) (rng() % (uint32_t) (i + 1));
                 std::swap(permutation[i], permutation[j]);
             }
 
             //Tabella duplicata: evita il wrap degli indici nel calcolo dei corner
-            for(int i = 0; i < 256; i++){
+            for(uint16_t i = 0; i < (permutation.max_size() >> 1) ; i++){
                 permutation[256 + i] = permutation[i];
             }
         }
@@ -102,10 +110,10 @@ namespace fcg{
             float dotProductTopLeft = Gradient2D(topLeft, xLocalCell, zLocalCell - 1.0f);
             float dotProductTopRight = Gradient2D(topRight, xLocalCell - 1.0f, zLocalCell - 1.0f);
 
-            //Rumore bordo superiore cella,metà sopra
+            //Rumore bordo superiore cella, metà sopra
             float topHalfBlend = Lerp(uSmoothedWeight, dotProductTopLeft,dotProductTopRight);
 
-            //[-1,1] grazie a clamp
+            //[-1,1] Tramite l'uso di clamp, tra [bottomHalfBlend, topHalfBlend]
             return std::clamp(Lerp(wSmoothedWeight, bottomHalfBlend, topHalfBlend), -1.0f, 1.0f); 
         }
 
@@ -113,32 +121,62 @@ namespace fcg{
             float floorX = std::floor(x);
             float floorY = std::floor(y);
             float floorZ = std::floor(z);
-            int xIndexUnitCell = ((int) floorX) & 255;
-            int yi = ((int) floorY) & 255;
-            int zIndexUnitCell = ((int) floorZ) & 255;
-            float xLocalCell = x - floorX;
-            float yf = y - floorY;
-            float zLocalCell = z - floorZ;
+            int xIndexUnitCell = ((int) floorX) & 255; //Equivalente a % 256, serve perché % da valori negativi
+            int yIndexUnitCell = ((int) floorY) & 255; //Equivalente a % 256
+            int zIndexUnitCell = ((int) floorZ) & 255; //Equivalente a % 256
+            float xLocalCell = x - floorX; //[0,1)
+            float yLocalCell = y - floorY; //[0,1)
+            float zLocalCell = z - floorZ; //[0,1)
 
+            //Coordinate lisce, per rendere le transizioni tra i blocchi più morbide
             float uSmoothedWeight = Fade(xLocalCell);
-            float v = Fade(yf);
+            float vSmoothedWeight = Fade(yLocalCell);
             float wSmoothedWeight = Fade(zLocalCell);
 
-            int a  = permutation[xIndexUnitCell] + yi;
-            int bottomLeft = permutation[a] + zIndexUnitCell;
-            int topLeft = permutation[a + 1] + zIndexUnitCell;
-            int b  = permutation[xIndexUnitCell + 1] + yi;
-            int bottomRight = permutation[b] + zIndexUnitCell;
-            int topRight = permutation[b + 1] + zIndexUnitCell;
+            //Hash parziali: si concatenano le permutazioni asse per asse (x, poi y, poi z)
+            int hashX     = permutation[xIndexUnitCell] + yIndexUnitCell;       //a
+            int hashXPlus = permutation[xIndexUnitCell + 1] + yIndexUnitCell;   //b
 
-            float y1 = Lerp(v,
-                Lerp(uSmoothedWeight, Gradient3D(permutation[bottomLeft], xLocalCell, yf, zLocalCell),        Gradient3D(permutation[bottomRight], xLocalCell - 1.0f, yf, zLocalCell)),
-                Lerp(uSmoothedWeight, Gradient3D(permutation[topLeft], xLocalCell, yf - 1.0f, zLocalCell), Gradient3D(permutation[topRight], xLocalCell - 1.0f, yf - 1.0f, zLocalCell)));
-            float y2 = Lerp(v,
-                Lerp(uSmoothedWeight, Gradient3D(permutation[bottomLeft + 1], xLocalCell, yf, zLocalCell - 1.0f),        Gradient3D(permutation[bottomRight + 1], xLocalCell - 1.0f, yf, zLocalCell - 1.0f)),
-                Lerp(uSmoothedWeight, Gradient3D(permutation[topLeft + 1], xLocalCell, yf - 1.0f, zLocalCell - 1.0f), Gradient3D(permutation[topRight + 1], xLocalCell - 1.0f, yf - 1.0f, zLocalCell - 1.0f)));
+            int hashBottomLeft  = permutation[hashX] + zIndexUnitCell;          //aa
+            int hashTopLeft     = permutation[hashX + 1] + zIndexUnitCell;      //ab
+            int hashBottomRight = permutation[hashXPlus] + zIndexUnitCell;      //ba
+            int hashTopRight    = permutation[hashXPlus + 1] + zIndexUnitCell;  //bb
 
-            return std::clamp(Lerp(wSmoothedWeight, y1, y2), -1.0f, 1.0f);
+            //Hash degli 8 angoli del cubo: "back" = faccia a z, "front" = faccia a z + 1
+            int backBottomLeft   = permutation[hashBottomLeft];
+            int backBottomRight  = permutation[hashBottomRight];
+            int backTopLeft      = permutation[hashTopLeft];
+            int backTopRight     = permutation[hashTopRight];
+            int frontBottomLeft  = permutation[hashBottomLeft + 1];
+            int frontBottomRight = permutation[hashBottomRight + 1];
+            int frontTopLeft     = permutation[hashTopLeft + 1];
+            int frontTopRight    = permutation[hashTopRight + 1];
+
+            //Gradient3D effettua il prodotto scalare, faccia posteriore (z)
+            float dotProductBackBottomLeft  = Gradient3D(backBottomLeft, xLocalCell, yLocalCell, zLocalCell);
+            float dotProductBackBottomRight = Gradient3D(backBottomRight, xLocalCell - 1.0f, yLocalCell, zLocalCell);
+            float dotProductBackTopLeft     = Gradient3D(backTopLeft, xLocalCell, yLocalCell - 1.0f, zLocalCell);
+            float dotProductBackTopRight    = Gradient3D(backTopRight, xLocalCell - 1.0f, yLocalCell - 1.0f, zLocalCell);
+
+            //Prodotto scalare, faccia anteriore (z + 1)
+            float dotProductFrontBottomLeft  = Gradient3D(frontBottomLeft, xLocalCell, yLocalCell, zLocalCell - 1.0f);
+            float dotProductFrontBottomRight = Gradient3D(frontBottomRight, xLocalCell - 1.0f, yLocalCell, zLocalCell - 1.0f);
+            float dotProductFrontTopLeft     = Gradient3D(frontTopLeft, xLocalCell, yLocalCell - 1.0f, zLocalCell - 1.0f);
+            float dotProductFrontTopRight    = Gradient3D(frontTopRight, xLocalCell - 1.0f, yLocalCell - 1.0f, zLocalCell - 1.0f);
+
+            //Faccia posteriore: prima si interpola su x (uSmoothedWeight), poi su y (vSmoothedWeight)
+            float backBottomBlend = Lerp(uSmoothedWeight, dotProductBackBottomLeft, dotProductBackBottomRight);
+            float backTopBlend    = Lerp(uSmoothedWeight, dotProductBackTopLeft, dotProductBackTopRight);
+            float backHalfBlend   = Lerp(vSmoothedWeight, backBottomBlend, backTopBlend);
+
+            //Faccia anteriore: stesso procedimento
+            float frontBottomBlend = Lerp(uSmoothedWeight, dotProductFrontBottomLeft, dotProductFrontBottomRight);
+            float frontTopBlend    = Lerp(uSmoothedWeight, dotProductFrontTopLeft, dotProductFrontTopRight);
+            float frontHalfBlend   = Lerp(vSmoothedWeight, frontBottomBlend, frontTopBlend);
+
+            //Infine si interpola tra le due facce lungo z (wSmoothedWeight)
+            //[-1,1] grazie a clamp
+            return std::clamp(Lerp(wSmoothedWeight, backHalfBlend, frontHalfBlend), -1.0f, 1.0f);
         }
     };
 }
