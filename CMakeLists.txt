@@ -130,4 +130,9 @@ target_link_libraries(Tappa16 PRIVATE common SFML::Window SFML::Graphics OpenGL:
 target_include_directories(Tappa16 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_compile_definitions(Tappa16 PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD2)
 
+add_executable(Tappa17 Tappa17/NicoCraft.cc ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
+target_link_libraries(Tappa17 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only ImGui-SFML::ImGui-SFML)
+target_include_directories(Tappa17 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_compile_definitions(Tappa17 PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD2)
+
 
