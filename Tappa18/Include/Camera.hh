@@ -59,6 +59,10 @@ namespace fcg
             return cameraPos;
         }
 
+        float getFarPlane() const{
+            return FARPLANE;
+        }
+
         //Impone direttamente la posizione della camera (usato quando e' il corpo fisico a comandare il movimento)
         void SetPosition(glm::vec3 position){
             cameraPos = position;

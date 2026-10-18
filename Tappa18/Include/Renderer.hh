@@ -34,10 +34,15 @@ namespace fcg{
         bool frustumCullingEnabled = true;        
 
         GLint viewProjModelLoc = -1, daylightLoc = -1;
+        GLint fogColorLoc = -1, fogStartLoc = -1, fogEndLoc = -1;
 
         //Dimensioni finestra centralizzate: usate da Hotbar (e in futuro Compass e menu)
         int windowWidth = 1920;
         int windowHeight = 1080;
+
+        //Inizio e fine della nebbia come frazione del far plane della camera
+        static constexpr float fogStartRatio = 0.85f;
+        static constexpr float fogEndRatio = 0.95f;
     public:
         Renderer(const std::vector<ShaderFiles>& shaderSets,
                 const std::string& res, int texturePixelSize, const std::string& shaderDir) : 
@@ -67,6 +72,9 @@ namespace fcg{
             worldShader.use();
 
             glUniform1f(daylightLoc, sky.GetDaylightFactor());
+            glUniform3f(fogColorLoc, skyColor.r, skyColor.g, skyColor.b);
+            glUniform1f(fogStartLoc, camera.getFarPlane() * fogStartRatio);
+            glUniform1f(fogEndLoc, camera.getFarPlane() * fogEndRatio);
             textureArray.Bind(0);
 
             frustum.Update(camera.viewProjMatrix);
@@ -153,6 +161,10 @@ namespace fcg{
             viewProjModelLoc = glGetUniformLocation(worldShader.program, "viewProjectionModel");
             daylightLoc = glGetUniformLocation(worldShader.program, "daylightFactor");
 
+            fogColorLoc = glGetUniformLocation(worldShader.program, "fogColor");
+            fogStartLoc = glGetUniformLocation(worldShader.program, "fogStart");
+            fogEndLoc   = glGetUniformLocation(worldShader.program, "fogEnd");
+  
             //Array delle texture viene passato come uniform al fragmentshader.
             GLint samplerLoc = glGetUniformLocation(worldShader.program, "textureArray");
             glUniform1i(samplerLoc, 0);
