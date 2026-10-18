@@ -4,9 +4,9 @@
 #include <imgui.h>
 #include <cmath>
 #include <string>
+#include "RenderStats.hh"
 
 namespace fcg{
-
     /*
         Overlay ImGui con le informazioni di gioco sempre a schermo:
         - in alto a sinistra il punto cardinale approssimato verso cui guarda il player (dallo yaw della Camera)
@@ -23,6 +23,7 @@ namespace fcg{
         float accumulatedTime = 0.0f;
         int frameCount = 0;
         int currentFps = 0;
+        bool showStats = false;
 
         static constexpr float refreshInterval = 0.5f;
         static constexpr float marginTop = 20.0f;
@@ -55,6 +56,31 @@ namespace fcg{
         void Draw(){
             DrawCompass();
             DrawFps();
+        }
+
+        void ToggleStats(){
+            showStats = !showStats;
+        }
+
+        //Va chiamata dopo Draw(), sempre tra ImGui::SFML::Update() e ImGui::Render()
+        void DrawStats(const RenderStats& stats, bool cullingEnabled){
+            if(!showStats) return;
+
+            ImGui::SetNextWindowPos(ImVec2(marginLeft, marginTop + 40.0f));
+            ImGui::SetNextWindowBgAlpha(0.0f);
+
+            ImGui::Begin("RenderStats", nullptr, OverlayFlags());
+            ImGui::PushFont(hudFont);
+            ImGui::SetWindowFontScale(18.0f / fontSize);
+
+            ImVec4 white(1.0f, 1.0f, 1.0f, 1.0f);
+            ImGui::TextColored(white, "Culling: %s", cullingEnabled ? "ON" : "OFF");
+            ImGui::TextColored(white, "Chunk: %d / %d", stats.chunksDrawn, stats.chunksTotal);
+            ImGui::TextColored(white, "Vertici: %lld / %lld", stats.verticesDrawn, stats.verticesTotal);
+            ImGui::TextColored(white, "Triangoli: %lld / %lld", stats.trianglesDrawn, stats.trianglesTotal);
+
+            ImGui::PopFont();
+            ImGui::End();
         }
 
     private:

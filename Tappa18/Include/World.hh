@@ -18,8 +18,8 @@
 
 namespace fcg
 {
-    constexpr int WORLDSIZECHUNKSX = 8;
-    constexpr int WORLDSIZECHUNKSZ = 8;
+    constexpr int WORLDSIZECHUNKSX = 24;
+    constexpr int WORLDSIZECHUNKSZ = 24;
 
     //Un chunk posizionato nella griglia mondo (coordinate in unita' di chunk, non di blocco)
     struct ChunkInstance{

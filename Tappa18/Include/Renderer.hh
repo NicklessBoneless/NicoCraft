@@ -13,6 +13,8 @@
 #include "BlockOutline.hh"
 #include "Sky.hh"
 #include "Hotbar.hh"
+#include "Frustum.hh"
+#include "RenderStats.hh"
 
 namespace fcg{
     //Tutto e solo il rendering: shader del mondo, texture array, uniform, draw call.
@@ -27,7 +29,9 @@ namespace fcg{
         fcg::BlockOutline outline;
         fcg::HotbarRenderer hotbarRenderer;
         fcg::Sky sky;
-        
+        fcg::Frustum frustum;
+        RenderStats stats;
+        bool frustumCullingEnabled = true;        
 
         GLint viewProjModelLoc = -1, daylightLoc = -1;
 
@@ -65,18 +69,36 @@ namespace fcg{
             glUniform1f(daylightLoc, sky.GetDaylightFactor());
             textureArray.Bind(0);
 
-            //Disegna ogni chunk traslato nella sua posizione di griglia
+            frustum.Update(camera.viewProjMatrix);
+            stats = RenderStats{};
+
+            //Disegna ogni chunk traslato nella sua posizione di griglia, saltando quelli fuori dal frustum
             for(const auto& instance : world.GetChunks()){
-                glm::mat4 modelMatrix = fcg::translation(
-                    instance.chunkX * Blocks::CHUNK_SIZE_X,
-                    0.0f,
-                    instance.chunkZ * Blocks::CHUNK_SIZE_Z
-                );
-                
-                glm::mat4 chunkPvm = camera.viewProjMatrix * modelMatrix;
+                const Blocks::ChunkMesh& mesh = instance.mesh;
+                if(mesh.IsEmpty()) continue;
+
+                stats.chunksTotal++;
+                stats.verticesTotal += mesh.GetVertexCount();
+                stats.trianglesTotal += mesh.GetTriangleCount();
+
+                float originX = (float) (instance.chunkX * Blocks::CHUNK_SIZE_X);
+                float originZ = (float) (instance.chunkZ * Blocks::CHUNK_SIZE_Z);
+
+                if(frustumCullingEnabled){
+                    glm::vec3 minCorner(originX, mesh.GetMinY(), originZ);
+                    glm::vec3 maxCorner(originX + Blocks::CHUNK_SIZE_X, mesh.GetMaxY(), originZ + Blocks::CHUNK_SIZE_Z);
+                    if(!frustum.IsBoxVisible(minCorner, maxCorner)) continue;
+                }
+
+                glm::mat4 chunkPvm = camera.viewProjMatrix * fcg::translation(originX, 0.0f, originZ);
                 glUniformMatrix4fv(viewProjModelLoc, 1, GL_FALSE, &chunkPvm[0][0]);
-                instance.mesh.Draw();
+                mesh.Draw();
+
+                stats.chunksDrawn++;
+                stats.verticesDrawn += mesh.GetVertexCount();
+                stats.trianglesDrawn += mesh.GetTriangleCount();
             }
+        
 
             if(target.hit){
                 outline.Draw(target.blockX, target.blockY, target.blockZ, camera.viewProjMatrix);
@@ -90,6 +112,18 @@ namespace fcg{
         void SetWindowSize(int width, int height){
            windowWidth = width;
            windowHeight = height;
+        }
+
+        const RenderStats& GetStats() const{
+            return stats;
+        }
+
+        void ToggleFrustumCulling(){
+            frustumCullingEnabled = !frustumCullingEnabled;
+        }
+
+        bool IsFrustumCullingEnabled() const{
+            return frustumCullingEnabled;
         }
 
         int GetWindowWidth() const{

@@ -225,6 +225,12 @@ void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& 
                 case sf::Keyboard::Scancode::Num9:
                     hotbar.SetSelected(6);
                     break;
+                case sf::Keyboard::Scancode::F3:
+                    hud.ToggleStats();
+                    break;
+                case sf::Keyboard::Scancode::F4:
+                    renderer.ToggleFrustumCulling();
+                    break;
                 default:
                     break; //Ignora gli altri tasti
             }
@@ -510,6 +516,7 @@ int main(){
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::SFML::Update(window, sf::seconds(deltaTime));
         hud->Draw();
+        hud->DrawStats(renderer->GetStats(), renderer->IsFrustumCullingEnabled());
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         

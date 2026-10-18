@@ -24,7 +24,7 @@ namespace fcg
         glm::vec3 cameraPos = {0.0f, 0.0f, 0.0f};
        
         const float NEARPLANE = 0.1f;
-        const float FARPLANE = 300.0f;
+        const float FARPLANE = 200.0f;
         const float mouseSensitivity = 0.15f;
 
     public:

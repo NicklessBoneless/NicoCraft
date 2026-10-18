@@ -5,6 +5,7 @@
 #include "Matrices.hh"
 #include "Hotshaders.hh"
 #include <functional>
+#include <algorithm>
 
 namespace Blocks
 {
@@ -132,6 +133,8 @@ namespace Blocks
     private:
         GLuint vao = 0, vbo = 0, ebo = 0;
         GLsizei indexCount = 0;
+        GLsizei vertexCount = 0;
+        float minY = 0.0f,maxY = 0.0f;
 
     public:
         ~ChunkMesh() { Clean(); }
@@ -140,6 +143,14 @@ namespace Blocks
             Clean();
             indexCount = static_cast<GLsizei>(mesh.indices.size());
             if(indexCount == 0) return;
+
+            vertexCount = static_cast<GLsizei>(mesh.vertices.size());
+            minY = mesh.vertices[0].y;
+            maxY = minY;
+            for(const Vertex& vertex : mesh.vertices){
+                minY = std::min(minY, vertex.y);
+                maxY = std::max(maxY, vertex.y);
+            }
 
             glGenVertexArrays(1, &vao);
             glBindVertexArray(vao);
@@ -171,11 +182,34 @@ namespace Blocks
             glBindVertexArray(0);
         }
 
+        bool IsEmpty() const{
+            return indexCount == 0;
+        }
+
+        GLsizei GetVertexCount() const{
+            return vertexCount;
+        }
+
+        GLsizei GetTriangleCount() const{
+            return indexCount / 3;
+        }
+
+        float GetMinY() const{
+            return minY;
+        }
+
+        float GetMaxY() const{
+            return maxY;
+        }
+
         void Clean(){
             if(vao){ glDeleteVertexArrays(1, &vao); vao = 0; }
             if(vbo){ glDeleteBuffers(1, &vbo); vbo = 0; }
             if(ebo){ glDeleteBuffers(1, &ebo); ebo = 0; }
             indexCount = 0;
+            vertexCount = 0;
+            minY = 0.0f;
+            maxY = 0.0f;
         }
     };
 }
