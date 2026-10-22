@@ -18,8 +18,8 @@ namespace fcg{
     class PerlinNoise : public Noise{
     private:
         
-        //Permutazioni 
-        std::array<uint8_t, 512> permutation;
+        //Permutazioni, permutations 
+        std::array<uint8_t, 512> perm;
 
         //Funzione 6x^{5}-15x^{4}+10x^{3}
         static float Fade(float x){ 
@@ -54,29 +54,48 @@ namespace fcg{
 
         //12 gradienti verso i punti medi degli spigoli del cubo (piu' 4 ripetuti)
         static float Gradient3D(int hash, float x, float y, float z){
-            int h = hash & 15;
-            float uSmoothedWeight = h < 8 ? x : y;
-            float vSmoothedWeight = h < 4 ? y : ((h == 12 || h == 14) ? x : z);
-            return ((h & 1) == 0 ? uSmoothedWeight : -uSmoothedWeight) + ((h & 2) == 0 ? vSmoothedWeight : -vSmoothedWeight);
+            int direction = hash & 15;
+
+            //Scegliamo quale componente è da scartare (x/y/z),
+            //dipendentemente dal gradiente scelto
+            float firstComponent;
+            if(direction < 8) firstComponent = x;
+            else firstComponent = y;
+            
+            float secondComponent;
+            if(direction < 4) secondComponent = y;
+            else if(direction == 12 || direction == 14) secondComponent = x;
+            else secondComponent = z;
+
+            //Che operazione bisogna effettuare su i due componenti? x + z o -x + z , etc.
+            if((direction & 1) != 0){
+                firstComponent = -firstComponent;
+            }
+            if((direction & 2) != 0){
+                secondComponent = -secondComponent;
+            }
+
+            //Prodotto scalare tra x,y,z, però dato che 
+            return firstComponent + secondComponent;
         }
 
     public: 
         explicit PerlinNoise(uint32_t seed){ 
             //Inizializza la tabella delle permutazioni
-            for(uint16_t i = 0; i < (permutation.max_size() >> 1) ; i++){
-                permutation[i] = (uint8_t) i;
+            for(uint16_t i = 0; i < (perm.max_size() >> 1) ; i++){
+                perm[i] = (uint8_t) i;
             }
             
             //Mescoliamo le permutazioni in base al seed scelto!
             std::mt19937 rng(seed);
-            for(int i = (permutation.max_size() >> 1)-1 ; i > 0 ; i--){
+            for(int i = (perm.max_size() >> 1)-1 ; i > 0 ; i--){
                 int j = (int) (rng() % (uint32_t) (i + 1));
-                std::swap(permutation[i], permutation[j]);
+                std::swap(perm[i], perm[j]);
             }
 
             //Tabella duplicata: evita il wrap degli indici nel calcolo dei corner
-            for(uint16_t i = 0; i < (permutation.max_size() >> 1) ; i++){
-                permutation[256 + i] = permutation[i];
+            for(uint16_t i = 0; i < (perm.max_size() >> 1) ; i++){
+                perm[256 + i] = perm[i];
             }
         }
 
@@ -93,10 +112,10 @@ namespace fcg{
             float wSmoothedWeight = Fade(zLocalCell);
 
             //Generiamo l'hash per ogni angolo del quadrato, che poi useremo per scegliere la direzione del vettore
-            int bottomLeft  = permutation[permutation[xIndexUnitCell] + zIndexUnitCell];         //aa
-            int bottomRight = permutation[permutation[xIndexUnitCell + 1] + zIndexUnitCell];     //ba
-            int topLeft     = permutation[permutation[xIndexUnitCell] + zIndexUnitCell + 1];     //ab
-            int topRight    = permutation[permutation[xIndexUnitCell + 1] + zIndexUnitCell + 1]; //bb
+            int bottomLeft  = perm[perm[xIndexUnitCell] + zIndexUnitCell];         //aa
+            int bottomRight = perm[perm[xIndexUnitCell + 1] + zIndexUnitCell];     //ba
+            int topLeft     = perm[perm[xIndexUnitCell] + zIndexUnitCell + 1];     //ab
+            int topRight    = perm[perm[xIndexUnitCell + 1] + zIndexUnitCell + 1]; //bb
 
             //Gradient2D effettua il prodotto scalare 
             float dotProductBottomLeft = Gradient2D(bottomLeft, xLocalCell, zLocalCell);
@@ -118,58 +137,71 @@ namespace fcg{
         }
 
         float Sample3D(float x, float y, float z) const override{
+            //Arrotondiamo verso il basso con floor, 
+            //con cast ad (int) avremmo arrotondato verso lo zero!
             float floorX = std::floor(x);
             float floorY = std::floor(y);
             float floorZ = std::floor(z);
+
+            //Valore che sarà usato nella tabella di permutazione per ciascuna coordinata
             int xIndexUnitCell = ((int) floorX) & 255; //Equivalente a % 256, serve perché % da valori negativi
             int yIndexUnitCell = ((int) floorY) & 255; //Equivalente a % 256
             int zIndexUnitCell = ((int) floorZ) & 255; //Equivalente a % 256
+            
+            //Calcoliamo le coordinate locali di P relative al cubo x,y,z
             float xLocalCell = x - floorX; //[0,1)
             float yLocalCell = y - floorY; //[0,1)
             float zLocalCell = z - floorZ; //[0,1)
 
-            //Coordinate lisce, per rendere le transizioni tra i blocchi più morbide
+            //Pesi, per rendere le transizioni tra i blocchi più morbide
             float uSmoothedWeight = Fade(xLocalCell);
             float vSmoothedWeight = Fade(yLocalCell);
             float wSmoothedWeight = Fade(zLocalCell);
 
-            //Hash parziali: si concatenano le permutazioni asse per asse (x, poi y, poi z)
-            int hashX     = permutation[xIndexUnitCell] + yIndexUnitCell;       //a
-            int hashXPlus = permutation[xIndexUnitCell + 1] + yIndexUnitCell;   //b
+            //Hash: Si concatenano le permutazioni asse x asse (x, poi y, infine z)
 
-            int hashBottomLeft  = permutation[hashX] + zIndexUnitCell;          //aa
-            int hashTopLeft     = permutation[hashX + 1] + zIndexUnitCell;      //ab
-            int hashBottomRight = permutation[hashXPlus] + zIndexUnitCell;      //ba
-            int hashTopRight    = permutation[hashXPlus + 1] + zIndexUnitCell;  //bb
-
+            //x , y
+            int hashX_Left_Y  = perm[xIndexUnitCell] + yIndexUnitCell;       //a
+            //x+1, y
+            int hashX_Right_Y = perm[xIndexUnitCell + 1] + yIndexUnitCell;   //b
+            
             //Hash degli 8 angoli del cubo: "back" = faccia a z, "front" = faccia a z + 1
-            int backBottomLeft   = permutation[hashBottomLeft];
-            int backBottomRight  = permutation[hashBottomRight];
-            int backTopLeft      = permutation[hashTopLeft];
-            int backTopRight     = permutation[hashTopRight];
-            int frontBottomLeft  = permutation[hashBottomLeft + 1];
-            int frontBottomRight = permutation[hashBottomRight + 1];
-            int frontTopLeft     = permutation[hashTopLeft + 1];
-            int frontTopRight    = permutation[hashTopRight + 1];
+            // x, y, z
+            int backBottomLeft   = perm[perm[hashX_Left_Y] + zIndexUnitCell];
+            // x+1, y, z
+            int backBottomRight  = perm[perm[hashX_Right_Y] + zIndexUnitCell];
+            // x, y+1, z
+            int backTopLeft      = perm[perm[hashX_Left_Y + 1] + zIndexUnitCell];
+            // x+1, y+1, z
+            int backTopRight     = perm[perm[hashX_Right_Y + 1] + zIndexUnitCell];
+            // x, y, z+1
+            int frontBottomLeft  = perm[perm[hashX_Left_Y] + zIndexUnitCell + 1];
+            // x+1, y, z+1
+            int frontBottomRight = perm[perm[hashX_Right_Y] + zIndexUnitCell + 1];
+            // x, y+1, z+1
+            int frontTopLeft     = perm[perm[hashX_Left_Y + 1] + zIndexUnitCell + 1];
+            // x+1, y+1, z+1
+            int frontTopRight    = perm[perm[hashX_Right_Y + 1] + zIndexUnitCell + 1];
 
-            //Gradient3D effettua il prodotto scalare, faccia posteriore (z)
+            //Gradient3D effettua il prodotto scalare, back (z)
             float dotProductBackBottomLeft  = Gradient3D(backBottomLeft, xLocalCell, yLocalCell, zLocalCell);
             float dotProductBackBottomRight = Gradient3D(backBottomRight, xLocalCell - 1.0f, yLocalCell, zLocalCell);
             float dotProductBackTopLeft     = Gradient3D(backTopLeft, xLocalCell, yLocalCell - 1.0f, zLocalCell);
             float dotProductBackTopRight    = Gradient3D(backTopRight, xLocalCell - 1.0f, yLocalCell - 1.0f, zLocalCell);
 
-            //Prodotto scalare, faccia anteriore (z + 1)
+            //Prodotto scalare, front (z + 1)
             float dotProductFrontBottomLeft  = Gradient3D(frontBottomLeft, xLocalCell, yLocalCell, zLocalCell - 1.0f);
             float dotProductFrontBottomRight = Gradient3D(frontBottomRight, xLocalCell - 1.0f, yLocalCell, zLocalCell - 1.0f);
             float dotProductFrontTopLeft     = Gradient3D(frontTopLeft, xLocalCell, yLocalCell - 1.0f, zLocalCell - 1.0f);
             float dotProductFrontTopRight    = Gradient3D(frontTopRight, xLocalCell - 1.0f, yLocalCell - 1.0f, zLocalCell - 1.0f);
 
-            //Faccia posteriore: prima si interpola su x (uSmoothedWeight), poi su y (vSmoothedWeight)
+            //Faccia back: 
+            //Prima si interpola su x (uSmoothedWeight), poi su y (vSmoothedWeight)
             float backBottomBlend = Lerp(uSmoothedWeight, dotProductBackBottomLeft, dotProductBackBottomRight);
             float backTopBlend    = Lerp(uSmoothedWeight, dotProductBackTopLeft, dotProductBackTopRight);
             float backHalfBlend   = Lerp(vSmoothedWeight, backBottomBlend, backTopBlend);
 
-            //Faccia anteriore: stesso procedimento
+            //Faccia front
             float frontBottomBlend = Lerp(uSmoothedWeight, dotProductFrontBottomLeft, dotProductFrontBottomRight);
             float frontTopBlend    = Lerp(uSmoothedWeight, dotProductFrontTopLeft, dotProductFrontTopRight);
             float frontHalfBlend   = Lerp(vSmoothedWeight, frontBottomBlend, frontTopBlend);
