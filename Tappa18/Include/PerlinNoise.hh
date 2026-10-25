@@ -54,29 +54,35 @@ namespace fcg{
 
         //12 gradienti verso i punti medi degli spigoli del cubo (piu' 4 ripetuti)
         static float Gradient3D(int hash, float x, float y, float z){
-            int direction = hash & 15;
+            int direction = hash & 15; 
+            switch(direction){ 
+                case 0: 
+                case 12:
+                    return x + y; // ( 1, 1, 0) 
 
-            //Scegliamo quale componente è da scartare (x/y/z),
-            //dipendentemente dal gradiente scelto
-            float firstComponent;
-            if(direction < 8) firstComponent = x;
-            else firstComponent = y;
-            
-            float secondComponent;
-            if(direction < 4) secondComponent = y;
-            else if(direction == 12 || direction == 14) secondComponent = x;
-            else secondComponent = z;
+                case 1: 
+                case 14:
+                    return -x + y; // (-1, 1, 0) 
 
-            //Che operazione bisogna effettuare su i due componenti? x + z o -x + z , etc.
-            if((direction & 1) != 0){
-                firstComponent = -firstComponent;
-            }
-            if((direction & 2) != 0){
-                secondComponent = -secondComponent;
-            }
+                case 2: return x - y;  // ( 1, -1, 0) 
+                case 3: return -x - y; // (-1, -1, 0) 
+                case 4: return x + z;  // ( 1, 0, 1) 
+                case 5: return -x + z; // (-1, 0, 1) 
+                case 6: return x - z;  // ( 1, 0, -1) 
+                case 7: return -x - z; // (-1, 0, -1) 
+                case 8: return y + z; // ( 0, 1, 1) 
 
-            //Prodotto scalare tra x,y,z, però dato che 
-            return firstComponent + secondComponent;
+                case 9: 
+                case 13: 
+                   return -y + z;  // ( 0, -1, 1) 
+                
+                case 10: return y - z;  // ( 0, 1, -1) 
+
+                case 11:
+                case 15: 
+                    return -y - z; // ( 0, -1, -1) 
+                default: return -y - z; 
+            }   
         }
 
     public: 
