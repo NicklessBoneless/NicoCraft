@@ -132,7 +132,7 @@ namespace fcg{
             }
 
             //Quali sezioni disegnare: BFS di visibilita' oppure solo frustum (F5 alterna)
-            float renderDistance = camera.getFarPlane() * fogEndRatio;
+            float renderDistance = camera.getFarPlane() * 2.0f;
             if(!cullingFrozen){
                 if(occlusionCullingEnabled){
                     sectionCuller.Compute(world, camera, frustum, frustumCullingEnabled, renderDistance, visibleSections);

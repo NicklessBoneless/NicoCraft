@@ -65,6 +65,14 @@ namespace fcg{
             queue.clear();
 
             int startNode = NodeIndex(startChunkX, startSectionY, startChunkZ);
+            
+            //Cella della camera dentro la sua sezione: da qui si esce solo dalle facce raggiungibili
+            const ChunkInstance& startInstance = chunks[startChunkZ * WORLDSIZECHUNKSX + startChunkX];
+            int cameraLocalX = std::clamp((int) std::floor(cameraPos.x) - startChunkX * Blocks::CHUNK_SIZE_X, 0, Blocks::CHUNK_SIZE_X - 1);
+            int cameraLocalY = std::clamp((int) std::floor(cameraPos.y) - startSectionY * Blocks::SECTION_SIZE, 0, Blocks::SECTION_SIZE - 1);
+            int cameraLocalZ = std::clamp((int) std::floor(cameraPos.z) - startChunkZ * Blocks::CHUNK_SIZE_Z, 0, Blocks::CHUNK_SIZE_Z - 1);
+            uint8_t startFaces = Blocks::ComputeReachableFaces(startInstance.chunk, startSectionY, cameraLocalX, cameraLocalY, cameraLocalZ);
+           
             visited[startNode] = 1;
             queue.push_back({startNode, noFace, 0});
             visibleNodes.push_back(startNode);
@@ -84,8 +92,13 @@ namespace fcg{
                     //Non si torna indietro rispetto a una direzione gia' percorsa
                     if(current.directions & (1 << opposite)) continue;
 
-                    //Dalla faccia d'ingresso si esce solo se l'aria collega le due facce
-                    if(current.entryFace != noFace && !Blocks::AreFacesConnected(connectivity, current.entryFace, face)) continue;
+                    //Dalla sezione della camera si esce dalle facce raggiungibili dalla sua cella,
+                    //dalle altre solo se l'aria collega la faccia d'ingresso con quella d'uscita
+                    if(current.entryFace == noFace){
+                        if(!(startFaces & (1 << face))) continue;
+                    }else if(!Blocks::AreFacesConnected(connectivity, current.entryFace, face)){
+                        continue;
+                    }
 
                     int neighborChunkX = chunkX + Blocks::FACE_OFFSETS[face][0];
                     int neighborSectionY = sectionY + Blocks::FACE_OFFSETS[face][1];

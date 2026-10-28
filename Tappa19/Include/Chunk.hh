@@ -218,8 +218,56 @@ namespace Blocks
         return connectivity;
     }    
 
-    class ChunkMesh
-    {
+    /*
+        Facce della sezione raggiungibili dalla cella (startX, startLocalY, startZ) passando solo
+        per celle attraversabili. Serve per la sezione della camera: da li' si puo' uscire solo
+        dalle facce toccate dalla regione d'aria in cui si trova. Bitmask di 6 bit (BlockFace)
+    */
+    inline uint8_t ComputeReachableFaces(const Chunk& chunk, int sectionY, int startX, int startLocalY, int startZ){
+        constexpr int cellCount = CHUNK_SIZE_X * SECTION_SIZE * CHUNK_SIZE_Z;
+        const int baseY = sectionY * SECTION_SIZE;
+
+        //Camera dentro un blocco solido (es. noclip nella roccia): caso conservativo, tutte le facce
+        if(!chunk.IsTransparent(startX, baseY + startLocalY, startZ)) return 0x3F;
+
+        std::array<bool, cellCount> visited{};
+        std::array<int, cellCount> stack;
+        uint8_t touchedFaces = 0;
+        int top = 0;
+
+        int startCell = startX + CHUNK_SIZE_X * (startLocalY + SECTION_SIZE * startZ);
+        visited[startCell] = true;
+        stack[top++] = startCell;
+
+        while(top > 0){
+            int cell = stack[--top];
+            int x = cell % CHUNK_SIZE_X;
+            int localY = (cell / CHUNK_SIZE_X) % SECTION_SIZE;
+            int z = cell / (CHUNK_SIZE_X * SECTION_SIZE);
+
+            if(z == CHUNK_SIZE_Z - 1) touchedFaces |= 1 << (int) BlockFace::Front;
+            if(z == 0)                touchedFaces |= 1 << (int) BlockFace::Back;
+            if(x == 0)                touchedFaces |= 1 << (int) BlockFace::Left;
+            if(x == CHUNK_SIZE_X - 1) touchedFaces |= 1 << (int) BlockFace::Right;
+            if(localY == SECTION_SIZE - 1) touchedFaces |= 1 << (int) BlockFace::Top;
+            if(localY == 0)                touchedFaces |= 1 << (int) BlockFace::Bottom;
+
+            for(int face = 0; face < 6; face++){
+                int nx = x + FACE_OFFSETS[face][0];
+                int ny = localY + FACE_OFFSETS[face][1];
+                int nz = z + FACE_OFFSETS[face][2];
+                if(nx < 0 || nx >= CHUNK_SIZE_X || ny < 0 || ny >= SECTION_SIZE || nz < 0 || nz >= CHUNK_SIZE_Z) continue;
+
+                int neighbor = nx + CHUNK_SIZE_X * (ny + SECTION_SIZE * nz);
+                if(visited[neighbor]) continue;
+                visited[neighbor] = true;
+                if(chunk.IsTransparent(nx, baseY + ny, nz)) stack[top++] = neighbor;
+            }
+        }
+        return touchedFaces;
+    }
+
+    class ChunkMesh{
     private:
         GLuint vao = 0, vbo = 0, ebo = 0;
         GLsizei indexCount = 0;
