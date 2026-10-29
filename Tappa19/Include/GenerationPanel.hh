@@ -79,6 +79,7 @@ namespace fcg{
                     ImGui::SliderFloat("Worm persistence", &config.caves.wormFractal.amplitudeMultiplier, 0.001f, 0.7f, "%.2f");
                     ImGui::SliderFloat("Spessore tunnel", &config.caves.wormThreshold, 0.001f, 0.08f, "%.3f");
                     ImGui::SliderFloat("Scala verticale tunnel", &config.caves.wormVerticalScale, 0.5f, 3.0f, "%.2f");
+                    ImGui::SliderInt("Min Tunnel Height", &config.caves.minCeilingHeight, 0, 10, "%d");
                 }
 
                 ImGui::SliderInt("Margine superficie", &config.caves.surfaceMargin, 0, 12);

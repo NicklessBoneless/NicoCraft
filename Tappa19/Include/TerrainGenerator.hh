@@ -111,7 +111,10 @@ namespace fcg{
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
                         if(IsCave(worldX, y, worldZ, surface)){
-                            chunk.Set(x, y, z, Blocks::BlockType::AIR);
+                            for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < surface ; dy++){
+                                chunk.Set(x, y + dy, z, Blocks::BlockType::AIR);
+                            }
+                            
                         }
                     }
                 }
