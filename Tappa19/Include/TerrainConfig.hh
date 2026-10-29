@@ -39,7 +39,7 @@ namespace fcg{
         //Tunnel (spaghetti): si scava dove due campi sono entrambi vicini a zero
         bool wormsEnabled = !true;
         FractalParams wormFractal = {4, 0.012f, 2.0f, 0.5f};
-        float wormThreshold = 0.032f; //Piu' alta = tunnel piu' larghi
+        float wormThreshold = 0.033f; //Piu' alta = tunnel piu' larghi
         float wormVerticalScale = 1.29f;
 
         int minCeilingHeight = 2;
