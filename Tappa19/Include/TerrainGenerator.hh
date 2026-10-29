@@ -33,9 +33,18 @@ namespace fcg{
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
         static constexpr int treeClearance = treeTrunkHeight + 2; //Spazio da lasciare sopra il terreno per la chioma
-        static constexpr float wormOffsetX = 131.7f; //Traslazione del secondo campo per i tunnel
-        static constexpr float wormOffsetY = 57.3f;
-        static constexpr float wormOffsetZ = 211.1f;
+        //Ogni campo ha il suo offset (in blocchi), cosi' sacche e tunnel non si sovrappongono sempre negli stessi punti
+        static constexpr float spongeOffsetX = 251.3f;
+        static constexpr float spongeOffsetY = 97.1f;
+        static constexpr float spongeOffsetZ = 173.9f;
+
+        static constexpr float wormAOffsetX = -181.7f;
+        static constexpr float wormAOffsetY = 43.9f;
+        static constexpr float wormAOffsetZ = 307.3f;
+
+        static constexpr float wormBOffsetX = 131.7f;
+        static constexpr float wormBOffsetY = 57.3f;
+        static constexpr float wormBOffsetZ = 211.1f;
 
     public:
         TerrainGenerator(uint32_t seed, std::unique_ptr<Noise> noise, FractalParams terrainParameters = FractalParams{},CavesConfig cavesConfig = CavesConfig{},float heightAmplitude = 30.0f) : 
@@ -101,7 +110,7 @@ namespace fcg{
                     int maxY = std::min(surface - cavesConfig.surfaceMargin, Blocks::CHUNK_SIZE_Y);
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
-                        if(IsCave(worldX, y, worldZ)){
+                        if(IsCave(worldX, y, worldZ, surface)){
                             chunk.Set(x, y, z, Blocks::BlockType::AIR);
                         }
                     }
@@ -109,25 +118,55 @@ namespace fcg{
             }
         }
 
-        bool IsCave(int worldX, int worldY, int worldZ) const{
+        bool IsCave(int worldX, int worldY, int worldZ, int surface) const{
             float x = (float) worldX;
             float y = (float) worldY;
             float z = (float) worldZ;
 
-            float value = Fractal3D(*noise, x, y, z, cavesConfig.fractal);
+            //Unione: basta una delle due morfologie. Se e' gia' una sacca, i tunnel non si calcolano
+            if(cavesConfig.spongeEnabled && IsSpongeCave(x, y, z, surface)) return true;
+            if(cavesConfig.wormsEnabled && IsWormCave(x, y, z)) return true;
+            return false;
+        }
 
-            if(cavesConfig.type == CaveType::Sponge){
-                return value > cavesConfig.spongeThreshold;
-            }
+        bool IsSpongeCave(float x, float y, float z, int surface) const{
+            float value = Fractal3D(*noise,
+                x + spongeOffsetX,
+                (y + spongeOffsetY) * cavesConfig.verticalScale,
+                z + spongeOffsetZ,
+                cavesConfig.spongeFractal);
 
             /*
-                Vermi: un solo campo con |n| < soglia darebbe pareti sottili (la superficie n=0),
-                non tunnel. Per avere gallerie si intersecano DUE campi (stesso Perlin 3D,
-                coordinate traslate): i punti vicini a zero in entrambi formano una curva
+                nearSurface vale 0 a minY e 1 in superficie: la soglia sale con depthBias,
+                quindi vicino al suolo ci sono meno sacche e in profondita' piu' grandi
             */
-            float second = Fractal3D(*noise, x + wormOffsetX, y + wormOffsetY, z + wormOffsetZ, cavesConfig.fractal);
-            return std::abs(value) < cavesConfig.wormThreshold && std::abs(second) < cavesConfig.wormThreshold;
-        }        
+            float depthRange = (float) std::max(surface - cavesConfig.minY, 1);
+            float nearSurface = std::clamp((y - (float) cavesConfig.minY) / depthRange, 0.0f, 1.0f);
+            float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
+
+            return value > threshold;
+        }
+
+        /*
+            Un solo campo con |n| < soglia darebbe pareti sottili (la superficie n=0), non tunnel.
+            Si intersecano DUE campi (stesso Perlin 3D, coordinate traslate): i punti vicini a zero
+            in entrambi formano una curva. Il secondo campo si calcola solo se il primo e' gia' sotto soglia
+        */
+        bool IsWormCave(float x, float y, float z) const{
+            float first = Fractal3D(*noise,
+                x + wormAOffsetX,
+                (y + wormAOffsetY) * cavesConfig.wormVerticalScale,
+                z + wormAOffsetZ,
+                cavesConfig.wormFractal);
+            if(std::abs(first) >= cavesConfig.wormThreshold) return false;
+
+            float second = Fractal3D(*noise,
+                x + wormBOffsetX,
+                (y + wormBOffsetY) * cavesConfig.wormVerticalScale,
+                z + wormBOffsetZ,
+                cavesConfig.wormFractal);
+            return std::abs(second) < cavesConfig.wormThreshold;
+        } 
 
         void GenerateTrees(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
             /*
@@ -146,10 +185,11 @@ namespace fcg{
                     //perche' quest'ultima non e' riproducibile tra standard library diverse
                     if(rng() % 100 != 0) continue;
                     if(IsTooCloseToOtherTree(x, z, treePositions)) continue;
-
-                    treePositions.push_back({x, z});
-
+                    
                     int groundY = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
+                    if(!chunk.IsSolid(x,groundY-1,z)) continue;
+                    
+                    treePositions.push_back({x, z});
                     int treeTop = groundY + treeTrunkHeight;
 
                     for(int y = groundY; y < treeTop; y++){

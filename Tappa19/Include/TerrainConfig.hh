@@ -10,23 +10,13 @@
 
 namespace fcg{
     enum class NoiseType{ Perlin = 0 };
-    enum class CaveType{ Sponge = 0, Worms = 1};
 
     constexpr int noiseTypeCount = 1;
-    constexpr int caveTypeCount = 2;
     
     inline const char* NoiseTypeName(NoiseType type){
         switch(type){
             case NoiseType::Perlin: return "Perlin";
             default: return "Perlin";
-        }
-    }
-
-    inline const char* CaveTypeName(CaveType type){
-        switch(type){
-            case CaveType::Sponge: return "Sponge";
-            case CaveType::Worms: return "Vorm";
-            default: return "Sponge";
         }
     }
 
@@ -38,17 +28,22 @@ namespace fcg{
 
     struct CavesConfig{
         bool enabled = true;
-        CaveType type = CaveType::Sponge;
-        FractalParams fractal = {3, 0.05f, 2.0f, 0.5f};
 
-        //Sponge: si scava dove il rumore supera la soglia (piu' bassa = piu' vuoto)
-        float spongeThreshold = 0.30f;
+        //Sacche (cheese): si scava dove il rumore supera la soglia (piu' bassa = piu' vuoto)
+        bool spongeEnabled = false;
+        FractalParams spongeFractal = {3, 0.05f, 2.0f, 0.5f};
+        float spongeThreshold = 0.35f;
+        float verticalScale = 1.0f; //>1 schiaccia le sacche in verticale (sale larghe e basse)
+        float depthBias = 0.10f;     //Quanto sale la soglia vicino alla superficie (0 = nessun effetto)
 
-        //Vorm: si scava dove |rumore| e' sotto la soglia (piu' alta = tunnel piu' larghi)
-        float wormThreshold = 0.08f;
+        //Tunnel (spaghetti): si scava dove due campi sono entrambi vicini a zero
+        bool wormsEnabled = true;
+        FractalParams wormFractal = {4, 0.010f, 2.0f, 0.5f};
+        float wormThreshold = 0.04f; //Piu' alta = tunnel piu' larghi
+        float wormVerticalScale = 1.2f;
 
         int minY = 3; //Sotto questa quota non si scava mai
-        int surfaceMargin = 0; //Strati intatti sotto la superficie, cosi' le caverne non bucano il terreno
+        int surfaceMargin = 0; //Strati intatti sotto la superficie (0 = ingressi visibili)
     };
 
     //Dati usati per la generazione del mondo, rende i mondi replicabili

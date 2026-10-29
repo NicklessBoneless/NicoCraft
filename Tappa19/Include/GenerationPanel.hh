@@ -60,29 +60,29 @@ namespace fcg{
             ImGui::Checkbox("Caverne", &config.caves.enabled);
 
             if(config.caves.enabled){
-                if(ImGui::BeginCombo("Tipo caverna", CaveTypeName(config.caves.type))){
-                    for(int i = 0; i < caveTypeCount; i++){
-                        bool selected = (i == (int) config.caves.type);
-                        if(ImGui::Selectable(CaveTypeName((CaveType) i), selected)){
-                            config.caves.type = (CaveType) i;
-                        }
-                    }
-                    ImGui::EndCombo();
+                ImGui::Checkbox("Sacche (spugna)", &config.caves.spongeEnabled);
+                if(config.caves.spongeEnabled){
+                    ImGui::SliderInt("Sponge octaves", &config.caves.spongeFractal.octaves, 1, 6);
+                    ImGui::SliderFloat("Sponge frequency", &config.caves.spongeFractal.frequency, 0.01f, 0.15f, "%.3f");
+                    ImGui::SliderFloat("Sponge lacunarity", &config.caves.spongeFractal.frequencyMultiplier, 1.5f, 3.5f, "%.2f");
+                    ImGui::SliderFloat("Sponge persistence", &config.caves.spongeFractal.amplitudeMultiplier, 0.1f, 0.9f, "%.2f");
+                    ImGui::SliderFloat("Soglia spugna", &config.caves.spongeThreshold, 0.05f, 0.7f, "%.2f");
+                    ImGui::SliderFloat("Scala verticale", &config.caves.verticalScale, 0.5f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Bias profondita'", &config.caves.depthBias, 0.0f, 0.5f, "%.2f");
                 }
 
-                ImGui::SliderInt("Cave octaves", &config.caves.fractal.octaves, 1, 6);
-                ImGui::SliderFloat("Cave frequency", &config.caves.fractal.frequency, 0.01f, 0.15f, "%.3f");
-                ImGui::SliderFloat("Cave lacunarity", &config.caves.fractal.frequencyMultiplier, 1.5f, 3.5f, "%.2f");
-                ImGui::SliderFloat("Cave persistence", &config.caves.fractal.amplitudeMultiplier, 0.1f, 0.9f, "%.2f");
-
-                if(config.caves.type == CaveType::Sponge){
-                    ImGui::SliderFloat("Soglia spugna", &config.caves.spongeThreshold, 0.05f, 0.7f, "%.2f");
-                }else{
-                    ImGui::SliderFloat("Spessore tunnel", &config.caves.wormThreshold, 0.01f, 0.30f, "%.3f");
+                ImGui::Checkbox("Tunnel (vermi)", &config.caves.wormsEnabled);
+                if(config.caves.wormsEnabled){
+                    ImGui::SliderInt("Worm octaves", &config.caves.wormFractal.octaves, 1, 6);
+                    ImGui::SliderFloat("Worm frequency", &config.caves.wormFractal.frequency, 0.001f, 0.08f, "%.3f");
+                    ImGui::SliderFloat("Worm lacunarity", &config.caves.wormFractal.frequencyMultiplier, 1.0f, 3.5f, "%.2f");
+                    ImGui::SliderFloat("Worm persistence", &config.caves.wormFractal.amplitudeMultiplier, 0.001f, 0.7f, "%.2f");
+                    ImGui::SliderFloat("Spessore tunnel", &config.caves.wormThreshold, 0.001f, 0.08f, "%.3f");
+                    ImGui::SliderFloat("Scala verticale tunnel", &config.caves.wormVerticalScale, 0.5f, 3.0f, "%.2f");
                 }
 
                 ImGui::SliderInt("Margine superficie", &config.caves.surfaceMargin, 0, 12);
-            }
+            }            
 
             if(ImGui::Button("Rigenera")){
                 result = Action::Regenerate;

@@ -234,7 +234,7 @@ void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& 
                 case sf::Keyboard::Scancode::F5:
                     renderer.ToggleOcclusionCulling();
                     break;
-                case sf::Keyboard::Scancode::F7:
+                case sf::Keyboard::Scancode::F6:
                     renderer.ToggleCullingFreeze();
                     break;
                 default:
@@ -546,13 +546,6 @@ int main(){
         world->ProcessBlockInteractions(*player, target, hotbar->GetSelectedBlockType());
 
         renderer->Draw(*world, player->getCamera(), target, *hotbar, deltaTime);
-        static bool wasOcclusionCheckPressed = false;
-        bool isOcclusionCheckPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F6);
-        if(isOcclusionCheckPressed && !wasOcclusionCheckPressed){
-            int differences = renderer->CountOcclusionDifferences(*world, player->getCamera(), target, *hotbar);
-            std::cout << "Test occlusione: " << differences << " pixel diversi" << std::endl;
-        }
-        wasOcclusionCheckPressed = isOcclusionCheckPressed;
         hud->Update(player->getCamera().GetYaw(), deltaTime);
 
         ImGui_ImplOpenGL3_NewFrame();
