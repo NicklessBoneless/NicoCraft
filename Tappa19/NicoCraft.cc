@@ -93,6 +93,32 @@ void HandleResize(const sf::Event::Resized& resized, fcg::Camera& camera, fcg::R
 // AUX Functions  //
 ////////////////////
 
+//Durante la generazione il thread principale e' occupato: se la coda eventi non viene
+//svuotata il window manager considera la finestra bloccata ("non risponde").
+//Un'eventuale chiusura richiesta nel frattempo viene solo ricordata, e gestita a fine generazione
+void KeepWindowResponsive(sf::RenderWindow& window, bool& closeRequested){
+    while(const std::optional event = window.pollEvent()){
+        if(event->is<sf::Event::Closed>()){
+            closeRequested = true;
+        }
+    }
+}
+
+//Stampa l'avanzamento in percentuale sulla stessa riga del terminale, solo quando cambia
+void PrintProgress(float progress){
+    static int lastPercent = -1;
+    int percent = (int) (progress * 100.0f);
+    if(percent == lastPercent || (percent & 5) != 0) return;
+
+    lastPercent = percent;
+    std::cout << "\rGenerazione: " << percent << "%" << std::flush;
+
+    if(percent >= 100){
+        std::cout << std::endl << std::flush;
+        lastPercent = -1; //Pronta per la prossima generazione
+    }
+}
+
 //Salva su file la terna corrente di preferenze: chiamata ad ogni modifica di FOV o
 //risoluzione, sia dal menu principale che dalla pausa
 void PersistSettings(float fov, int width, int height){
@@ -390,7 +416,20 @@ int main(){
                     //Inizializza Player, Renderer, Hotbar, World (chunk + mesh), PauseMenu.
                     fcg::DrawLoadingScreen(window, res);
 
-                    world = std::make_unique<fcg::World>();
+                    bool closeRequested = false;
+                    auto onProgress = [&window, &closeRequested](float progress){
+                        KeepWindowResponsive(window, closeRequested);
+                        PrintProgress(progress);
+                    };
+
+                    world = std::make_unique<fcg::World>(fcg::TerrainConfig{}, onProgress);
+
+                    if(closeRequested){
+                        programRunning = false;
+                        break; //Esce dallo switch, il ciclo principale termina subito dopo
+                    }
+                    glViewport(0, 0, window.getSize().x, window.getSize().y); //Eventuali Resized sono stati consumati dalla coda
+                                        
                     player = std::make_unique<fcg::Player>(world->FindSpawnPosition());
                     player->getCamera().SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
                     player->getCamera().SetFov(mainMenu->GetFov());
@@ -469,11 +508,21 @@ int main(){
             window.display();
 
             if(generationAction == fcg::GenerationPanel::Action::Regenerate){
-                double milliseconds = world->Regenerate(generationPanel->GetConfig());
+                bool closeRequested = false;
+                auto onProgress = [&window, &closeRequested](float progress){
+                    KeepWindowResponsive(window, closeRequested);
+                    PrintProgress(progress);
+                };
+
+                double milliseconds = world->Regenerate(generationPanel->GetConfig(), onProgress);
                 generationPanel->SetLastGenerationMs(milliseconds);
                 player->RespawnAt(world->FindSpawnPosition());
-                target = fcg::RaycastHit{};     
-            }       
+                target = fcg::RaycastHit{};
+
+                if(closeRequested){
+                    programRunning = false;
+                }
+            }   
 
             switch(action){
                 case fcg::PauseMenu::MenuAction::Resume:

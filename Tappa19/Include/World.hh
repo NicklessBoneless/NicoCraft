@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <memory>
 #include <chrono>
+#include <functional>
 
 #include "Blocks.hh"
 #include "Chunk.hh"
@@ -16,6 +17,8 @@
 #include "TerrainGenerator.hh"
 #include "PerlinNoise.hh"
 #include "TerrainConfig.hh"
+
+using ProgressCallback = std::function<void(float)>; 
 
 namespace fcg
 {
@@ -51,7 +54,7 @@ namespace fcg
         TerrainGenerator terrainGenerator;
 
     public:
-        explicit World(const TerrainConfig& config = TerrainConfig{}) :
+        explicit World(const TerrainConfig& config = TerrainConfig{}, const ProgressCallback& inProgress = nullptr) :
             currentTerrainConfig(config),
             terrainGenerator(
                 config.seed, 
@@ -61,8 +64,8 @@ namespace fcg
                 config.heightAmplitude)
             {
             chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
-            GenerateAllChunks();
-            BuildAllMeshes();
+            GenerateAllChunks(inProgress);
+            BuildAllMeshes(inProgress);
         }
 
         const TerrainConfig& GetConfig() const{
@@ -74,19 +77,22 @@ namespace fcg
             Ritorna i millisecondi di sola generazione dei blocchi (il meshing e' escluso,
             cosi' la misura confronta gli algoritmi e non il costo della mesh)
         */
-        double Regenerate(const TerrainConfig& config){
+        double Regenerate(const TerrainConfig& config, const ProgressCallback& inProgress = nullptr){
             auto start = std::chrono::steady_clock::now();
 
             currentTerrainConfig = config;
             terrainGenerator = TerrainGenerator(config.seed, CreateNoise(config.noiseType, config.seed), config.fractal,config.caves,config.heightAmplitude);
 
+            int generatedChunks = 0;
             for(ChunkInstance& instance : chunks){
                 instance.chunk = Blocks::Chunk();
                 terrainGenerator.GenerateChunk(instance.chunk, instance.chunkX, instance.chunkZ);
+                generatedChunks++;
+                ReportProgress(inProgress, 0.5f* (float) generatedChunks / (float) chunks.size());
             }
 
             auto end = std::chrono::steady_clock::now();
-            BuildAllMeshes(); //Dopo aver generato tutti i chunk: il meshing legge i vicini
+            BuildAllMeshes(inProgress); //Dopo aver generato tutti i chunk: il meshing legge i vicini
 
             return std::chrono::duration<double, std::milli>(end - start).count();
         }
@@ -325,28 +331,34 @@ namespace fcg
             return false;
         }
 
-        //Generiamo tutti i chunk
-        void GenerateAllChunks(){
+                static void ReportProgress(const ProgressCallback& onProgress, float progress){
+            if(onProgress) onProgress(progress);
+        }
+
+        //La generazione dei blocchi occupa la prima meta' della barra, il meshing la seconda
+        void GenerateAllChunks(const ProgressCallback& onProgress){
+            float totalChunks = (float) (WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
             for(int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++){
                 for(int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++){
-                    //Aggiungo
-                    chunks.emplace_back(); //Chiama il costruttore di Chunk!
-                    ChunkInstance& instance = chunks.back(); //Prendo il puntatore all'ultimo
-                    //Assegno le coordinate chunk
+                    chunks.emplace_back();
+                    ChunkInstance& instance = chunks.back();
                     instance.chunkX = chunkX;
                     instance.chunkZ = chunkZ;
-                    //Riempo il chunk
                     terrainGenerator.GenerateChunk(instance.chunk, chunkX, chunkZ);
+                    ReportProgress(onProgress, 0.5f * (float) chunks.size() / totalChunks);
                 }
             }
         }
 
-        void BuildAllMeshes(){
+        void BuildAllMeshes(const ProgressCallback& onProgress = nullptr){
+            int builtChunks = 0;
             for(ChunkInstance& instance : chunks){
                 RebuildChunkMesh(instance);
+                builtChunks++;
+                ReportProgress(onProgress, 0.5f + 0.5f * (float) builtChunks / (float) chunks.size());
             }
         }
-
+        
         //Indice nel vector dei chunk, -1 se fuori dal mondo.
         //Valido perche' GenerateAllChunks inserisce i chunk in ordine (chunkZ esterno, chunkX interno)
         static int ChunkIndex(int chunkX, int chunkZ){
