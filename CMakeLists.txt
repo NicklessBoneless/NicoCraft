@@ -74,33 +74,6 @@ endif()
 ###############################
 
 # nome eseguibile, nome file
-add_executable(Tappa01 Tappa01/NicoCraft.cc) 
-target_link_libraries(Tappa01 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa02 Tappa02/NicoCraft.cc)
-target_link_libraries(Tappa02 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa03 Tappa03/NicoCraft.cc) 
-target_link_libraries(Tappa03 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa04 Tappa04/NicoCraft.cc) 
-target_link_libraries(Tappa04 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa05 Tappa05/NicoCraft.cc) 
-target_link_libraries(Tappa05 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa06 Tappa06/NicoCraft.cc) 
-target_link_libraries(Tappa06 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa07 Tappa07/NicoCraft.cc) 
-target_link_libraries(Tappa07 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa08 Tappa08/NicoCraft.cc) 
-target_link_libraries(Tappa08 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
-add_executable(Tappa09 Tappa09/NicoCraft.cc) 
-target_link_libraries(Tappa09 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
-
 add_executable(Tappa10 Tappa10/NicoCraft.cc) 
 target_link_libraries(Tappa10 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only)
 
@@ -139,5 +112,10 @@ add_executable(Tappa18 Tappa18/NicoCraft.cc ${imgui_SOURCE_DIR}/backends/imgui_i
 target_link_libraries(Tappa18 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only ImGui-SFML::ImGui-SFML)
 target_include_directories(Tappa18 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_compile_definitions(Tappa18 PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD2)
+
+add_executable(Tappa19 Tappa19/NicoCraft.cc ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
+target_link_libraries(Tappa19 PRIVATE common SFML::Window SFML::Graphics OpenGL::GL glm::glm-header-only ImGui-SFML::ImGui-SFML)
+target_include_directories(Tappa19 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_compile_definitions(Tappa19 PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD2)
 
 
