@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <iostream>
 #include <SFML/Graphics/Image.hpp>
-#include <glm/vec3.hpp>
 
 namespace Blocks{
     enum class BlockType : uint8_t{
@@ -46,14 +45,6 @@ namespace Blocks{
         LOG_SIDERIGHTROT,
         LEAVES,
         GLASS,
-    };
-
-    struct Block{
-        BlockType type = BlockType::AIR;
-
-        bool isSolid() const {
-            return type != BlockType::AIR;
-        }
     };
 
     inline bool isBlockTransparent(BlockType type){
@@ -144,6 +135,8 @@ namespace Blocks{
 
     public:
         TextureArray() = default;
+        TextureArray(const TextureArray&) = delete;
+        TextureArray& operator=(const TextureArray&) = delete;
         ~TextureArray() { Clean(); }
 
         //Carica una lista di percorsi immagini e le aggiunge al Texture Array

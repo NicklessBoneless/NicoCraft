@@ -28,8 +28,6 @@ namespace fcg
         const float mouseSensitivity = 0.15f;
 
     public:
-        //aspectRatio di default 1.0f: chi crea la Camera deve chiamare SetWindowSize()
-        //appena conosce le dimensioni reali della finestra (vedi main() e Handle(Resized))
         Camera(){
             ViewProjection();
         }
@@ -39,6 +37,7 @@ namespace fcg
         }
 
         void SetWindowSize(int width, int height){
+            if(width <= 0 || height <= 0) return;
             aspectRatio = ((float) width) / (float) height;
             ViewProjection();
         }
@@ -86,7 +85,6 @@ namespace fcg
         }
 
         //Direzione di movimento orizzontale (piano XZ) da WASD, in base allo yaw corrente.
-        //Usa SOLO le prime 4 celle del binding array (W,A,S,D)
         glm::vec3 computeHorizontalMovement(const PlayerInput& input, bool isNoClip) const{
             float yawRad = glm::radians(yawDeg);
             glm::vec3 forward = {glm::sin(yawRad), 0.0f, -glm::cos(yawRad)};
@@ -95,11 +93,10 @@ namespace fcg
             glm::vec3 moveDirection{0.0f};
 
             float x, y, z;
-            x = y = z = 1.0f;
-
-            z = input.moveForward - input.moveBackward;
+            
             x = input.moveRight - input.moveLeft;
-            y = isNoClip ? input.flyUp - input.flyDown : 0.0f;
+            y = isNoClip ? (input.flyUp - input.flyDown) : 0.0f;
+            z = input.moveForward - input.moveBackward;
 
             moveDirection += (forward * z) + (right * x) + (up * y);
 
@@ -133,10 +130,6 @@ namespace fcg
         void SetFov(float fov){
             fovDegrees = fov;
             ViewProjection();
-        }
-
-        float GetFov() const{
-            return fovDegrees;
         }
 
         void ViewProjection(){

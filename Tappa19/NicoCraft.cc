@@ -7,8 +7,6 @@
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/Graphics/View.hpp>
-#include <SFML/Graphics/Image.hpp>
 #include <memory>
 #include <vector>
 
@@ -27,7 +25,6 @@
 const std::string dirShaders = "../Tappa19/Shaders/";
 const std::string res = "../Resources/";
 const std::string winTitle = "NicoCraft - Tappa19";
-const int TEXTUREPIXELSIZE = 32;
 
 //File in cui vengono salvate le preferenze (risoluzione, FOV): vive nella cartella da cui
 //viene lanciato l'eseguibile (tipicamente build/), non va quindi consegnato ne' versionato
@@ -108,7 +105,7 @@ void KeepWindowResponsive(sf::RenderWindow& window, bool& closeRequested){
 void PrintProgress(float progress){
     static int lastPercent = -1;
     int percent = (int) (progress * 100.0f);
-    if(percent == lastPercent || (percent & 5) != 0) return;
+    if(percent == lastPercent || (percent % 5) != 0) return;
 
     lastPercent = percent;
     std::cout << "\rGenerazione: " << percent << "%" << std::flush;
@@ -166,11 +163,9 @@ void HandleMenuEvents(sf::RenderWindow& window, fcg::MainMenu& mainMenu, bool& p
 }
 
 /*
-    Eventi durante lo stato Paused: Esc riprende il gioco, click sui tasti dell'overlay.
-    FOV viene applicato subito alla Camera per un'anteprima live, la risoluzione no (si applichera' al prossimo avvio in "Settings.hh")
-*/
-//Eventi durante lo stato Paused: chiusura finestra, resize, Esc per riprendere.
-//I click dell'overlay li gestisce ImGui: l'azione si legge da PauseMenu::Draw()
+    Controlla mentre il gioco in pausa, dalla coda degli eventi del tipo:
+    Chiusura finestra, Resize finestra, Ripresa del gioco
+*/ 
 void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg::Renderer& renderer,fcg::Camera& camera, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         ImGui::SFML::ProcessEvent(window, *event);
@@ -181,7 +176,6 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
         }
 
         if(const auto* resized = event->getIf<sf::Event::Resized>()){
-            glViewport(0, 0, resized->size.x, resized->size.y);
             HandleResize(*resized,camera,renderer,pauseMenu);
             return;
         }
@@ -318,34 +312,6 @@ PlayerInput CapturePlayerInput(){
     return input;
 }
 
-void TestSectionConnectivity(){
-    using namespace Blocks;
-    Chunk chunk; //Tutta aria
-
-    uint16_t airMask = ComputeSectionConnectivity(chunk, 0);
-    std::cout << "Aria piena (attese 15 coppie): " << (airMask == 0x7FFF ? "OK" : "ERRORE") << std::endl;
-
-    for(int x = 0; x < CHUNK_SIZE_X; x++){
-        for(int y = 0; y < SECTION_SIZE; y++){
-            for(int z = 0; z < CHUNK_SIZE_Z; z++) chunk.Set(x, y, z, BlockType::STONE);
-        }
-    }
-    uint16_t solidMask = ComputeSectionConnectivity(chunk, 0);
-    std::cout << "Roccia piena (attesa 0): " << (solidMask == 0 ? "OK" : "ERRORE") << std::endl;
-
-    //Tunnel lungo X: tocca solo Left e Right
-    for(int x = 0; x < CHUNK_SIZE_X; x++) chunk.Set(x, 8, 8, BlockType::AIR);
-    uint16_t tunnelMask = ComputeSectionConnectivity(chunk, 0);
-    uint16_t expectedTunnel = (uint16_t) (1 << FacePairIndex((int) BlockFace::Left, (int) BlockFace::Right));
-    std::cout << "Tunnel Left-Right: " << (tunnelMask == expectedTunnel ? "OK" : "ERRORE") << std::endl;
-
-    //Caverna chiusa: nessuna faccia toccata
-    for(int x = 0; x < CHUNK_SIZE_X; x++) chunk.Set(x, 8, 8, BlockType::STONE);
-    chunk.Set(8, 8, 8, BlockType::AIR);
-    uint16_t sealedMask = ComputeSectionConnectivity(chunk, 0);
-    std::cout << "Caverna chiusa (attesa 0): " << (sealedMask == 0 ? "OK" : "ERRORE") << std::endl;
-}
-
 //////////
 // Main //
 //////////
@@ -353,7 +319,6 @@ void TestSectionConnectivity(){
 int main(){
     //// Startup ////
     fcg::Settings startupSettings = fcg::LoadSettings(settingsPath);
-    TestSectionConnectivity();
 
     Setup setup(startupSettings.width, startupSettings.height);
     sf::RenderWindow& window = setup.window;
@@ -443,9 +408,7 @@ int main(){
                             {"sky"      , dirShaders + "shader_sky.vert"      , dirShaders + "shader_sky.frag"},
                             {"stars"    , dirShaders + "shader_stars.vert"    , dirShaders + "shader_stars.frag"}
                         },
-                        res,
-                        TEXTUREPIXELSIZE,
-                        dirShaders);
+                        res);
 
                     renderer->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
 
@@ -457,7 +420,6 @@ int main(){
                     generationPanel = std::make_unique<fcg::GenerationPanel>(world->GetConfig());
                     RebuildFontAtlas();
 
-                    glEnable(GL_PROGRAM_POINT_SIZE); //Necessario per gl_PointSize nel vertex shader delle stelle
                     glEnable(GL_CULL_FACE);
                     glCullFace(GL_BACK);
                     glEnable(GL_DEPTH_TEST);
@@ -538,6 +500,7 @@ int main(){
                     hud.reset();
                     pauseMenu.reset();
                     generationPanel.reset();
+                    player.reset();
 
                     window.setMouseCursorVisible(true);
                     window.setMouseCursorGrabbed(false);
@@ -574,6 +537,7 @@ int main(){
 
         if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
             pauseMenu->Reset();
+            player->StopSprint();
             window.setMouseCursorVisible(true);
             window.setMouseCursorGrabbed(false);
             continue;

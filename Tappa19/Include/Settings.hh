@@ -14,7 +14,7 @@ namespace fcg{
         float fov = 90.0f;
     };
 
-    //Se il file non esiste ancora, allora salva i valori di default
+    //Se il file non esiste ancora, carica valori di default
     inline Settings LoadSettings(const std::string& path){
         Settings settings;
 
@@ -29,12 +29,13 @@ namespace fcg{
             std::string key = line.substr(0, separator);
             std::string value = line.substr(separator + 1);
 
-            if(key == "width") 
-                settings.width = std::stoi(value);
-            else if(key == "height") 
-                settings.height = std::stoi(value);
-            else if(key == "fov") 
-                settings.fov = std::stof(value);
+            try{
+                if(key == "width") settings.width = std::stoi(value);
+                else if(key == "height") settings.height = std::stoi(value);
+                else if(key == "fov") settings.fov = std::stof(value);
+            }catch(const std::exception&){
+                continue;
+            }
         }
 
         return settings;

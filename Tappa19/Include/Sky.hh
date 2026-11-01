@@ -26,8 +26,6 @@ namespace fcg{
 
         const glm::vec3 daySky = {0.53f, 0.81f, 0.92f};
         const glm::vec3 nightSky = {0.01f, 0.015f, 0.04f};
-        const float skyColorMultiplier = 0.9f;
-        const float lightMultiplier = 1.2f;
        
         //// Sole e Luna ////
         static constexpr float skyRadius = 90.0f;  //Distanza di Sole/Luna dalla camera
@@ -38,7 +36,7 @@ namespace fcg{
         sf::Texture sunTexture, moonTexture;
 
         //// Stelle ////
-        static constexpr float starRadius = 95.0f; //Deve restare sotto il FARPLANE (100.0f) della Camera
+        static constexpr float starRadius = 95.0f; //Deve restare sotto il FARPLANE della Camera
         static constexpr float starPointSize = 0.50f;
         static constexpr float starThreshold = 0.58f;
         GLuint starsVao = 0, starsVbo = 0, starsEbo = 0;
@@ -115,11 +113,9 @@ namespace fcg{
                     daylight = glm::mix(maxDaylight, minDaylight, fastT);
                     break;
                 }
-                case 4:{ //PRIMA NOTTE: gia' al minimo, resta costante
-                    daylight = minDaylight;
-                    break;
-                }
-                case 5:{ //NOTTE FONDA: costante al minimo
+                case 4:
+                case 5:
+                { //PRIMA NOTTE: gia' al minimo, resta costante
                     daylight = minDaylight;
                     break;
                 }
@@ -380,10 +376,12 @@ namespace fcg{
             glDrawElements(GL_TRIANGLES, starIndexCount, GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
 
+            /*
             GLenum err = glGetError();
             if(err != GL_NO_ERROR){
                 std::cerr << "GL error dopo disegno stelle: " << err << std::endl;
             }
+            */
         }
 
         void Cleanup(){

@@ -62,7 +62,7 @@ namespace fcg
         return glm::mat4(
                          c, s, 0, 0,
                          -s, c, 0, 0,
-                         s, 0, 1, 0,
+                         0, 0, 1, 0,
                          0, 0, 0, 1
                          );
     }

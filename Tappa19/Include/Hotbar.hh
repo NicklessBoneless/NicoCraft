@@ -12,14 +12,8 @@
 #include "Blocks.hh"
 
 namespace fcg{
-
-    //Quale BlockType occupa lo slot: deciso una volta all'avvio, non cambia mai
-    struct HotbarSlotDefinition{
-        Blocks::BlockType blockType;
-    };
-
     struct HotbarSlot{
-        HotbarSlotDefinition definition;
+        Blocks::BlockType block;
     };
 
     /*
@@ -49,7 +43,7 @@ namespace fcg{
         }
 
         Blocks::BlockType GetBlockTypeAt(int index) const{
-            return slots[index].definition.blockType;
+            return slots[index].block;
         }
 
         int GetSelectedIndex() const{
@@ -57,7 +51,7 @@ namespace fcg{
         }
 
         Blocks::BlockType GetSelectedBlockType() const{
-            return slots[selectedIndex].definition.blockType;
+            return slots[selectedIndex].block;
         }
 
         //Seleziona lo slot 'index' (0-based). Richiesta ignorata se fuori range

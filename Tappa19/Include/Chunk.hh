@@ -2,10 +2,7 @@
 #define CHUNK_HH
 
 #include "Blocks.hh"
-#include "Matrices.hh"
-#include "Hotshaders.hh"
 #include <functional>
-#include <algorithm>
 #include <cstdint>
 #include <array>
 
@@ -81,9 +78,9 @@ namespace Blocks
     //Front, Back, Left, Right, Top, Bottom
     constexpr float FACE_BRIGHTNESS[6] = { 0.75f, 0.75f, 0.75f, 0.75f, 1.f, 0.55f };
 
-    using NeighborSolidFn = std::function<bool(int, int, int)>;
+    using NeighborTransparentFn = std::function<bool(int, int, int)>;
 
-    inline MeshData BuildChunkMesh(const Chunk& chunk, const NeighborSolidFn& isNeighborTransparent, int sectionHeightY){
+    inline MeshData BuildChunkMesh(const Chunk& chunk, const NeighborTransparentFn& isNeighborTransparent, int sectionHeightY){
         MeshData mesh;
         int startingHeightY = sectionHeightY * SECTION_SIZE;
         int RoofHeightY = startingHeightY + SECTION_SIZE;
@@ -272,9 +269,43 @@ namespace Blocks
         GLuint vao = 0, vbo = 0, ebo = 0;
         GLsizei indexCount = 0;
         GLsizei vertexCount = 0;
-        float minY = 0.0f,maxY = 0.0f;
 
     public:
+        ChunkMesh() = default;
+        //Vogliamo che la copiatura elimina e non copi niente.
+        ChunkMesh(const ChunkMesh&) = delete;
+        ChunkMesh& operator=(const ChunkMesh&) = delete;
+
+        //Lo spostamento trasferisce la proprieta' degli handle GL: l'originale resta vuoto
+        ChunkMesh(ChunkMesh&& other) noexcept :
+            vao(other.vao), vbo(other.vbo), ebo(other.ebo),
+            indexCount(other.indexCount), vertexCount(other.vertexCount){
+            other.vao = 0;
+            other.vbo = 0;
+            other.ebo = 0;
+            other.indexCount = 0;
+            other.vertexCount = 0;
+        }
+
+        ChunkMesh& operator=(ChunkMesh&& other) noexcept{
+            //Se fa un assegnazione elimina prima quello vecchio
+            if(this != &other){
+                Clean(); //Libera le risorse che questo oggetto possedeva
+
+                vao = other.vao;
+                vbo = other.vbo;
+                ebo = other.ebo;
+                indexCount = other.indexCount;
+                vertexCount = other.vertexCount;
+
+                other.vao = 0;
+                other.vbo = 0;
+                other.ebo = 0;
+                other.indexCount = 0;
+                other.vertexCount = 0;
+            }
+            return *this;
+        }
         ~ChunkMesh() { Clean(); }
 
         void Upload(const MeshData& mesh){
@@ -283,13 +314,7 @@ namespace Blocks
             if(indexCount == 0) return;
 
             vertexCount = static_cast<GLsizei>(mesh.vertices.size());
-            minY = mesh.vertices[0].y;
-            maxY = minY;
-            for(const Vertex& vertex : mesh.vertices){
-                minY = std::min(minY, vertex.y);
-                maxY = std::max(maxY, vertex.y);
-            }
-
+            
             glGenVertexArrays(1, &vao);
             glBindVertexArray(vao);
 
@@ -332,22 +357,12 @@ namespace Blocks
             return indexCount / 3;
         }
 
-        float GetMinY() const{
-            return minY;
-        }
-
-        float GetMaxY() const{
-            return maxY;
-        }
-
         void Clean(){
             if(vao){ glDeleteVertexArrays(1, &vao); vao = 0; }
             if(vbo){ glDeleteBuffers(1, &vbo); vbo = 0; }
             if(ebo){ glDeleteBuffers(1, &ebo); ebo = 0; }
             indexCount = 0;
             vertexCount = 0;
-            minY = 0.0f;
-            maxY = 0.0f;
         }
     };
 }

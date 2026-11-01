@@ -1,7 +1,6 @@
 #ifndef PLAYER_HH
 #define PLAYER_HH
 
-#include <iostream>
 #include "Camera.hh"
 #include "PlayerPhysics.hh"
 #include "PlayerInput.hh"
@@ -102,7 +101,7 @@ namespace fcg
         }
 
     private:
-        //Metodo helper che isola il polling di SFML e l'aggiornamento fisico
+        //Gestisce tutte le parti del movimento del giocatore, camera nel mondo, e l'input
         void NormalMove(float deltaTime, fcg::IWorld& world, const PlayerInput& input){
             if(input.jump) 
                 physics.Jump(world);

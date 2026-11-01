@@ -3,6 +3,7 @@
 
 #include <glm/vec3.hpp>
 #include <cmath>
+#include <algorithm>
 #include "IWorld.hh"
 
 namespace fcg{
@@ -19,7 +20,6 @@ namespace fcg{
         glm::vec3 position; //Piedi del player, coordinate mondo
         glm::vec3 velocity = {0.0f, 0.0f, 0.0f};
         bool onGround = false;
-        bool isCeiling = false;
 
         static constexpr float gravity = 25.0f;
         static constexpr float terminalVelocity = 50.0f;
@@ -47,7 +47,7 @@ namespace fcg{
         void Jump(IWorld& world){
             if(!onGround) return;
             float headroom = GetHeadroom(world);
-            //Se lo spazio sopra la testa è inferiore a 0.25 blocchi (es. tunnel 2x1)
+            //Se lo spazio sopra la testa è inferiore a 0.2 blocchi (es. tunnel 2x1)
             if(headroom < 0.2f){
                 //Impostiamo una velocità iniziale ridotta proporzionale allo spazio rimasto,
                 //sufficiente per dare una sensazione di molla/spinta dolce senza impattare violentemente il soffitto.
@@ -101,15 +101,11 @@ namespace fcg{
             if(CollidesAt(position, world)) position.x -= delta.x;
 
             //Asse Y
-            isCeiling = false;
             if(delta.y > 0.0f){
                 position.y += delta.y;
-                if (CollidesAt(position, world)) {
-                    // Invece di fare il semplice rollback e azzerare d'impatto la velocità,
-                    // riallineiamo la posizione dei piedi al limite massimo consentito dal soffitto.
+                if(CollidesAt(position, world)) {
                     position.y -= delta.y; // Annulla lo spostamento
                     velocity.y = 0.0f;     // Azzera la velocità verticale
-                    isCeiling = true;
                 }
             }else if(delta.y < 0.0f) {
                 position.y += delta.y;

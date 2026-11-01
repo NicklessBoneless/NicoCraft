@@ -53,8 +53,7 @@ namespace fcg{
         static constexpr float fogStartRatio = 0.85f;
         static constexpr float fogEndRatio = 0.95f;
     public:
-        Renderer(const std::vector<ShaderFiles>& shaderSets,
-                const std::string& res, int texturePixelSize, const std::string& shaderDir) : 
+        Renderer(const std::vector<ShaderFiles>& shaderSets, const std::string& res) : 
             worldShader(FindShaderFiles(shaderSets, "world").vertexFile,FindShaderFiles(shaderSets, "world").fragmentFile),
             crosshair(FindShaderFiles(shaderSets, "crosshair").vertexFile,FindShaderFiles(shaderSets, "crosshair").fragmentFile),
             outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile),
@@ -63,38 +62,6 @@ namespace fcg{
         {
             InitializeTextures(res);
             Locations();
-        }
-
-        //Debug (F6): disegna il frame con e senza occlusione e conta i pixel diversi
-        int CountOcclusionDifferences(const World& world, Camera& camera, const RaycastHit& target, const Hotbar& hotbar){
-            GLint viewport[4];
-            glGetIntegerv(GL_VIEWPORT, viewport);
-            size_t bufferSize = (size_t) viewport[2] * viewport[3] * 4;
-            std::vector<unsigned char> withOcclusion(bufferSize);
-            std::vector<unsigned char> withoutOcclusion(bufferSize);
-
-            bool previousOcclusion = occlusionCullingEnabled;
-            bool previousFreeze = cullingFrozen;
-            cullingFrozen = false;
-
-            occlusionCullingEnabled = true;
-            Draw(world, camera, target, hotbar, 0.0f);
-            glReadPixels(viewport[0], viewport[1], viewport[2], viewport[3], GL_RGBA, GL_UNSIGNED_BYTE, withOcclusion.data());
-
-            occlusionCullingEnabled = false;
-            Draw(world, camera, target, hotbar, 0.0f);
-            glReadPixels(viewport[0], viewport[1], viewport[2], viewport[3], GL_RGBA, GL_UNSIGNED_BYTE, withoutOcclusion.data());
-
-            occlusionCullingEnabled = previousOcclusion;
-            cullingFrozen = previousFreeze;
-
-            int differences = 0;
-            for(size_t i = 0; i < bufferSize; i += 4){
-                if(withOcclusion[i] != withoutOcclusion[i] || withOcclusion[i + 1] != withoutOcclusion[i + 1] || withOcclusion[i + 2] != withoutOcclusion[i + 2]){
-                    differences++;
-                }
-            }
-            return differences;
         }
 
         //Disegna un frame completo (LA SCENA): 
@@ -196,14 +163,6 @@ namespace fcg{
 
         bool IsOcclusionCullingEnabled() const{
             return occlusionCullingEnabled;
-        }
-
-        int GetWindowWidth() const{
-           return windowWidth;
-        }
-
-        int GetWindowHeight() const{
-            return windowHeight;
         }
 
     private:

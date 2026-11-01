@@ -268,71 +268,16 @@ namespace fcg
         }
 
     private:
-        //Riempie un chunk con il terreno
-        static void fillExistingChunks(Blocks::Chunk& chunk){
-            const int SURFACE = Blocks::CHUNK_SIZE_Y * 0.5;
-            for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
-                for(int y = 0; y < SURFACE; y++){
-                    for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
-                        if(y == SURFACE - 1){
-                            chunk.Set(x, y, z, Blocks::BlockType::GRASS);
-                        }
-                        else if(y < SURFACE * 0.90) chunk.Set(x, y, z, Blocks::BlockType::STONE);
-                        else chunk.Set(x, y, z, Blocks::BlockType::DIRT);
-                    }
-                }
-            }
+        //Notifica l'avanzamento (0..1) solo se e' stata fornita una callback
+        static void ReportProgress(const ProgressCallback& callback, float progress){
+            if(callback) callback(progress);
         }
 
-        //Genera gli alberi
-        void GenerateTrees(Blocks::Chunk& chunk){
-            const int SURFACE = Blocks::CHUNK_SIZE_Y * 0.5;
-            const int MIN_TREE_DISTANCE = 3; //Distanza minima (in blocchi) tra due tronchi
-            const int TREEHEIGHT = 5 + SURFACE;
-            std::vector<std::pair<int,int>> treePositions; //Tronchi gia' piazzati in questo chunk (x,z)
-
-            //x/z partono da 1 e si fermano a CHUNK_SIZE-2: cosi' x-1, x+1, z-1, z+1 restano sempre in bounds
-            for(int x = 1; x < Blocks::CHUNK_SIZE_X - 1; x++){
-                for(int z = 1; z < Blocks::CHUNK_SIZE_Z - 1; z++){
-                    if((rand() % 100 + 1) < 99.99) continue; //Stessa probabilita' di prima
-
-                    if(IsTooCloseToOtherTree(x, z, treePositions, MIN_TREE_DISTANCE)) continue;
-
-                    treePositions.push_back({x, z});
-                    
-                    for(int i = SURFACE; i < TREEHEIGHT ; i++){
-                        chunk.Set(x, i, z, Blocks::BlockType::LOGWOOD);
-                    }
-
-                    for(int i = SURFACE + 3; i < TREEHEIGHT + 1; i++){
-                        if(i == SURFACE) continue;
-                        if(i == TREEHEIGHT) chunk.Set(x, i, z,Blocks::BlockType::LEAVES);
-                        chunk.Set(x + 1, i, z + 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x - 1, i, z - 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x - 1, i, z + 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x + 1, i, z - 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x + 1, i, z,     Blocks::BlockType::LEAVES);
-                        chunk.Set(x,     i, z + 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x,     i, z - 1, Blocks::BlockType::LEAVES);
-                        chunk.Set(x - 1, i, z,     Blocks::BlockType::LEAVES);
-                    }
-                }
-            }
-        }
-
-        //Controlla se (x,z) sono entro minDistance da un tronco già piazzato
-        static bool IsTooCloseToOtherTree(int x, int z, const std::vector<std::pair<int,int>>& treePositions, int minDistance){
-            int minDistanceSquared = minDistance * minDistance;
-            for(const auto& pos : treePositions){
-                int dx = x - pos.first;
-                int dz = z - pos.second;
-                if(dx * dx + dz * dz < minDistanceSquared) return true;
-            }
-            return false;
-        }
-
-                static void ReportProgress(const ProgressCallback& onProgress, float progress){
-            if(onProgress) onProgress(progress);
+        //Indice nel vector dei chunk, -1 se fuori dal mondo.
+        //Valido perche' GenerateAllChunks inserisce i chunk in ordine (chunkZ esterno, chunkX interno)
+        static int ChunkIndex(int chunkX, int chunkZ){
+            if(chunkX < 0 || chunkX >= WORLDSIZECHUNKSX || chunkZ < 0 || chunkZ >= WORLDSIZECHUNKSZ) return -1;
+            return chunkZ * WORLDSIZECHUNKSX + chunkX;
         }
 
         //La generazione dei blocchi occupa la prima meta' della barra, il meshing la seconda
@@ -359,13 +304,6 @@ namespace fcg
             }
         }
         
-        //Indice nel vector dei chunk, -1 se fuori dal mondo.
-        //Valido perche' GenerateAllChunks inserisce i chunk in ordine (chunkZ esterno, chunkX interno)
-        static int ChunkIndex(int chunkX, int chunkZ){
-            if(chunkX < 0 || chunkX >= WORLDSIZECHUNKSX || chunkZ < 0 || chunkZ >= WORLDSIZECHUNKSZ) return -1;
-            return chunkZ * WORLDSIZECHUNKSX + chunkX;
-        }
-
         //Cerca il chunk alle coordinate di griglia indicate, nullptr se non esiste
         Blocks::Chunk* GetChunkAt(int chunkX, int chunkZ){
             int chunkIndex = ChunkIndex(chunkX,chunkZ);
@@ -380,7 +318,7 @@ namespace fcg
             return &chunks[chunkIndex];  
         }
 
-                //Ricostruisce mesh e connettivita' di UNA sezione
+        //Ricostruisce mesh e connettività di UNA sezione
         void RebuildSection(ChunkInstance& instance, int sectionHeightY){
             auto isTransparentOutside = [this, &instance](int localX, int localY, int localZ){
                 return IsTransparentWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
@@ -464,10 +402,17 @@ namespace fcg
         //lungo la direzione di piazzamento, dedotta da hitFace (la faccia colpita del blocco
         //bersaglio, stesso indice usato in Blocks::FACE_OFFSETS)
         static Blocks::BlockType ChangeRotation(Blocks::BlockType selectedType, int hitFace){
-            const auto& offset = Blocks::FACE_OFFSETS[hitFace];
-            if(offset[0] != 0) return Blocks::BlockType::LOGWOODEASTX;
-            if(offset[2] != 0) return Blocks::BlockType::LOGWOODNORTHZ;
-            return Blocks::BlockType::LOGWOOD; //Faccia Top/Bottom: asse Y, comportamento invariato
+            const int* offset = Blocks::FACE_OFFSETS[hitFace];
+            switch(selectedType){
+                case Blocks::BlockType::LOGWOOD:
+                    if(offset[0] != 0) return Blocks::BlockType::LOGWOODEASTX;
+                    if(offset[2] != 0) return Blocks::BlockType::LOGWOODNORTHZ;
+                    return Blocks::BlockType::LOGWOOD; //Faccia Top/Bottom: asse Y, comportamento invariato
+                break;
+                default:
+                break;
+            }
+            return selectedType;
         }
     };
 }

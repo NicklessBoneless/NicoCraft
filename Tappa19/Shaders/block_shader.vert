@@ -10,7 +10,6 @@ out float outTexture;
 out float outBrightness;
 out float outFogDistance;
 
-uniform mat4 model;
 uniform mat4 viewProjectionModel;
 
 void main(){

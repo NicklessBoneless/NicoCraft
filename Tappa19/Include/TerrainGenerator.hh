@@ -8,6 +8,7 @@
 #include <random>
 #include <utility>
 #include <vector>
+#include <array>
  
 #include "Chunk.hh"
 #include "Noise.hh"
@@ -28,11 +29,17 @@ namespace fcg{
         CavesConfig cavesConfig;
         float heightAmplitude;
 
+        //HeightMap per la generazione del mondo (salviamo le altezze)
+        //Array di size x * z, HeightMap è un alias
+        using HeightMap = std::array<int, Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Z>;
+        
+
         static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 2; //Quota media del terreno
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
         static constexpr int treeClearance = treeTrunkHeight + 2; //Spazio da lasciare sopra il terreno per la chioma
+        
         //Ogni campo ha il suo offset (in blocchi), cosi' sacche e tunnel non si sovrappongono sempre negli stessi punti
         static constexpr float spongeOffsetX = 251.3f;
         static constexpr float spongeOffsetY = 97.1f;
@@ -45,7 +52,7 @@ namespace fcg{
         static constexpr float wormBOffsetX = 131.7f;
         static constexpr float wormBOffsetY = 57.3f;
         static constexpr float wormBOffsetZ = 211.1f;
-
+    
     public:
         TerrainGenerator(uint32_t seed, std::unique_ptr<Noise> noise, FractalParams terrainParameters = FractalParams{},CavesConfig cavesConfig = CavesConfig{},float heightAmplitude = 30.0f) : 
         seed(seed), 
@@ -70,21 +77,38 @@ namespace fcg{
         }     
 
         void GenerateChunk(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
+            HeightMap heightMap = BuildHeightMap(chunkX, chunkZ);
+
             //Riempo il mondo di blocchi
-            FillTerrain(chunk, chunkX, chunkZ);
+            FillTerrain(chunk, heightMap);
 
             //Creo le caverne
-            GenerateCaves(chunk, chunkX, chunkZ); 
+            GenerateCaves(chunk, chunkX, chunkZ, heightMap); 
 
             //Aggiungo gli alberi e altro
-            GenerateTrees(chunk, chunkX, chunkZ);
+            GenerateTrees(chunk, chunkX, chunkZ, heightMap);
         }
 
     private:
-        void FillTerrain(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
+        static int HeightIndex(int x, int z){
+            return x + Blocks::CHUNK_SIZE_X * z;
+        }
+
+        //Una sola valutazione del fBm 2D per colonna: poi tutte le passate leggono da qui
+        HeightMap BuildHeightMap(int chunkX, int chunkZ) const{
+            HeightMap heightMap;
+            for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
+                for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
+                    heightMap[HeightIndex(x, z)] = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
+                }
+            }
+            return heightMap;
+        }
+
+        void FillTerrain(Blocks::Chunk& chunk, const HeightMap& heightMap) const{
             for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
-                    int surface = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
+                    int surface = heightMap[HeightIndex(x,z)];
                     for(int y = 0; y < surface; y++){
                         if(y == surface - 1) chunk.Set(x, y, z, Blocks::BlockType::GRASS);
                         else if(y >= (surface-1)-dirtDepth) chunk.Set(x, y, z, Blocks::BlockType::DIRT);
@@ -98,7 +122,7 @@ namespace fcg{
             Scava le caverne campionando il Perlin 3D in coordinate MONDO (niente cuciture tra chunk).
             Si scava solo tra minY e (superficie - surfaceMargin): la crosta resta sempre intatta
         */
-        void GenerateCaves(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
+        void GenerateCaves(Blocks::Chunk& chunk,int chunkX,int chunkZ,const HeightMap& heightMap) const{
             if(!cavesConfig.enabled) return;
 
             for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
@@ -106,16 +130,14 @@ namespace fcg{
                     int worldX = chunkX * Blocks::CHUNK_SIZE_X + x;
                     int worldZ = chunkZ * Blocks::CHUNK_SIZE_Z + z;
 
-                    int surface = GetSurfaceHeight(worldX, worldZ);
+                    int surface = heightMap[HeightIndex(x,z)];
                     int maxY = std::min(surface - cavesConfig.surfaceMargin, Blocks::CHUNK_SIZE_Y);
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
-                        if(IsCave(worldX, y, worldZ, surface)){
-                            for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < surface ; dy++){
-                                chunk.Set(x, y + dy, z, Blocks::BlockType::AIR);
-                            }
-                            
-                        }
+                        if(!IsCave(worldX, y, worldZ, surface)) continue;
+                        for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < surface ; dy++){
+                            chunk.Set(x, y + dy, z, Blocks::BlockType::AIR);
+                        }   
                     }
                 }
             }
@@ -171,7 +193,7 @@ namespace fcg{
             return std::abs(second) < cavesConfig.wormThreshold;
         } 
 
-        void GenerateTrees(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
+        void GenerateTrees(Blocks::Chunk& chunk, int chunkX, int chunkZ,const HeightMap& heightMap) const{
             /*
                 seed_seq mescola seed e coordinate del chunk: stesso seed e stesso chunk
                 danno sempre gli stessi alberi, indipendentemente dall'ordine di generazione
@@ -189,7 +211,7 @@ namespace fcg{
                     if(rng() % 100 != 0) continue;
                     if(IsTooCloseToOtherTree(x, z, treePositions)) continue;
                     
-                    int groundY = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
+                    int groundY = heightMap[HeightIndex(x, z)];;
                     if(!chunk.IsSolid(x,groundY-1,z)) continue;
                     
                     treePositions.push_back({x, z});
