@@ -115,8 +115,8 @@ namespace fcg{
             ImGui::End();
         }
 
-        //A yaw=0 il forward della Camera e' -Z (vedi Camera::GetForward): -Z=Nord, +X=Est,
-        //+Z=Sud, -X=Ovest. 4 settori da 90 gradi
+        //A yaw=0 il forward della Camera e' -Z quando spawna: 
+        //Z=Nord, -Z=Sud, +X=Ovest, -X=Est. 4 settori da 90 gradi
         static std::string DirectionLabel(float yawDeg){
             float normalized = std::fmod(yawDeg, 360.0f);
             if(normalized < 0.0f) normalized += 360.0f;

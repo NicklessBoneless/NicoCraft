@@ -105,7 +105,7 @@ void KeepWindowResponsive(sf::RenderWindow& window, bool& closeRequested){
 void PrintProgress(float progress){
     static int lastPercent = -1;
     int percent = (int) (progress * 100.0f);
-    if(percent == lastPercent || (percent % 5) != 0) return;
+    if(percent == lastPercent || (percent & 5) == 0) return;
 
     lastPercent = percent;
     std::cout << "\rGenerazione: " << percent << "%" << std::flush;
