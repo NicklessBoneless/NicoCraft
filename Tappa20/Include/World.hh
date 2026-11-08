@@ -1,0 +1,420 @@
+#ifndef WORLD_HH
+#define WORLD_HH
+
+#include <vector>
+#include <array>
+#include <cmath>
+#include <limits>
+#include <cstdlib>
+#include <memory>
+#include <chrono>
+#include <functional>
+
+#include "Blocks.hh"
+#include "Chunk.hh"
+#include "IWorld.hh"
+#include "Player.hh"
+#include "TerrainGenerator.hh"
+#include "PerlinNoise.hh"
+#include "TerrainConfig.hh"
+
+using ProgressCallback = std::function<void(float)>; 
+
+namespace fcg
+{
+    constexpr int WORLDSIZECHUNKSX = 20;
+    constexpr int WORLDSIZECHUNKSZ = 20;
+
+    //Un chunk posizionato nella griglia mondo (coordinate in unita' di chunk, non di blocco)
+    struct ChunkInstance{
+        Blocks::Chunk chunk;
+        std::array<Blocks::ChunkMesh, Blocks::SECTIONS_PER_CHUNK> meshes;
+        std::array<uint16_t, Blocks::SECTIONS_PER_CHUNK> connectivity{};
+        int chunkX;
+        int chunkZ;
+    };
+
+    //Se colpisce un blocco esso ritorna le coordinate MONDO del blocco
+    struct RaycastHit{
+        bool hit = false;
+        int blockX = 0;
+        int blockY = 0;
+        int blockZ = 0;
+        int hitFace = -1; //Faccia colpita del blocco (indice in Blocks::FACE_OFFSETS), -1 se hit=false
+    };
+
+    //Simulazione del mondo voxel: chunk, editing (break/place), raycast, rebuild mesh su modifica.
+    //Non conosce shader, uniform o draw call: quello e' compito di Renderer (vedi Renderer.hh)
+    class World : public fcg::IWorld{
+    public:
+        std::vector<ChunkInstance> chunks;
+    
+    private:
+        TerrainConfig currentTerrainConfig;
+        TerrainGenerator terrainGenerator;
+
+    public:
+        explicit World(const TerrainConfig& config = TerrainConfig{}, const ProgressCallback& inProgress = nullptr) :
+            currentTerrainConfig(config),
+            terrainGenerator(
+                config.seed, 
+                CreateNoise(config.noiseType, config.seed), 
+                config.fractal,
+                config.caves,
+                config.heightAmplitude)
+            {
+            chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
+            GenerateAllChunks(inProgress);
+            BuildAllMeshes(inProgress);
+        }
+
+        const TerrainConfig& GetConfig() const{
+            return currentTerrainConfig;
+        }
+
+        /*
+            Rigenera tutti i chunk con una nuova configurazione, senza ricreare il World.
+            Ritorna i millisecondi di sola generazione dei blocchi (il meshing e' escluso,
+            cosi' la misura confronta gli algoritmi e non il costo della mesh)
+        */
+        double Regenerate(const TerrainConfig& config, const ProgressCallback& inProgress = nullptr){
+            auto start = std::chrono::steady_clock::now();
+
+            currentTerrainConfig = config;
+            terrainGenerator = TerrainGenerator(config.seed, CreateNoise(config.noiseType, config.seed), config.fractal,config.caves,config.heightAmplitude);
+
+            int generatedChunks = 0;
+            for(ChunkInstance& instance : chunks){
+                instance.chunk = Blocks::Chunk();
+                terrainGenerator.GenerateChunk(instance.chunk, instance.chunkX, instance.chunkZ);
+                generatedChunks++;
+                ReportProgress(inProgress, 0.5f* (float) generatedChunks / (float) chunks.size());
+            }
+
+            auto end = std::chrono::steady_clock::now();
+            BuildAllMeshes(inProgress); //Dopo aver generato tutti i chunk: il meshing legge i vicini
+
+            return std::chrono::duration<double, std::milli>(end - start).count();
+        }
+
+        uint32_t GetSeed() const{
+            return terrainGenerator.GetSeed();
+        }
+
+                //Spawn al centro del mondo, appena sopra il blocco piu' alto della colonna
+        //(se c'e' un albero ci si trova sopra la chioma, ma mai incastrati dentro)
+        glm::vec3 FindSpawnPosition(){
+            int spawnX = WORLDSIZECHUNKSX * Blocks::CHUNK_SIZE_X / 2;
+            int spawnZ = WORLDSIZECHUNKSZ * Blocks::CHUNK_SIZE_Z / 2;
+
+            int y = Blocks::CHUNK_SIZE_Y - 1;
+            while(y > 0 && !IsSolidAtWorld(spawnX, y, spawnZ)){
+                y--;
+            }
+            return glm::vec3(spawnX + 0.5f, (float) (y + 2), spawnZ + 0.5f);
+        }
+
+        const std::vector<ChunkInstance>& GetChunks() const{
+            return chunks;
+        }
+
+        //Lancia un raggio da 'origin' lungo 'direction' (non serve normalizzata) e restituisce
+        //Il primo blocco solido incontrato entro 'maxDistance', con voxel traversal DDA
+        RaycastHit RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance){
+            RaycastHit result;
+
+            int x = (int) std::floor(origin.x);
+            int y = (int) std::floor(origin.y);
+            int z = (int) std::floor(origin.z);
+
+            int stepX = direction.x > 0.0f ? 1 : -1;
+            int stepY = direction.y > 0.0f ? 1 : -1;
+            int stepZ = direction.z > 0.0f ? 1 : -1;
+
+            float tDeltaX = direction.x != 0.0f ? std::abs(1.0f / direction.x) : std::numeric_limits<float>::infinity();
+            float tDeltaY = direction.y != 0.0f ? std::abs(1.0f / direction.y) : std::numeric_limits<float>::infinity();
+            float tDeltaZ = direction.z != 0.0f ? std::abs(1.0f / direction.z) : std::numeric_limits<float>::infinity();
+
+            float tMaxX = NextBoundary(origin.x, x, direction.x, stepX);
+            float tMaxY = NextBoundary(origin.y, y, direction.y, stepY);
+            float tMaxZ = NextBoundary(origin.z, z, direction.z, stepZ);
+
+            int enteredFace = -1; //Faccia da cui si e' entrati nella cella corrente
+
+            float traveled = 0.0f;
+            while(traveled < maxDistance){
+                if(IsSolidAtWorld(x, y, z)){
+                    result.hit = true;
+                    result.blockX = x;
+                    result.blockY = y;
+                    result.blockZ = z;
+                    result.hitFace = enteredFace;
+                    return result;
+                }
+
+                if(tMaxX < tMaxY && tMaxX < tMaxZ){
+                    x += stepX;
+                    traveled = tMaxX;
+                    tMaxX += tDeltaX;
+                    enteredFace = stepX > 0 ? 2 : 3; //Entrando in +X si tocca la faccia Left(2) del blocco; in -X la Right(3)
+                }
+                else if(tMaxY < tMaxZ){
+                    y += stepY;
+                    traveled = tMaxY;
+                    tMaxY += tDeltaY;
+                    enteredFace = stepY > 0 ? 5 : 4; //+Y -> Bottom(5), -Y -> Top(4)
+                }
+                else{
+                    z += stepZ;
+                    traveled = tMaxZ;
+                    tMaxZ += tDeltaZ;
+                    enteredFace = stepZ > 0 ? 1 : 0; //+Z -> Back(1), -Z -> Front(0)
+                }
+            }
+            return result;
+        }
+
+        //Rompe (rimuove) il blocco alle coordinate MONDO indicate, aggiornando la mesh
+        //del chunk modificato e, se necessario, quella dei chunk adiacenti
+        void BreakBlockWorld(int worldX, int worldY, int worldZ){
+            if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+                return;
+            }
+
+            int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+            int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+            ChunkInstance* instance = GetChunkInstanceAt(chunkX, chunkZ);
+            if(!instance){
+                return;
+            }
+
+            int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+            int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+            instance->chunk.Set(localX, worldY, localZ, Blocks::BlockType::AIR);
+            RebuildAfterEdit(*instance, localX, worldY, localZ);
+        }
+
+        //Piazza un blocco alle coordinate MONDO indicate, aggiornando la mesh
+        //del chunk modificato e, se necessario, quella dei chunk adiacenti
+        void PlaceBlockWorld(int worldX, int worldY, int worldZ, Blocks::BlockType type){
+            if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+                return;
+            }
+
+            int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+            int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+            ChunkInstance* instance = GetChunkInstanceAt(chunkX, chunkZ);
+            if(!instance){
+                return;
+            }
+
+            int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+            int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+            //Sicurezza: non sovrascrivere un blocco gia' solido (non dovrebbe succedere, placeX/Y/Z e' gia' aria)
+            if(instance->chunk.IsSolid(localX, worldY, localZ)){
+                return;
+            }
+
+            instance->chunk.Set(localX, worldY, localZ, type);
+            RebuildAfterEdit(*instance, localX, worldY, localZ);
+        }
+
+        //Traduce l'input in coda sul Player (break/place) in modifiche effettive al mondo.
+        void ProcessBlockInteractions(Player& player, RaycastHit& target, Blocks::BlockType selectedBlockType){
+            bool wantBreak = player.ConsumeBreakBlock();
+            bool wantPlace = player.ConsumePlaceBlock();
+
+            if(wantBreak && target.hit){
+                BreakBlockWorld(target.blockX, target.blockY, target.blockZ);
+                target.hit = false;
+                return;
+            }
+            if(wantPlace && target.hit && target.hitFace >= 0){
+                const auto& offset = Blocks::FACE_OFFSETS[target.hitFace];
+                int placeX = target.blockX + offset[0];
+                int placeY = target.blockY + offset[1];
+                int placeZ = target.blockZ + offset[2];
+                Blocks::BlockType typeToPlace = selectedBlockType;
+                if(typeToPlace == Blocks::BlockType::LOGWOOD) typeToPlace = ChangeRotation(selectedBlockType, target.hitFace);
+                if(!player.IsPlayerOccupyingBlock(placeX, placeY, placeZ)){
+                    PlaceBlockWorld(placeX, placeY, placeZ, typeToPlace);
+                }
+            }
+        }
+
+        //Controlla se è solido il blocco in coordinate MONDO, individuando da solo il chunk corretto.
+        //Override di fcg::IWorld: è così che PlayerPhysics interroga il mondo senza conoscere World
+        bool IsSolidAtWorld(int worldX, int worldY, int worldZ) override{
+            if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
+                return false;
+            }
+
+            int chunkX = FloorDiv(worldX, Blocks::CHUNK_SIZE_X);
+            int chunkZ = FloorDiv(worldZ, Blocks::CHUNK_SIZE_Z);
+
+            Blocks::Chunk* chunk = GetChunkAt(chunkX, chunkZ);
+            if(!chunk){
+                return false;
+            }
+
+            int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
+            int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
+
+            return chunk->IsSolid(localX, worldY, localZ);
+        }
+
+    private:
+        //Notifica l'avanzamento (0..1) solo se e' stata fornita una callback
+        static void ReportProgress(const ProgressCallback& callback, float progress){
+            if(callback) callback(progress);
+        }
+
+        //Indice nel vector dei chunk, -1 se fuori dal mondo.
+        //Valido perche' GenerateAllChunks inserisce i chunk in ordine (chunkZ esterno, chunkX interno)
+        static int ChunkIndex(int chunkX, int chunkZ){
+            if(chunkX < 0 || chunkX >= WORLDSIZECHUNKSX || chunkZ < 0 || chunkZ >= WORLDSIZECHUNKSZ) return -1;
+            return chunkZ * WORLDSIZECHUNKSX + chunkX;
+        }
+
+        //La generazione dei blocchi occupa la prima meta' della barra, il meshing la seconda
+        void GenerateAllChunks(const ProgressCallback& onProgress){
+            float totalChunks = (float) (WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
+            for(int chunkZ = 0; chunkZ < WORLDSIZECHUNKSZ; chunkZ++){
+                for(int chunkX = 0; chunkX < WORLDSIZECHUNKSX; chunkX++){
+                    chunks.emplace_back();
+                    ChunkInstance& instance = chunks.back();
+                    instance.chunkX = chunkX;
+                    instance.chunkZ = chunkZ;
+                    terrainGenerator.GenerateChunk(instance.chunk, chunkX, chunkZ);
+                    ReportProgress(onProgress, 0.5f * (float) chunks.size() / totalChunks);
+                }
+            }
+        }
+
+        void BuildAllMeshes(const ProgressCallback& onProgress = nullptr){
+            int builtChunks = 0;
+            for(ChunkInstance& instance : chunks){
+                RebuildChunkMesh(instance);
+                builtChunks++;
+                ReportProgress(onProgress, 0.5f + 0.5f * (float) builtChunks / (float) chunks.size());
+            }
+        }
+        
+        //Cerca il chunk alle coordinate di griglia indicate, nullptr se non esiste
+        Blocks::Chunk* GetChunkAt(int chunkX, int chunkZ){
+            int chunkIndex = ChunkIndex(chunkX,chunkZ);
+            if(chunkIndex < 0) return nullptr;
+            return &chunks[chunkIndex].chunk;
+        }
+
+        //Cerca la ChunkInstance completa (chunk + mesh) alle coordinate di griglia indicate
+        ChunkInstance* GetChunkInstanceAt(int chunkX, int chunkZ){
+            int chunkIndex = ChunkIndex(chunkX, chunkZ);
+            if(chunkIndex < 0) return nullptr;
+            return &chunks[chunkIndex];  
+        }
+
+        //Ricostruisce mesh e connettività di UNA sezione
+        void RebuildSection(ChunkInstance& instance, int sectionHeightY){
+            auto isTransparentOutside = [this, &instance](int localX, int localY, int localZ){
+                return IsTransparentWorld(instance.chunkX, instance.chunkZ, localX, localY, localZ);
+            };
+            Blocks::MeshData meshData = Blocks::BuildChunkMesh(instance.chunk, isTransparentOutside, sectionHeightY);
+            instance.meshes[sectionHeightY].Upload(meshData);
+            instance.connectivity[sectionHeightY] = Blocks::ComputeSectionConnectivity(instance.chunk, sectionHeightY);
+        }
+
+        //Ricostruisce tutte le sezioni di un chunk
+        void RebuildChunkMesh(ChunkInstance& instance){
+            for(int sectionY = 0; sectionY < Blocks::SECTIONS_PER_CHUNK; sectionY++){
+                RebuildSection(instance, sectionY);
+            }
+        }
+
+        void RebuildNeighborSectionIfExists(int chunkX, int chunkZ, int sectionY){
+            ChunkInstance* neighbor = GetChunkInstanceAt(chunkX, chunkZ);
+            if(neighbor){
+                RebuildSection(*neighbor, sectionY);
+            }
+        }
+
+        /*
+            Dopo una modifica ricostruisce solo le sezioni toccate: quella del blocco,
+            quella sopra/sotto se il blocco e' sul bordo in Y, e la stessa sezione del chunk
+            vicino se il blocco e' sul bordo in X/Z
+        */
+        void RebuildAfterEdit(ChunkInstance& instance, int localX, int worldY, int localZ){
+            int sectionY = worldY / Blocks::SECTION_SIZE;
+            int localY = worldY % Blocks::SECTION_SIZE;
+
+            RebuildSection(instance, sectionY);
+            if(localY == 0 && sectionY > 0) RebuildSection(instance, sectionY - 1);
+            if(localY == Blocks::SECTION_SIZE - 1 && sectionY < Blocks::SECTIONS_PER_CHUNK - 1) RebuildSection(instance, sectionY + 1);
+
+            if(localX == 0) RebuildNeighborSectionIfExists(instance.chunkX - 1, instance.chunkZ, sectionY);
+            if(localX == Blocks::CHUNK_SIZE_X - 1) RebuildNeighborSectionIfExists(instance.chunkX + 1, instance.chunkZ, sectionY);
+            if(localZ == 0) RebuildNeighborSectionIfExists(instance.chunkX, instance.chunkZ - 1, sectionY);
+            if(localZ == Blocks::CHUNK_SIZE_Z - 1) RebuildNeighborSectionIfExists(instance.chunkX, instance.chunkZ + 1, sectionY);
+        }
+
+        //Controlla se è solido un blocco a coordinate locali (anche fuori dai bordi 0..15)
+        //Rispetto al chunk (chunkX, chunkZ), guardando nel chunk vicino se necessario
+        bool IsTransparentWorld(int chunkX, int chunkZ, int localX, int localY, int localZ){
+            //Y non è suddiviso in chunk
+            if(localY < 0 || localY >= Blocks::CHUNK_SIZE_Y){
+                return true;
+            }
+
+            int neighborChunkX = chunkX + (localX < 0 ? -1 : (localX >= Blocks::CHUNK_SIZE_X ? 1 : 0));
+            int neighborChunkZ = chunkZ + (localZ < 0 ? -1 : (localZ >= Blocks::CHUNK_SIZE_Z ? 1 : 0));
+
+            Blocks::Chunk* neighbor = GetChunkAt(neighborChunkX, neighborChunkZ);
+            if(!neighbor){
+                return true; //Bordo del mondo: nessun chunk vicino. Allora Renderizza.
+            }
+
+            int wrappedX = ((localX % Blocks::CHUNK_SIZE_X) + Blocks::CHUNK_SIZE_X) % Blocks::CHUNK_SIZE_X;
+            int wrappedZ = ((localZ % Blocks::CHUNK_SIZE_Z) + Blocks::CHUNK_SIZE_Z) % Blocks::CHUNK_SIZE_Z;
+
+            return neighbor->IsTransparent(wrappedX, localY, wrappedZ);
+        }
+
+        //Divisione intera "verso il basso" (floor): serve perché l'operatore % (modulo) di C++
+        //tronca verso '0', non verso -infinito, e con coordinate negative darebbe risultati sbagliati
+        static int FloorDiv(int a, int b){
+            int d = a / b;
+            int r = a % b;
+            return (r != 0 && ((r < 0) != (b < 0))) ? d - 1 : d;
+        }
+
+        //Distanza (in unita' di t lungo il raggio) dal punto 'originComp' al prossimo confine di voxel
+        static float NextBoundary(float originComp, int voxelComp, float dirComp, int step){
+            if(dirComp == 0.0f) return std::numeric_limits<float>::infinity();
+            float boundary = step > 0 ? (float)(voxelComp + 1) : (float) voxelComp;
+            return (boundary - originComp) / dirComp;
+        }
+
+        //Se il blocco selezionato e' un tronco, restituisce la variante con l'asse orientato
+        //lungo la direzione di piazzamento, dedotta da hitFace (la faccia colpita del blocco
+        //bersaglio, stesso indice usato in Blocks::FACE_OFFSETS)
+        static Blocks::BlockType ChangeRotation(Blocks::BlockType selectedType, int hitFace){
+            const int* offset = Blocks::FACE_OFFSETS[hitFace];
+            switch(selectedType){
+                case Blocks::BlockType::LOGWOOD:
+                    if(offset[0] != 0) return Blocks::BlockType::LOGWOODEASTX;
+                    if(offset[2] != 0) return Blocks::BlockType::LOGWOODNORTHZ;
+                    return Blocks::BlockType::LOGWOOD; //Faccia Top/Bottom: asse Y, comportamento invariato
+                break;
+                default:
+                break;
+            }
+            return selectedType;
+        }
+    };
+}
+
+#endif
