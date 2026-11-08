@@ -82,6 +82,18 @@ namespace fcg{
                     ImGui::SliderInt("Min Tunnel Height", &config.caves.minCeilingHeight, 0, 10, "%d");
                 }
 
+                ImGui::Checkbox("Spaghetti 2D", &config.caves.spaghettiEnabled);
+                if(config.caves.spaghettiEnabled){
+                    ImGui::SliderInt("Spaghetti octaves", &config.caves.spaghettiPathFractal.octaves, 1, 8);
+                    ImGui::SliderFloat("Spaghetti frequency", &config.caves.spaghettiPathFractal.frequency, 0.003f, 0.05f, "%.3f");
+                    ImGui::SliderFloat("Spaghetti persistence", &config.caves.spaghettiPathFractal.amplitudeMultiplier, 0.1f, 0.7f, "%.2f");
+                    ImGui::SliderFloat("Spessore spaghetti (Threshold)", &config.caves.spaghettiThreshold, 0.005f, 0.1f, "%.3f");
+                    ImGui::SliderInt("Altezza spaghetti", &config.caves.spaghettiHeight, 2, 10);
+                    ImGui::SliderFloat("Elevation frequency", &config.caves.spaghettiElevationFractal.frequency, 0.002f, 0.03f, "%.3f");
+                    ImGui::SliderInt("Quota min spaghetti", &config.caves.spaghettiMinY, 3, 120);
+                    ImGui::SliderInt("Quota max spaghetti", &config.caves.spaghettiMaxY, 3, 200);
+                }
+
                 ImGui::SliderInt("Margine superficie", &config.caves.surfaceMargin, 0, 12);
             }            
 

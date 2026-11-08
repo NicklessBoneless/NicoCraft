@@ -52,6 +52,11 @@ namespace fcg{
         static constexpr float wormBOffsetX = 131.7f;
         static constexpr float wormBOffsetY = 57.3f;
         static constexpr float wormBOffsetZ = 211.1f;
+
+        static constexpr float spaghettiPathOffsetX = 1733.1f;
+        static constexpr float spaghettiPathOffsetZ = -2291.7f;
+        static constexpr float spaghettiElevationOffsetX = -3187.3f;
+        static constexpr float spaghettiElevationOffsetZ = 1459.9f;
     
     public:
         TerrainGenerator(uint32_t seed, std::unique_ptr<Noise> noise, FractalParams terrainParameters = FractalParams{},CavesConfig cavesConfig = CavesConfig{},float heightAmplitude = 30.0f) : 
@@ -135,12 +140,17 @@ namespace fcg{
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
                         if(!IsCave(worldX, y, worldZ, surface)) continue;
+                        if(chunk.Get(x,y-1,z) == Blocks::BlockType::DIRT){
+                            chunk.Set(x, y-1, z, Blocks::BlockType::GRASS);
+                        }
                         for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < surface ; dy++){
                             chunk.Set(x, y + dy, z, Blocks::BlockType::AIR);
                         }   
                     }
                 }
             }
+
+            GenerateSpaghetti2D(chunk, chunkX, chunkZ, heightMap);
         }
 
         bool IsCave(int worldX, int worldY, int worldZ, int surface) const{
@@ -192,6 +202,48 @@ namespace fcg{
                 cavesConfig.wormFractal);
             return std::abs(second) < cavesConfig.wormThreshold;
         } 
+
+        /*
+            Spaghetti 2D: i due campi si valutano UNA volta per colonna (non per cella).
+            Dove |path| < soglia c'e' un tunnel; elevation ne decide la quota del centro.
+            La sezione e' tondeggiante: l'altezza cala verso i bordi della larghezza
+        */
+        void GenerateSpaghetti2D(Blocks::Chunk& chunk, int chunkX, int chunkZ, const HeightMap& heightMap) const{
+            if(!cavesConfig.spaghettiEnabled) return;
+
+            float centerMid = 0.5f * (float) (cavesConfig.spaghettiMinY + cavesConfig.spaghettiMaxY);
+            float centerHalfRange = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
+
+            for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
+                for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
+                    float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + x);
+                    float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + z);
+
+                    float path = Fractal2D(*noise, worldX + spaghettiPathOffsetX, worldZ + spaghettiPathOffsetZ, cavesConfig.spaghettiPathFractal);
+                    float distance = std::abs(path);
+                    if(distance >= cavesConfig.spaghettiThreshold) continue;
+
+                    float elevation = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
+                    float center = centerMid + elevation * centerHalfRange;
+
+                    //1 al centro del tunnel, 0 sui bordi: sezione tondeggiante
+                    float ratio = distance / cavesConfig.spaghettiThreshold;
+                    float roundness = std::sqrt(1.0f - ratio * ratio);
+                    float halfHeight = 0.5f * (float) cavesConfig.spaghettiHeight * roundness;
+
+                    int surface = heightMap[HeightIndex(x, z)];
+                    int yStart = std::max((int) std::ceil(center - halfHeight), cavesConfig.minY);
+                    int yEnd = std::min((int) std::floor(center + halfHeight), surface - cavesConfig.surfaceMargin - 1);
+
+                    if(chunk.Get(x,yStart-1,z) == Blocks::BlockType::DIRT){
+                        chunk.Set(x,yStart-1, z, Blocks::BlockType::GRASS);
+                    }
+                    for(int y = yStart; y <= yEnd; y++){
+                        chunk.Set(x, y, z, Blocks::BlockType::AIR);
+                    }
+                }
+            }
+        }
 
         void GenerateTrees(Blocks::Chunk& chunk, int chunkX, int chunkZ,const HeightMap& heightMap) const{
             /*
