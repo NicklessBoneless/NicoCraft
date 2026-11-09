@@ -424,6 +424,7 @@ namespace fcg{
                     int yStart = std::max((int) std::ceil(center - halfHeight), cavesConfig.minY);
                     int yEnd = std::min((int) std::floor(center + halfHeight), surface - cavesConfig.surfaceMargin - 1);
 
+                    if(yStart > yEnd) continue;
                     if(chunk.Get(x,yStart-1,z) == Blocks::BlockType::DIRT){
                         chunk.Set(x,yStart-1, z, Blocks::BlockType::GRASS);
                     }
