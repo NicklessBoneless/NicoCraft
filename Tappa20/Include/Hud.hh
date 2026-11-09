@@ -122,7 +122,7 @@ namespace fcg{
             if(normalized < 0.0f) normalized += 360.0f;
 
             if(normalized >= 315.0f || normalized < 45.0f) return "South";
-            if(normalized < 135.0f) return "Ovest";
+            if(normalized < 135.0f) return "West";
             if(normalized < 225.0f) return "North";
             return "East";
         }
