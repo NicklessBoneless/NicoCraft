@@ -343,55 +343,6 @@ namespace fcg{
             GenerateSpaghetti2D(chunk, chunkX, chunkZ, heightMap);
         }
 
-        bool IsCave(int worldX, int worldY, int worldZ, int surface, const std::vector<uint8_t>& wormMask, int localX, int localZ) const{
-            float x = (float) worldX;
-            float y = (float) worldY;
-            float z = (float) worldZ;
-
-            if(cavesConfig.spongeEnabled && IsSpongeCave(x, y, z, surface)) return true;
-            if(!wormMask.empty() && wormMask[WormMaskIndex(localX, worldY, localZ)]) return true;
-            return false;
-        }
-
-        bool IsSpongeCave(float x, float y, float z, int surface) const{
-            float value = Fractal3D(*noise,
-                x + spongeOffsetX,
-                (y + spongeOffsetY) * cavesConfig.verticalScale,
-                z + spongeOffsetZ,
-                cavesConfig.spongeFractal);
-
-            /*
-                nearSurface vale 0 a minY e 1 in superficie: la soglia sale con depthBias,
-                quindi vicino al suolo ci sono meno sacche e in profondita' piu' grandi
-            */
-            float depthRange = (float) std::max(surface - cavesConfig.minY, 1);
-            float nearSurface = std::clamp((y - (float) cavesConfig.minY) / depthRange, 0.0f, 1.0f);
-            float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
-
-            return value > threshold;
-        }
-
-        /*
-            Un solo campo con |n| < soglia darebbe pareti sottili (la superficie n=0), non tunnel.
-            Si intersecano DUE campi (stesso Perlin 3D, coordinate traslate): i punti vicini a zero
-            in entrambi formano una curva. Il secondo campo si calcola solo se il primo e' gia' sotto soglia
-        */
-        bool IsWormCave(float x, float y, float z) const{
-            float first = Fractal3D(*noise,
-                x + wormAOffsetX,
-                (y + wormAOffsetY) * cavesConfig.wormVerticalScale,
-                z + wormAOffsetZ,
-                cavesConfig.wormFractal);
-            if(std::abs(first) >= cavesConfig.wormThreshold) return false;
-
-            float second = Fractal3D(*noise,
-                x + wormBOffsetX,
-                (y + wormBOffsetY) * cavesConfig.wormVerticalScale,
-                z + wormBOffsetZ,
-                cavesConfig.wormFractal);
-            return std::abs(second) < cavesConfig.wormThreshold;
-        } 
-
         /*
             Spaghetti 2D: i due campi si valutano UNA volta per colonna (non per cella).
             Dove |path| < soglia c'e' un tunnel; elevation ne decide la quota del centro.
