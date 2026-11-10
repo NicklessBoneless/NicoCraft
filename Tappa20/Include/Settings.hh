@@ -38,6 +38,11 @@ namespace fcg{
             }
         }
 
+        Settings defaultSettings;
+        if(settings.height <= 0 || settings.width <= 0 || settings.fov <= 0 || settings.fov > 160){
+            return defaultSettings;
+        }
+
         return settings;
     }
 
