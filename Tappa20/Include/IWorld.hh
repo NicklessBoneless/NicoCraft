@@ -10,7 +10,7 @@ namespace fcg
     //World la implementerà (public IWorld) in World.hh.
     class IWorld{
     public:
-        virtual bool IsSolidAtWorld(int worldX, int worldY, int worldZ) = 0;
+        virtual const bool IsSolidAtWorld(int worldX, int worldY, int worldZ) = 0;
         virtual ~IWorld() = default;
     };
 }

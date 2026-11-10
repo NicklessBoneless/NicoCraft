@@ -246,7 +246,7 @@ namespace fcg
 
         //Controlla se è solido il blocco in coordinate MONDO, individuando da solo il chunk corretto.
         //Override di fcg::IWorld: è così che PlayerPhysics interroga il mondo senza conoscere World
-        bool IsSolidAtWorld(int worldX, int worldY, int worldZ) override{
+        const bool IsSolidAtWorld(int worldX, int worldY, int worldZ) override{
             if(worldY < 0 || worldY >= Blocks::CHUNK_SIZE_Y){
                 return false;
             }
