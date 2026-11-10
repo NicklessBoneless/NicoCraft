@@ -46,12 +46,10 @@ namespace fcg
     //Simulazione del mondo voxel: chunk, editing (break/place), raycast, rebuild mesh su modifica.
     //Non conosce shader, uniform o draw call: quello e' compito di Renderer (vedi Renderer.hh)
     class World : public fcg::IWorld{
-    public:
-        std::vector<ChunkInstance> chunks;
-    
     private:
         TerrainConfig currentTerrainConfig;
         TerrainGenerator terrainGenerator;
+        std::vector<ChunkInstance> chunks;
 
     public:
         explicit World(const TerrainConfig& config = TerrainConfig{}, const ProgressCallback& inProgress = nullptr) :
@@ -70,6 +68,10 @@ namespace fcg
 
         const TerrainConfig& GetConfig() const{
             return currentTerrainConfig;
+        }
+
+        const std::vector<ChunkInstance>& GetChunks() const{
+            return chunks;
         }
 
         /*
@@ -112,10 +114,6 @@ namespace fcg
                 y--;
             }
             return glm::vec3(spawnX + 0.5f, (float) (y + 2), spawnZ + 0.5f);
-        }
-
-        const std::vector<ChunkInstance>& GetChunks() const{
-            return chunks;
         }
 
         //Lancia un raggio da 'origin' lungo 'direction' (non serve normalizzata) e restituisce
@@ -408,7 +406,6 @@ namespace fcg
                     if(offset[0] != 0) return Blocks::BlockType::LOGWOODEASTX;
                     if(offset[2] != 0) return Blocks::BlockType::LOGWOODNORTHZ;
                     return Blocks::BlockType::LOGWOOD; //Faccia Top/Bottom: asse Y, comportamento invariato
-                break;
                 default:
                 break;
             }
