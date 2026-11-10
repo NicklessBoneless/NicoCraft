@@ -20,6 +20,7 @@ namespace fcg{
         //// Stato temporale ////
         float elapsedTime = 20.0f; //Metà giornata è sempre PI/daylightSpeed*2
         int timeSector = 1;
+        float dayNightT = 0.5f;
         static constexpr float daylightSpeed = 0.005f; //Un ciclo completo dura circa 6.28/daylightSpeed secondi (20 min)
         static constexpr float minDaylight = 0.30f;   //Luminosita' minima dei blocchi (notte fonda)
         static constexpr float maxDaylight = 1.1f;   //Luminosita' massima dei blocchi (pieno giorno)
@@ -55,6 +56,7 @@ namespace fcg{
             BuildCelestialQuad();
             BuildStars();
             Locations();
+            Update(0.0f);
         }
 
         ~Sky(){
@@ -64,33 +66,17 @@ namespace fcg{
         //Va chiamato una volta per frame
         void Update(float deltaTime){
             elapsedTime += deltaTime;
-        }
-
-        //t oscilla tra 0 (notte piena) e 1 (giorno pieno)
-        float GetDayNightT(){
             float angle = elapsedTime * daylightSpeed;
             float t = (glm::sin(angle) + 1.0f) * 0.5f;
-            //std::cout<<"timeSector = "<<timeSector<<"\n";
-            if(t >= 0.75f && timeSector == 1){
-                timeSector = 2;
-            }
-            else if(t <= 0.55f && timeSector == 2){
-                timeSector = 3;
-            }
-            else if(t <= 0.25f && timeSector == 3){
-                timeSector = 4;
-            }
-            else if(t < 0.05f && timeSector == 4){
-                timeSector = 5;
-            }
-            else if(t >= 0.45f && timeSector == 5){
-                timeSector = 1;
-            }
-            return t;
+            UpdateTimeSector(t);
+        }
+
+        float GetDayNightT() const{
+            return dayNightT;
         }
 
         //Fattore di luce globale da applicare ai blocchi del mondo (range [minDaylight, maxDaylight])
-        float GetDaylightFactor(){
+        float GetDaylightFactor() const{
             float t = GetDayNightT();
             float daylight = minDaylight;
 
@@ -126,7 +112,7 @@ namespace fcg{
         }
 
         //Colore corrente del cielo, da passare a glClearColor
-        glm::vec3 GetSkyColor() {
+        glm::vec3 GetSkyColor() const{
             float t = GetDayNightT();
 
             glm::vec3 three4Day   = glm::mix(nightSky, daySky, 0.75f);
@@ -193,6 +179,26 @@ namespace fcg{
         }
 
     private:
+        //t oscilla tra 0 (notte piena) e 1 (giorno pieno)
+        void UpdateTimeSector(float t){
+            //std::cout<<"timeSector = "<<timeSector<<"\n";
+            if(t >= 0.75f && timeSector == 1){
+                timeSector = 2;
+            }
+            else if(t <= 0.55f && timeSector == 2){
+                timeSector = 3;
+            }
+            else if(t <= 0.25f && timeSector == 3){
+                timeSector = 4;
+            }
+            else if(t < 0.05f && timeSector == 4){
+                timeSector = 5;
+            }
+            else if(t >= 0.45f && timeSector == 5){
+                timeSector = 1;
+            }
+        }
+
         void LoadTextures(const std::string& resourcesDir){
             if(!sunTexture.loadFromFile(resourcesDir + "sun.png")){
                 std::cerr << "Errore nel caricamento di sun.png" << std::endl;
