@@ -106,7 +106,15 @@ namespace fcg
             if(input.jump) 
                 physics.Jump(world);
             glm::vec3 horizontalVelocity = camera.getHorizontalMovement(input) * moveSpeed;
-            physics.UpdatePlayerPosition(deltaTime, world, horizontalVelocity);
+            
+            //Più passi piccoli per frame: evita di attraversare pavimenti sottili ad alta velocità
+            float remaining = deltaTime;
+            while(remaining > 0.0f){
+                float step = std::min(remaining, 1.0f / 120.0f);
+                physics.UpdatePlayerPosition(step, world, horizontalVelocity);
+                remaining -= step;
+            }
+
             CheckPlayerPosition();
             camera.SetPosition(physics.GetEyePosition());
         }

@@ -9,6 +9,7 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 #include "rawmouse.hh"
 #include "./Include/Player.hh"
@@ -543,7 +544,7 @@ int main(){
             continue;
         }
 
-        float deltaTime = clock.restart().asSeconds();
+        float deltaTime = std::min(clock.restart().asSeconds(), 0.05f);
 
         PlayerInput currentInput = CapturePlayerInput();
         player->UpdatePosition(deltaTime, *world, currentInput);
