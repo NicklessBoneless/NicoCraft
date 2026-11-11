@@ -278,7 +278,7 @@ namespace fcg{
                     for(int cellX = 0; cellX < cellsXZ; cellX++){
                         float corners[8];
                         float maxCorner = -2.0f;
-                        for(int c = 0; c < 8; c++){
+                        for(int c = 0 ; c < 8 ; c++){
                             corners[c] = field[gridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1))];
                             maxCorner = std::max(maxCorner, corners[c]);
                         }
@@ -324,8 +324,8 @@ namespace fcg{
             if(cavesConfig.spongeEnabled) BuildSpongeMask(chunkX, chunkZ, topY, heightMap, caveMask);
             if(cavesConfig.wormsEnabled) BuildWormMask(chunkX, chunkZ, topY, caveMask);
 
-            for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
-                for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
+            for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
+                for(int z = 0; z < Blocks::CHUNK_SIZE_Z ; z++){
                     int surface = heightMap[HeightIndex(x,z)];
                     int maxY = std::min(surface - cavesConfig.surfaceMargin, Blocks::CHUNK_SIZE_Y);
 
