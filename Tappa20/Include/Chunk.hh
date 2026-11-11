@@ -51,9 +51,9 @@ namespace Blocks
 
     struct Vertex{
         float x, y, z;
-        float u, v;
-        float texture;
-        float brightness;
+        uint8_t u, v;
+        uint8_t texture;
+        uint8_t brightness;
     };
 
     struct MeshData{
@@ -74,7 +74,7 @@ namespace Blocks
         {{0,0,0},{1,0,0},{1,0,1},{0,0,1}}
     };
 
-    constexpr float FACE_UV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
+    constexpr u_int8_t FACE_UV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
     //Front, Back, Left, Right, Top, Bottom
     constexpr float FACE_BRIGHTNESS[6] = { 0.75f, 0.75f, 0.75f, 0.75f, 1.f, 0.55f };
 
@@ -109,8 +109,8 @@ namespace Blocks
                         }
                         
                         uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
-                        float texture = static_cast<float>(getTextureIndex(type, face));
-                        float brightness = FACE_BRIGHTNESS[i];
+                        uint8_t texture = static_cast<uint8_t>(getTextureIndex(type, face));
+                        uint8_t brightness = static_cast<uint8_t>(FACE_BRIGHTNESS[i] * 255.0f + 0.5f);
 
                         for(int v = 0; v < 4; ++v){
                             mesh.vertices.push_back({
@@ -328,11 +328,15 @@ namespace Blocks
 
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, x));
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, u));
+            
+            //Tipi interi non normalizzati: lo shader riceve 0.0/1.0 per le UV e l'indice come float
+            glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, u));
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, texture));
+            glVertexAttribPointer(2, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, texture));
             glEnableVertexAttribArray(2);
-            glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, brightness));
+
+            //Normalizzato (GL_TRUE): 0..255 diventa 0.0..1.0
+            glVertexAttribPointer(3, 1, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), (void*) offsetof(Vertex, brightness));
             glEnableVertexAttribArray(3);
 
             glBindVertexArray(0);
