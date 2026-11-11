@@ -44,7 +44,7 @@ namespace fcg{
         bool cullingFrozen = false;
         bool occlusionCullingEnabled = true;
 
-        GLint viewProjModelLoc = -1, daylightLoc = -1;
+        GLint viewProjLoc = -1, chunkOriginLoc = -1,daylightLoc = -1;
         GLint fogColorLoc = -1, fogStartLoc = -1, fogEndLoc = -1;
 
         //Dimensioni finestra centralizzate: usate da Hotbar (e in futuro Compass e menu)
@@ -88,6 +88,8 @@ namespace fcg{
             glUniform1f(fogEndLoc, camera.getFarPlane() * fogEndRatio);
             textureArray.Bind(0);
 
+            glUniformMatrix4fv(viewProjLoc, 1, GL_FALSE, &camera.viewProjMatrix[0][0]);
+
             frustum.Update(camera.viewProjMatrix);
             stats = RenderStats{};
 
@@ -102,6 +104,7 @@ namespace fcg{
                     }
                 }
             }
+
             //Quali sezioni disegnare: BFS di visibilita' oppure solo frustum (F5 alterna)
             float renderDistance = camera.getFarPlane() * 2.0f;
             if(!cullingFrozen){
@@ -113,16 +116,18 @@ namespace fcg{
             }
 
             const std::vector<ChunkInstance>& chunks = world.GetChunks();
+            int lastChunkIndex = -1;
             for(int node : visibleSections){
                 int sectionY = node % Blocks::SECTIONS_PER_CHUNK;
-                const ChunkInstance& instance = chunks[node / Blocks::SECTIONS_PER_CHUNK];
+                int chunkIndex = node / Blocks::SECTIONS_PER_CHUNK;
+                const ChunkInstance& instance = chunks[chunkIndex];
                 const Blocks::ChunkMesh& mesh = instance.meshes[sectionY];
                 if(mesh.IsEmpty()) continue; //Aria o roccia piena: attraversata dalla BFS ma senza facce
 
-                float originX = (float) (instance.chunkX * Blocks::CHUNK_SIZE_X);
-                float originZ = (float) (instance.chunkZ * Blocks::CHUNK_SIZE_Z);
-                glm::mat4 chunkPvm = camera.viewProjMatrix * fcg::translation(originX, 0.0f, originZ);
-                glUniformMatrix4fv(viewProjModelLoc, 1, GL_FALSE, &chunkPvm[0][0]);
+                if(chunkIndex != lastChunkIndex){
+                    glUniform3f(chunkOriginLoc, (instance.chunkX * Blocks::CHUNK_SIZE_X), 0.0f, (instance.chunkZ * Blocks::CHUNK_SIZE_Z));
+                    lastChunkIndex = chunkIndex;
+                }
                 mesh.Draw();
 
                 stats.sectionsDrawn++;
@@ -202,7 +207,8 @@ namespace fcg{
         void Locations(){
             worldShader.use();
 
-            viewProjModelLoc = glGetUniformLocation(worldShader.program, "viewProjectionModel");
+            viewProjLoc = glGetUniformLocation(worldShader.program, "viewProjection");
+            chunkOriginLoc = glGetUniformLocation(worldShader.program, "chunkOrigin");
             daylightLoc = glGetUniformLocation(worldShader.program, "daylightFactor");
 
             fogColorLoc = glGetUniformLocation(worldShader.program, "fogColor");

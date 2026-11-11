@@ -10,10 +10,11 @@ out float outTexture;
 out float outBrightness;
 out float outFogDistance;
 
-uniform mat4 viewProjectionModel;
+uniform mat4 viewProjection;
+uniform vec3 chunkOrigin;
 
 void main(){
-    gl_Position = viewProjectionModel * vec4(vertexPosition, 1.0);
+    gl_Position = viewProjection * vec4(vertexPosition + chunkOrigin, 1.0);
     outFogDistance = gl_Position.w;
     outUVCoordinates = UVCoordinates;
     outTexture = texture;
