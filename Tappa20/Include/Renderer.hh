@@ -12,6 +12,7 @@
 #include "Crosshair.hh"
 #include "BlockOutline.hh"
 #include "Sky.hh"
+#include "Hud.hh"
 #include "Hotbar.hh"
 #include "Frustum.hh"
 #include "RenderStats.hh"
@@ -29,6 +30,7 @@ namespace fcg{
         fcg::Crosshair crosshair;
         fcg::BlockOutline outline;
         fcg::HotbarRenderer hotbarRenderer;
+        fcg::Hud hud;
         fcg::Sky sky;
 
         //Frustum Culling
@@ -58,6 +60,7 @@ namespace fcg{
             crosshair(FindShaderFiles(shaderSets, "crosshair").vertexFile,FindShaderFiles(shaderSets, "crosshair").fragmentFile),
             outline(FindShaderFiles(shaderSets, "outline").vertexFile,FindShaderFiles(shaderSets, "outline").fragmentFile),
             hotbarRenderer(res, FindShaderFiles(shaderSets, "hotbar")),
+            hud(res),
             sky(res,FindShaderFiles(shaderSets, "sky"),FindShaderFiles(shaderSets, "stars"))
         {
             InitializeTextures(res);
@@ -88,16 +91,17 @@ namespace fcg{
             frustum.Update(camera.viewProjMatrix);
             stats = RenderStats{};
 
-            //Totali: tutte le sezioni non vuote, indipendentemente dal culling
-            for(const ChunkInstance& instance : world.GetChunks()){
-                for(const Blocks::ChunkMesh& mesh : instance.meshes){
-                    if(mesh.IsEmpty()) continue;
-                    stats.sectionsTotal++;
-                    stats.verticesTotal += mesh.GetVertexCount();
-                    stats.trianglesTotal += mesh.GetTriangleCount();
+            if(hud.IsStatsVisible()){
+                //Totali: tutte le sezioni non vuote, indipendentemente dal culling
+                for(const ChunkInstance& instance : world.GetChunks()){
+                    for(const Blocks::ChunkMesh& mesh : instance.meshes){
+                        if(mesh.IsEmpty()) continue;
+                        stats.sectionsTotal++;
+                        stats.verticesTotal += mesh.GetVertexCount();
+                        stats.trianglesTotal += mesh.GetTriangleCount();
+                    }
                 }
             }
-
             //Quali sezioni disegnare: BFS di visibilita' oppure solo frustum (F5 alterna)
             float renderDistance = camera.getFarPlane() * 2.0f;
             if(!cullingFrozen){
@@ -142,6 +146,23 @@ namespace fcg{
 
         const RenderStats& GetStats() const{
             return stats;
+        }
+
+        void UpdateHud(float yawDeg,float deltaTime){
+            hud.Update(yawDeg,deltaTime);
+        }
+
+        void DrawHud(){
+            hud.Draw();
+            hud.DrawStats(stats,frustumCullingEnabled,occlusionCullingEnabled);
+        }
+
+        void ToggleStats(){
+            hud.ToggleStats();
+        }
+
+        bool isStatsEnabled(){
+            return hud.IsStatsVisible();
         }
 
         void ToggleCullingFreeze(){

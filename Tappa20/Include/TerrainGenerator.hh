@@ -38,6 +38,7 @@ namespace fcg{
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int wormGridStep = 4; //Passo (blocchi) della griglia di campionamento dei worm, SEMPRE DIVISORE DI 16
         static constexpr int spongeGridStep = 2; //Passo (blocchi) della griglia di campionamento della spugna
+        static constexpr int treeRarity = 400;
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
         static constexpr int treeClearance = treeTrunkHeight + 2; //Spazio da lasciare sopra il terreno per la chioma
@@ -401,7 +402,7 @@ namespace fcg{
                 for(int z = 1; z < Blocks::CHUNK_SIZE_Z - 1; z++){
                     //Probabilita' 1%. Uso % su rng() invece di uniform_int_distribution
                     //perche' quest'ultima non e' riproducibile tra standard library diverse
-                    if(rng() % 100 != 0) continue;
+                    if(rng() % treeRarity != 0) continue;
                     if(IsTooCloseToOtherTree(x, z, treePositions)) continue;
                     
                     int groundY = heightMap[HeightIndex(x, z)];;

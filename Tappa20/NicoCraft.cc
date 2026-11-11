@@ -20,7 +20,6 @@
 #include "./Include/PauseMenu.hh"
 #include "./Include/Settings.hh"
 #include "./Include/LoadingScreen.hh"
-#include "./Include/Hud.hh"
 #include "./Include/GenerationPanel.hh"
 
 const std::string dirShaders = "../Tappa20/Shaders/";
@@ -192,7 +191,7 @@ void HandlePauseEvents(sf::RenderWindow& window, fcg::PauseMenu& pauseMenu, fcg:
 
 //Eventi durante lo stato Playing: identica alla logica di gioco gia' esistente, a parte
 //Esc che ora apre la pausa invece di chiudere il programma
-void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer,fcg::PauseMenu& pauseMenu ,fcg::Hotbar& hotbar, fcg::Hud& hud, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
+void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& renderer,fcg::PauseMenu& pauseMenu ,fcg::Hotbar& hotbar, fcg::RawMouse& rawMouse, GameState& state, bool& programRunning){
     while(const std::optional event = window.pollEvent()){
         ImGui::SFML::ProcessEvent(window, *event);
 
@@ -247,7 +246,7 @@ void HandleEvents(sf::RenderWindow& window, fcg::Player& player, fcg::Renderer& 
                     hotbar.SetSelected(6);
                     break;
                 case sf::Keyboard::Scancode::F3:
-                    hud.ToggleStats();
+                    renderer.ToggleStats();
                     break;
                 case sf::Keyboard::Scancode::F4:
                     renderer.ToggleFrustumCulling();
@@ -351,7 +350,6 @@ int main(){
     std::unique_ptr<fcg::World> world;
     std::unique_ptr<fcg::PauseMenu> pauseMenu;
     std::unique_ptr<fcg::Hotbar> hotbar;
-    std::unique_ptr<fcg::Hud> hud;
     std::unique_ptr<fcg::GenerationPanel> generationPanel;
 
     fcg::RaycastHit target; //Ultimo blocco puntato: resta "congelato" mentre si e' in pausa
@@ -413,7 +411,6 @@ int main(){
 
                     renderer->SetWindowSize((int) window.getSize().x, (int) window.getSize().y);
 
-                    hud = std::make_unique<fcg::Hud>(res);
                     hotbar = std::make_unique<fcg::Hotbar>();
 
                     pauseMenu = std::make_unique<fcg::PauseMenu>(res, mainMenu->GetFov(), mainMenu->GetResolutionWidth(), mainMenu->GetResolutionHeight());
@@ -498,7 +495,6 @@ int main(){
                     renderer.reset();
                     world.reset();
                     hotbar.reset();
-                    hud.reset();
                     pauseMenu.reset();
                     generationPanel.reset();
                     player.reset();
@@ -533,7 +529,7 @@ int main(){
         }
 
         //Playing in game
-        HandleEvents(window, *player, *renderer, *pauseMenu,*hotbar, *hud, rawMouse, state, programRunning);
+        HandleEvents(window, *player, *renderer, *pauseMenu,*hotbar, rawMouse, state, programRunning);
         if(!programRunning) break;
 
         if(state == GameState::Paused){ //Quando si preme ESC (Mette in pausa il gioco)
@@ -560,12 +556,11 @@ int main(){
         world->ProcessBlockInteractions(*player, target, hotbar->GetSelectedBlockType());
 
         renderer->Draw(*world, player->getCamera(), target, *hotbar, deltaTime);
-        hud->Update(player->getCamera().GetYaw(), deltaTime);
+        renderer->UpdateHud(player->getCamera().GetYaw(), deltaTime);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::SFML::Update(window, sf::seconds(deltaTime));
-        hud->Draw();
-        hud->DrawStats(renderer->GetStats(), renderer->IsFrustumCullingEnabled(), renderer->IsOcclusionCullingEnabled());
+        renderer->DrawHud();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         

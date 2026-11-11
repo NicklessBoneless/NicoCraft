@@ -62,6 +62,10 @@ namespace fcg{
             showStats = !showStats;
         }
 
+        bool IsStatsVisible(){
+            return showStats;
+        }
+
         //Va chiamata dopo Draw(), sempre tra ImGui::SFML::Update() e ImGui::Render()
         void DrawStats(const RenderStats& stats, bool frustumEnabled,bool occlusionEnabled){
             if(!showStats) return;
