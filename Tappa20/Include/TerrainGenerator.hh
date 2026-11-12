@@ -182,9 +182,11 @@ namespace fcg{
             const int pointsXZ = cellsXZ + 1;
             const int pointsY = cellsY + 1;
 
+            //Allochiamo i due field che sarannno usati per le celle 4x4x4
             std::vector<float> fieldA(pointsXZ * pointsXZ * pointsY);
             std::vector<float> fieldB(pointsXZ * pointsXZ * pointsY);
         
+            //Riempiamo field con i valori di perlin 3D (Approssimazione)
             for(int j = 0; j < pointsY; j++){
                 for(int k = 0; k < pointsXZ; k++){
                     for(int i = 0; i < pointsXZ; i++){
@@ -193,6 +195,7 @@ namespace fcg{
                         float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
                         int index = GridIndex(i, j, k, pointsXZ);
 
+                        //Perlin due volte con offset diversi
                         fieldA[index] = Fractal3D(*noise,
                             worldX + wormAOffsetX,
                             (worldY + wormAOffsetY) * cavesConfig.wormVerticalScale,
@@ -207,6 +210,7 @@ namespace fcg{
                 }
             }
 
+            //Cicliamo sulle celle 4x4x4
             for(int cellY = 0; cellY < cellsY; cellY++){
                 for(int cellZ = 0; cellZ < cellsXZ; cellZ++){
                     for(int cellX = 0; cellX < cellsXZ; cellX++){
@@ -217,8 +221,10 @@ namespace fcg{
                             cornersA[c] = fieldA[index];
                             cornersB[c] = fieldB[index];
                         }
+                        //Controlliamo che il valore dei cornersi sia tra threshold e -threshold, se non lo è skip
                         if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
 
+                        //Andiamo a ciclare sulla cella non saltata
                         for(int ly = 0; ly < step; ly++){
                             int y = minY + cellY * step + ly;
                             if(y >= Blocks::CHUNK_SIZE_Y) continue;
@@ -228,6 +234,7 @@ namespace fcg{
                                     float fy = (float) ly / (float) step;
                                     float fz = (float) lz / (float) step;
 
+                                    //Interpolazione 
                                     if(std::abs(Trilinear(cornersA, fx, fy, fz)) >= threshold) continue;
                                     if(std::abs(Trilinear(cornersB, fx, fy, fz)) >= threshold) continue;
 
@@ -255,6 +262,7 @@ namespace fcg{
             const int pointsXZ = cellsXZ + 1;
             const int pointsY = cellsY + 1;
 
+            //Riempiamo field con i valori di perlin 3D (Approssimazione)
             std::vector<float> field(pointsXZ * pointsXZ * pointsY);
             for(int j = 0; j < pointsY; j++){
                 for(int k = 0; k < pointsXZ; k++){
@@ -272,6 +280,7 @@ namespace fcg{
                 }
             }
 
+            //Cicliamo sulle celle 2x2x2
             for(int cellY = 0; cellY < cellsY; cellY++){
                 for(int cellZ = 0; cellZ < cellsXZ; cellZ++){
                     for(int cellX = 0; cellX < cellsXZ; cellX++){
