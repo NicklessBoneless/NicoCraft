@@ -339,6 +339,7 @@ namespace fcg{
             if(cavesConfig.spongeEnabled) BuildSpongeMask(chunkX, chunkZ, maximumHeight, heightMap, caveMask);
             if(cavesConfig.wormsEnabled) BuildWormMask(chunkX, chunkZ, maximumHeight, caveMask);
 
+            //Andiamo a genererare le caverne con heightMap
             for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z ; z++){
                     int surface = heightMap[HeightIndex(x,z)];
@@ -369,21 +370,25 @@ namespace fcg{
 
             float centerMid = 0.5f * (float) (cavesConfig.spaghettiMinY + cavesConfig.spaghettiMaxY);
             float centerHalfRange = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
+            FractalParams scaledPathFractal = cavesConfig.spaghettiPathFractal;
+            scaledPathFractal.frequency *= cavesConfig.spaghettiDensity;
+            float scaledThreshold = cavesConfig.spaghettiThreshold * cavesConfig.spaghettiDensity;
 
             for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
                     float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + x);
                     float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + z);
 
-                    float path = Fractal2D(*noise, worldX + spaghettiPathOffsetX, worldZ + spaghettiPathOffsetZ, cavesConfig.spaghettiPathFractal);
+                    float path = Fractal2D(*noise, worldX + spaghettiPathOffsetX, worldZ + spaghettiPathOffsetZ, scaledPathFractal);
                     float distance = std::abs(path);
-                    if(distance >= cavesConfig.spaghettiThreshold) continue;
+                    if(distance >= scaledThreshold) continue;
 
                     float elevation = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
                     float center = centerMid + elevation * centerHalfRange;
 
+
                     //1 al centro del tunnel, 0 sui bordi: sezione tondeggiante
-                    float ratio = distance / cavesConfig.spaghettiThreshold;
+                    float ratio = distance / scaledThreshold;
                     float roundness = std::sqrt(1.0f - ratio * ratio);
                     float halfHeight = 0.5f * (float) cavesConfig.spaghettiHeight * roundness;
 
