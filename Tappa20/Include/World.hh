@@ -22,8 +22,8 @@ using ProgressCallback = std::function<void(float)>;
 
 namespace fcg
 {
-    constexpr int WORLDSIZECHUNKSX = 20;
-    constexpr int WORLDSIZECHUNKSZ = 20;
+    constexpr int WORLDSIZECHUNKSX = 2;
+    constexpr int WORLDSIZECHUNKSZ = 2;
 
     //Un chunk posizionato nella griglia mondo (coordinate in unita' di chunk, non di blocco)
     struct ChunkInstance{
@@ -61,8 +61,11 @@ namespace fcg
                 config.caves,
                 config.heightAmplitude)
             {
+            //Allochiamo la memoria ai chunk
             chunks.reserve(WORLDSIZECHUNKSX * WORLDSIZECHUNKSZ);
+            //Riempiamo, generiamo il mondo di gioco
             GenerateAllChunks(inProgress);
+            //Infine creiamo le mesh
             BuildAllMeshes(inProgress);
         }
 

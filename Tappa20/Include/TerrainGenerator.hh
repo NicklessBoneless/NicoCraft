@@ -34,7 +34,7 @@ namespace fcg{
         using HeightMap = std::array<int, Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Z>;
         
 
-        static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 2; //Quota media del terreno
+        static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 4; //Quota media del terreno
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int wormGridStep = 4; //Passo (blocchi) della griglia di campionamento dei worm, SEMPRE DIVISORE DI 16
         static constexpr int spongeGridStep = 2; //Passo (blocchi) della griglia di campionamento della spugna
@@ -82,7 +82,8 @@ namespace fcg{
         int GetSurfaceHeight(int worldX, int worldZ) const{
             float MediumElevationValue = Fractal2D(*noise, (float) worldX, (float) worldZ, terrainParameters); //n = [-1,1]
             int height = baseHeight + (int) std::floor(MediumElevationValue * heightAmplitude);
-            return std::clamp(height, 2, Blocks::CHUNK_SIZE_Y - treeClearance);
+            //Clamp serve per far rimanere il valore dell'altezza (height) tra [2 - Chunk_Size_Y]
+            return std::clamp(height, 2, Blocks::CHUNK_SIZE_Y); 
         }     
 
         void GenerateChunk(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
@@ -118,7 +119,8 @@ namespace fcg{
             for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
                     int surface = heightMap[HeightIndex(x,z)];
-                    for(int y = 0; y < surface; y++){
+                    chunk.Set(x, 0, z, Blocks::BlockType::STONE); //Bedrock (SOON)
+                    for(int y = 1; y < surface; y++){
                         if(y == surface - 1) chunk.Set(x, y, z, Blocks::BlockType::GRASS);
                         else if(y >= (surface-1)-dirtDepth) chunk.Set(x, y, z, Blocks::BlockType::DIRT);
                         else chunk.Set(x, y, z, Blocks::BlockType::STONE);
@@ -155,16 +157,20 @@ namespace fcg{
             return allAbove || allBelow;
         }
 
+        static int GridIndex(int i, int j , int k , int pointsXZ){
+            return (j * pointsXZ + k) * pointsXZ + i;
+        }
+
         /*
             Costruisce la maschera dei tunnel worm del chunk: i due campi 3D si valutano solo sui
             punti di una griglia (passo wormGridStep) e poi si interpolano. Densita' = scala di
             frequenza e soglia insieme (sqrt perche' i tunnel per volume vanno come frequenza^2),
             cosi' la larghezza resta invariata e cambia solo la quantita'
         */
-        void BuildWormMask(int chunkX, int chunkZ, int topY, std::vector<uint8_t>& mask) const{
+        void BuildWormMask(int chunkX, int chunkZ, int maximumHeight, std::vector<uint8_t>& mask) const{
             const int step = wormGridStep;
             const int minY = cavesConfig.minY;
-            const int cellsY = (topY - minY + step - 1) / step;
+            const int cellsY = (maximumHeight - minY + step - 1) / step;
             if(cellsY <= 0) return;
 
             float densityScale = std::sqrt(cavesConfig.wormCaveDensity);
@@ -178,17 +184,14 @@ namespace fcg{
 
             std::vector<float> fieldA(pointsXZ * pointsXZ * pointsY);
             std::vector<float> fieldB(pointsXZ * pointsXZ * pointsY);
-            auto gridIndex = [pointsXZ](int i, int j, int k){
-                return (j * pointsXZ + k) * pointsXZ + i; //i = x, j = y, k = z
-            };
-
+        
             for(int j = 0; j < pointsY; j++){
                 for(int k = 0; k < pointsXZ; k++){
                     for(int i = 0; i < pointsXZ; i++){
                         float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * step);
                         float worldY = (float) (minY + j * step);
                         float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
-                        int index = gridIndex(i, j, k);
+                        int index = GridIndex(i, j, k, pointsXZ);
 
                         fieldA[index] = Fractal3D(*noise,
                             worldX + wormAOffsetX,
@@ -210,7 +213,7 @@ namespace fcg{
                         float cornersA[8];
                         float cornersB[8];
                         for(int c = 0; c < 8; c++){
-                            int index = gridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1));
+                            int index = GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1),pointsXZ);
                             cornersA[c] = fieldA[index];
                             cornersB[c] = fieldB[index];
                         }
@@ -253,22 +256,18 @@ namespace fcg{
             const int pointsY = cellsY + 1;
 
             std::vector<float> field(pointsXZ * pointsXZ * pointsY);
-            auto gridIndex = [pointsXZ](int i, int j, int k){
-                return (j * pointsXZ + k) * pointsXZ + i; //i = x, j = y, k = z
-            };
-
             for(int j = 0; j < pointsY; j++){
                 for(int k = 0; k < pointsXZ; k++){
                     for(int i = 0; i < pointsXZ; i++){
                         float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * step);
                         float worldY = (float) (minY + j * step);
                         float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
-
-                        field[gridIndex(i, j, k)] = Fractal3D(*noise,
-                            worldX + spongeOffsetX,
+                        float height3D = Fractal3D(*noise,worldX + spongeOffsetX,
                             (worldY + spongeOffsetY) * cavesConfig.verticalScale,
                             worldZ + spongeOffsetZ,
                             cavesConfig.spongeFractal);
+
+                        field[GridIndex(i, j, k,pointsXZ)] =  height3D;
                     }
                 }
             }
@@ -279,30 +278,37 @@ namespace fcg{
                         float corners[8];
                         float maxCorner = -2.0f;
                         for(int c = 0 ; c < 8 ; c++){
-                            corners[c] = field[gridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1))];
+                            corners[c] = field[GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1), pointsXZ)];
                             maxCorner = std::max(maxCorner, corners[c]);
                         }
 
-                        //La soglia reale e' sempre >= spongeThreshold: sopra non si puo' scavare
+                        //Se maxCorner <= soglia allora scartiamo
                         if(maxCorner <= cavesConfig.spongeThreshold) continue;
 
+                        //Andiamo a ciclare sulla cella se > threshold
+                        //cella Step x Step x Step
                         for(int ly = 0; ly < step; ly++){
-                            int y = minY + cellY * step + ly;
+                            int y = minY + cellY * step + ly; // y chunk
                             if(y >= Blocks::CHUNK_SIZE_Y) continue;
 
                             for(int lz = 0; lz < step; lz++){
                                 for(int lx = 0; lx < step; lx++){
-                                    int localX = cellX * step + lx;
-                                    int localZ = cellZ * step + lz;
+                                    int localX = cellX * step + lx; //x chunk
+                                    int localZ = cellZ * step + lz; //z chunk
 
+                                    //Altezza terreno colonna
                                     int surface = heightMap[HeightIndex(localX, localZ)];
+                                    //Ampiezza terreno scavabile
                                     float depthRange = (float) std::max(surface - minY, 1);
+                                    //[0-1] Posizione relativa tra [Bedrock-Altezza Massima] 
                                     float nearSurface = std::clamp((float) (y - minY) / depthRange, 0.0f, 1.0f);
+                                    //Threshold - La threshold aumenta se la superficie è più vicina
                                     float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
 
+                                    //Interpolazione lineare tra i valori di tutti i corner
                                     float value = Trilinear(corners, (float) lx / (float) step, (float) ly / (float) step, (float) lz / (float) step);
                                     if(value > threshold){
-                                        mask[WormMaskIndex(localX, y, localZ)] = 1;
+                                        mask[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
                                     }
                                 }
                             }
@@ -320,9 +326,9 @@ namespace fcg{
             if(!cavesConfig.enabled) return;
 
             std::vector<uint8_t> caveMask(Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Y * Blocks::CHUNK_SIZE_Z, 0);
-            int topY = *std::max_element(heightMap.begin(), heightMap.end());
-            if(cavesConfig.spongeEnabled) BuildSpongeMask(chunkX, chunkZ, topY, heightMap, caveMask);
-            if(cavesConfig.wormsEnabled) BuildWormMask(chunkX, chunkZ, topY, caveMask);
+            int maximumHeight = *std::max_element(heightMap.begin(), heightMap.end());
+            if(cavesConfig.spongeEnabled) BuildSpongeMask(chunkX, chunkZ, maximumHeight, heightMap, caveMask);
+            if(cavesConfig.wormsEnabled) BuildWormMask(chunkX, chunkZ, maximumHeight, caveMask);
 
             for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z ; z++){
