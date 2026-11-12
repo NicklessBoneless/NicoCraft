@@ -30,14 +30,14 @@ namespace fcg{
         bool enabled = true;
 
         //Sacche (cheese): si scava dove il rumore supera la soglia (piu' bassa = piu' vuoto)
-        bool spongeEnabled = !true;
+        bool spongeEnabled = true;
         FractalParams spongeFractal = {4, 0.018f, 1.90f, 0.45f}; //oct.,freq.,lacun.,persist.
         float spongeThreshold = 0.28f;
         float verticalScale = 1.05f; //>1 schiaccia le sacche in verticale (sale larghe e basse)
         float depthBias = 0.05f;     //Quanto sale la soglia vicino alla superficie (0 = nessun effetto)
 
         //Tunnel (spaghetti): si scava dove due campi sono entrambi vicini a zero
-        bool wormsEnabled = !true;
+        bool wormsEnabled = true;
         FractalParams wormFractal = {4, 0.011f, 2.0f, 0.45f}; //oct.,freq.,lacun.,persist.
         float wormThreshold = 0.025f; //Piu' alta = tunnel piu' larghi
         float wormVerticalScale = 1.22f;
