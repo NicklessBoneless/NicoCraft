@@ -193,6 +193,7 @@ namespace fcg
             int localX = worldX - chunkX * Blocks::CHUNK_SIZE_X;
             int localZ = worldZ - chunkZ * Blocks::CHUNK_SIZE_Z;
 
+            if(instance->chunk.Get(localX,worldY,localZ) == Blocks::BlockType::BEDROCK) return;
             instance->chunk.Set(localX, worldY, localZ, Blocks::BlockType::AIR);
             RebuildAfterEdit(*instance, localX, worldY, localZ);
         }
