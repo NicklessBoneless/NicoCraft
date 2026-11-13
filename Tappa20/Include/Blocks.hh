@@ -18,7 +18,8 @@ namespace Blocks{
         LEAVES,
         GLASS,
         LOGWOODNORTHZ,
-        LOGWOODEASTX
+        LOGWOODEASTX,
+        BEDROCK
     };
 
     enum class BlockFace : uint8_t{
@@ -45,6 +46,7 @@ namespace Blocks{
         LOG_SIDERIGHTROT,
         LEAVES,
         GLASS,
+        BEDROCK,
     };
 
     inline bool isBlockTransparent(BlockType type){
@@ -104,6 +106,9 @@ namespace Blocks{
             case BlockType::GLASS:
                 return static_cast<uint32_t>(TextureIndex::GLASS);
                 
+            case BlockType::BEDROCK:
+                return static_cast<uint32_t>(TextureIndex::BEDROCK);
+
             default:
                 return static_cast<uint32_t>(TextureIndex::MISSING); 
         }
@@ -128,7 +133,8 @@ namespace Blocks{
             "logSideLeftRot.png",      // Index 9 -> LOG_ROT
             "logSideRightRot.png",     // Index 10 -> LOG_ROT
             "leaves.png",              // Index 11 -> LEAVES
-            "glass.png"                // Index 12 -> GLASS
+            "glass.png",                // Index 12 -> GLASS
+            "bedrock.png"
         };
 
         const int textureSize = 32;

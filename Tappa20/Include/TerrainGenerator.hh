@@ -119,7 +119,7 @@ namespace fcg{
             for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
                     int surface = heightMap[HeightIndex(x,z)];
-                    chunk.Set(x, 0, z, Blocks::BlockType::STONE); //Bedrock (SOON)
+                    chunk.Set(x, 0, z, Blocks::BlockType::BEDROCK); //Bedrock (SOON)
                     for(int y = 1; y < surface; y++){
                         if(y == surface - 1) chunk.Set(x, y, z, Blocks::BlockType::GRASS);
                         else if(y >= (surface-1)-dirtDepth) chunk.Set(x, y, z, Blocks::BlockType::DIRT);
