@@ -22,8 +22,8 @@ using ProgressCallback = std::function<void(float)>;
 
 namespace fcg
 {
-    constexpr int WORLDSIZECHUNKSX = 2;
-    constexpr int WORLDSIZECHUNKSZ = 2;
+    constexpr int WORLDSIZECHUNKSX = 10;
+    constexpr int WORLDSIZECHUNKSZ = 10;
 
     //Un chunk posizionato nella griglia mondo (coordinate in unita' di chunk, non di blocco)
     struct ChunkInstance{

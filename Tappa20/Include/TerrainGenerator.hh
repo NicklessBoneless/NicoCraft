@@ -271,7 +271,7 @@ namespace fcg{
                         float worldY = (float) (minY + j * step);
                         float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
                         float height3D = Fractal3D(*noise,worldX + spongeOffsetX,
-                            (worldY + spongeOffsetY) * cavesConfig.verticalScale,
+                            (worldY + spongeOffsetY) * cavesConfig.horizontalScale,
                             worldZ + spongeOffsetZ,
                             cavesConfig.spongeFractal);
 

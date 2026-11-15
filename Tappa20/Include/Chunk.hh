@@ -74,7 +74,7 @@ namespace Blocks
         {{0,0,0},{1,0,0},{1,0,1},{0,0,1}}
     };
 
-    constexpr u_int8_t FACE_UV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
+    constexpr uint8_t FACE_UV[4][2] = { {0,0}, {1,0}, {1,1}, {0,1} };
     //Front, Back, Left, Right, Top, Bottom
     constexpr float FACE_BRIGHTNESS[6] = { 0.75f, 0.75f, 0.75f, 0.75f, 1.f, 0.55f };
 

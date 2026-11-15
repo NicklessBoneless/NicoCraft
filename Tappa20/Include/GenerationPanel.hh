@@ -67,7 +67,7 @@ namespace fcg{
                     ImGui::SliderFloat("Sponge lacunarity", &config.caves.spongeFractal.frequencyMultiplier, 1.5f, 3.5f, "%.2f");
                     ImGui::SliderFloat("Sponge persistence", &config.caves.spongeFractal.amplitudeMultiplier, 0.1f, 0.9f, "%.2f");
                     ImGui::SliderFloat("Soglia spugna", &config.caves.spongeThreshold, 0.05f, 0.7f, "%.2f");
-                    ImGui::SliderFloat("Scala verticale", &config.caves.verticalScale, 0.5f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Scala verticale", &config.caves.horizontalScale, 0.5f, 3.0f, "%.2f");
                     ImGui::SliderFloat("Bias profondita'", &config.caves.depthBias, 0.0f, 0.5f, "%.2f");
                 }
 

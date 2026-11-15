@@ -33,7 +33,7 @@ namespace fcg{
         bool spongeEnabled = true;
         FractalParams spongeFractal = {4, 0.018f, 1.90f, 0.45f}; //oct.,freq.,lacun.,persist.
         float spongeThreshold = 0.28f;
-        float verticalScale = 1.05f; //>1 schiaccia le sacche in verticale (sale larghe e basse)
+        float horizontalScale = 1.05f; //>1 schiaccia le sacche in verticale (sale larghe e basse)
         float depthBias = 0.05f;     //Quanto sale la soglia vicino alla superficie (0 = nessun effetto)
 
         //Tunnel (spaghetti): si scava dove due campi sono entrambi vicini a zero
