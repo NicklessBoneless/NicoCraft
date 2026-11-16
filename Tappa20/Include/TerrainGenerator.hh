@@ -238,7 +238,7 @@ namespace fcg{
                                     if(std::abs(Trilinear(cornersA, fx, fy, fz)) >= threshold) continue;
                                     if(std::abs(Trilinear(cornersB, fx, fy, fz)) >= threshold) continue;
 
-                                    for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < Blocks::CHUNK_SIZE_Y ; dy++){
+                                    for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < maximumHeight ; dy++){
                                         mask[WormMaskIndex(cellX * step + lx, y + dy, cellZ * step + lz)] = 1;
                                     }
                                 }
