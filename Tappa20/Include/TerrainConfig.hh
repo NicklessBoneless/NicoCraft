@@ -30,7 +30,7 @@ namespace fcg{
         bool enabled = true;
 
         //Sacche (cheese): si scava dove il rumore supera la soglia (piu' bassa = piu' vuoto)
-        bool spongeEnabled = true;
+        bool spongeEnabled = !true;
         FractalParams spongeFractal = {4, 0.018f, 1.90f, 0.45f}; //oct.,freq.,lacun.,persist.
         float spongeThreshold = 0.28f;
         float horizontalScale = 1.05f; //>1 schiaccia le sacche in verticale (sale larghe e basse)
@@ -44,12 +44,12 @@ namespace fcg{
         float wormCaveDensity = 0.60f; //Frazione di tunnel rispetto ai valori base: scala insieme frequenza e soglia
         int minCeilingHeight = 3;
         
-        int minY = 3; //Sotto questa quota non si scava mai
+        int minY = 1; //Sotto questa quota non si scava mai
         int surfaceMargin = 0; //Strati intatti sotto la superficie (0 = ingressi visibili)
    
         //Spaghetti 2D: il percorso in pianta viene da un campo 2D (si scava dove e' vicino a zero),
         //la quota del tunnel da un secondo campo 2D. L'altezza e' un parametro diretto
-        bool spaghettiEnabled = true;
+        bool spaghettiEnabled = !true;
         FractalParams spaghettiPathFractal = {5, 0.015f, 1.55f, 0.7f}; //oct.,freq.,lacun.,persist.
         FractalParams spaghettiElevationFractal = {4, 0.008f, 2.1f, 0.6f}; //oct.,freq.,lacun.,persist.
         float spaghettiDensity = 0.50f;

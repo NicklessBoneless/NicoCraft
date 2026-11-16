@@ -221,7 +221,7 @@ namespace fcg{
                             cornersA[c] = fieldA[index];
                             cornersB[c] = fieldB[index];
                         }
-                        //Controlliamo che il valore dei cornersi sia tra threshold e -threshold, se non lo è skip
+                        //Controlliamo che il valore dei Corners del cubetto 4x4x4 sia tra threshold e -threshold, se non lo è skip
                         if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
 
                         //Andiamo a ciclare sulla cella non saltata
@@ -238,7 +238,9 @@ namespace fcg{
                                     if(std::abs(Trilinear(cornersA, fx, fy, fz)) >= threshold) continue;
                                     if(std::abs(Trilinear(cornersB, fx, fy, fz)) >= threshold) continue;
 
-                                    mask[WormMaskIndex(cellX * step + lx, y, cellZ * step + lz)] = 1;
+                                    for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < Blocks::CHUNK_SIZE_Y ; dy++){
+                                        mask[WormMaskIndex(cellX * step + lx, y + dy, cellZ * step + lz)] = 1;
+                                    }
                                 }
                             }
                         }
@@ -346,13 +348,14 @@ namespace fcg{
                     int maxY = std::min(surface - cavesConfig.surfaceMargin, Blocks::CHUNK_SIZE_Y);
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
-                        if(!caveMask[WormMaskIndex(x, y, z)]) continue;
+                        //Se è 0 allora non è caverna
+                        if(caveMask[WormMaskIndex(x, y, z)] == 0) continue;
+
+                        //Se è 1, allora dobbiamo sostituire con l'aria
                         if(chunk.Get(x,y-1,z) == Blocks::BlockType::DIRT){
                             chunk.Set(x, y-1, z, Blocks::BlockType::GRASS);
                         }
-                        for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < surface ; dy++){
-                            chunk.Set(x, y + dy, z, Blocks::BlockType::AIR);
-                        }   
+                        chunk.Set(x, y, z, Blocks::BlockType::AIR);   
                     }
                 }
             }
