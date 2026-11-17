@@ -30,7 +30,7 @@ namespace fcg{
         float heightAmplitude;
 
         //HeightMap per la generazione del mondo (salviamo le altezze)
-        //Array di size x * z, HeightMap è un alias
+        //Array di grandezza Chunk_Size_x * Chunk_size_z, HeightMap è un alias
         using HeightMap = std::array<int, Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Z>;
         
 
@@ -87,6 +87,7 @@ namespace fcg{
         }     
 
         void GenerateChunk(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
+            //Costruiamo la heightmap per questo chunk tramite perlin2D
             HeightMap heightMap = BuildHeightMap(chunkX, chunkZ);
 
             //Riempo il mondo di blocchi
@@ -100,38 +101,19 @@ namespace fcg{
         }
 
     private:
+        //Calcola l'indice per la heightmap del chunk
         static int HeightIndex(int x, int z){
             return x + Blocks::CHUNK_SIZE_X * z;
         }
 
-        //Una sola valutazione del fBm 2D per colonna: poi tutte le passate leggono da qui
-        HeightMap BuildHeightMap(int chunkX, int chunkZ) const{
-            HeightMap heightMap;
-            for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
-                for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
-                    heightMap[HeightIndex(x, z)] = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
-                }
-            }
-            return heightMap;
-        }
-
-        void FillTerrain(Blocks::Chunk& chunk, const HeightMap& heightMap) const{
-            for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
-                for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
-                    int surface = heightMap[HeightIndex(x,z)];
-                    chunk.Set(x, 0, z, Blocks::BlockType::BEDROCK); //Bedrock (SOON)
-                    for(int y = 1; y < surface; y++){
-                        if(y == surface - 1) chunk.Set(x, y, z, Blocks::BlockType::GRASS);
-                        else if(y >= (surface-1)-dirtDepth) chunk.Set(x, y, z, Blocks::BlockType::DIRT);
-                        else chunk.Set(x, y, z, Blocks::BlockType::STONE);
-                    }
-                }
-            }
-        }
-
-        //Indice della maschera worm del chunk: un byte per cella (x, y, z locali)
+        //Calcola l'indice per la maschera worm del chunk: un byte per cella (x, y, z locali)
         static int WormMaskIndex(int x, int y, int z){
             return (y * Blocks::CHUNK_SIZE_Z + z) * Blocks::CHUNK_SIZE_X + x;
+        }
+
+        //Calcola l'indice della griglia di grandezza gridStepSize
+        static int GridIndex(int i, int j, int k, int gridStepsSize){
+            return (j * gridStepsSize + k) * gridStepsSize + i;
         }
 
         //Interpolazione trilineare degli 8 angoli (ordine: indice = dx + 2*dy + 4*dz)
@@ -145,8 +127,11 @@ namespace fcg{
             return c0 + fz * (c1 - c0);
         }
 
-        //Vero se tutti gli angoli sono fuori da [-threshold, threshold] dallo stesso lato:
-        //allora anche l'interpolato lo e' e la cella non puo' contenere tunnel
+        /*
+            Controlla se tutti gli angoli sono fuori dalla threshold
+            TRUE se tutti gli angoli sono fuori da [-threshold, threshold] dallo stesso lato.
+            FALSE se almeno uno degli angoli è all'interno della threshold
+        */
         static bool AllCornersOutside(const float* v, float threshold){
             bool allAbove = true;
             bool allBelow = true;
@@ -157,8 +142,117 @@ namespace fcg{
             return allAbove || allBelow;
         }
 
-        static int GridIndex(int i, int j , int k , int pointsXZ){
-            return (j * pointsXZ + k) * pointsXZ + i;
+        /*
+            Costruisce una heightMap tramite Perlin Noise 2D
+            ChunkX,Z specificano il chunk si cui si va a operare con il perlin
+            servono a converitire in coordinate mondo le coordinate locali
+        */
+        HeightMap BuildHeightMap(int chunkX, int chunkZ) const{
+            HeightMap heightMap;
+            for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
+                for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
+                    heightMap[HeightIndex(x, z)] = GetSurfaceHeight(chunkX * Blocks::CHUNK_SIZE_X + x, chunkZ * Blocks::CHUNK_SIZE_Z + z);
+                }
+            }
+            return heightMap;
+        }
+
+        /*
+            Riempe il chunk da [0-Surface] con i blocchi prestabiliti.
+            La surface dipende dal valore della heightmap calcolata con Perlin Noise 2D
+        */
+        void FillTerrain(Blocks::Chunk& chunk, const HeightMap& heightMap) const{
+            for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
+                for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
+                    int surface = heightMap[HeightIndex(x,z)];
+                    chunk.Set(x, 0, z, Blocks::BlockType::BEDROCK);
+                    for(int y = 1; y < surface; y++){
+                        if(y == surface - 1) chunk.Set(x, y, z, Blocks::BlockType::GRASS);
+                        else if(y >= (surface-1)-dirtDepth) chunk.Set(x, y, z, Blocks::BlockType::DIRT);
+                        else chunk.Set(x, y, z, Blocks::BlockType::STONE);
+                    }
+                }
+            }
+        }
+
+        /*
+            Scrive nella maschera le sacche (spugna) del chunk. Il campo 3D si valuta solo sui punti
+            di una griglia (passo spongeGridStep) e poi si interpola; la soglia, che dipende da y 
+            e dalla superficie della colonna, si calcola invece esatta per ogni blocco.
+        */
+        void AddSpongeMask(int chunkX, int chunkZ, int topY, const HeightMap& heightMap, std::vector<uint8_t>& mask) const{
+            const int step = spongeGridStep;
+            const int minY = cavesConfig.minY;
+            const int cellsY = (topY - minY + step - 1) / step;
+            if(cellsY <= 0) return;
+
+            const int cellsXZ = Blocks::CHUNK_SIZE_X / step;
+            const int pointsXZ = cellsXZ + 1;
+            const int pointsY = cellsY + 1;
+
+            //Riempiamo field con i valori di perlin 3D (Approssimazione)
+            std::vector<float> field(pointsXZ * pointsXZ * pointsY);
+            for(int j = 0; j < pointsY; j++){
+                for(int k = 0; k < pointsXZ; k++){
+                    for(int i = 0; i < pointsXZ; i++){
+                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * step);
+                        float worldY = (float) (minY + j * step);
+                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
+                        float height3D = Fractal3D(*noise,worldX + spongeOffsetX,
+                            (worldY + spongeOffsetY) * cavesConfig.horizontalScale,
+                            worldZ + spongeOffsetZ,
+                            cavesConfig.spongeFractal);
+
+                        field[GridIndex(i, j, k,pointsXZ)] =  height3D;
+                    }
+                }
+            }
+
+            //Cicliamo sulle celle 2x2x2
+            for(int cellY = 0; cellY < cellsY; cellY++){
+                for(int cellZ = 0; cellZ < cellsXZ; cellZ++){
+                    for(int cellX = 0; cellX < cellsXZ; cellX++){
+                        float corners[8];
+                        float maxCorner = -2.0f;
+                        for(int c = 0 ; c < 8 ; c++){
+                            corners[c] = field[GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1), pointsXZ)];
+                            maxCorner = std::max(maxCorner, corners[c]);
+                        }
+
+                        //Se maxCorner <= soglia allora scartiamo
+                        if(maxCorner <= cavesConfig.spongeThreshold) continue;
+
+                        //Andiamo a ciclare sulla cella se > threshold
+                        //cella Step x Step x Step
+                        for(int ly = 0; ly < step; ly++){
+                            int y = minY + cellY * step + ly; // y chunk
+                            if(y >= Blocks::CHUNK_SIZE_Y) continue;
+
+                            for(int lz = 0; lz < step; lz++){
+                                for(int lx = 0; lx < step; lx++){
+                                    int localX = cellX * step + lx; //x chunk
+                                    int localZ = cellZ * step + lz; //z chunk
+
+                                    //Altezza terreno colonna
+                                    int surface = heightMap[HeightIndex(localX, localZ)];
+                                    //Ampiezza terreno scavabile
+                                    float depthRange = (float) std::max(surface - minY, 1);
+                                    //[0-1] Posizione relativa tra [Bedrock-Altezza Massima] 
+                                    float nearSurface = std::clamp((float) (y - minY) / depthRange, 0.0f, 1.0f);
+                                    //Threshold - La threshold aumenta se la superficie è più vicina
+                                    float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
+
+                                    //Interpolazione lineare tra i valori di tutti i corner
+                                    float value = Trilinear(corners, (float) lx / (float) step, (float) ly / (float) step, (float) lz / (float) step);
+                                    if(value > threshold){
+                                        mask[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /*
@@ -167,7 +261,7 @@ namespace fcg{
             frequenza e soglia insieme (sqrt perche' i tunnel per volume vanno come frequenza^2),
             cosi' la larghezza resta invariata e cambia solo la quantita'
         */
-        void BuildWormMask(int chunkX, int chunkZ, int maximumHeight, std::vector<uint8_t>& mask) const{
+        void AddWormMask(int chunkX, int chunkZ, int maximumHeight, std::vector<uint8_t>& mask) const{
             const int step = wormGridStep;
             const int minY = cavesConfig.minY;
             const int cellsY = (maximumHeight - minY + step - 1) / step;
@@ -250,86 +344,6 @@ namespace fcg{
         }
 
         /*
-            Scrive nella maschera le sacche (spugna) del chunk. Il campo 3D si valuta solo sui punti
-            di una griglia (passo spongeGridStep) e poi si interpola; la soglia, che dipende da y e
-            dalla superficie della colonna, si calcola invece esatta per ogni blocco
-        */
-        void BuildSpongeMask(int chunkX, int chunkZ, int topY, const HeightMap& heightMap, std::vector<uint8_t>& mask) const{
-            const int step = spongeGridStep;
-            const int minY = cavesConfig.minY;
-            const int cellsY = (topY - minY + step - 1) / step;
-            if(cellsY <= 0) return;
-
-            const int cellsXZ = Blocks::CHUNK_SIZE_X / step;
-            const int pointsXZ = cellsXZ + 1;
-            const int pointsY = cellsY + 1;
-
-            //Riempiamo field con i valori di perlin 3D (Approssimazione)
-            std::vector<float> field(pointsXZ * pointsXZ * pointsY);
-            for(int j = 0; j < pointsY; j++){
-                for(int k = 0; k < pointsXZ; k++){
-                    for(int i = 0; i < pointsXZ; i++){
-                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * step);
-                        float worldY = (float) (minY + j * step);
-                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
-                        float height3D = Fractal3D(*noise,worldX + spongeOffsetX,
-                            (worldY + spongeOffsetY) * cavesConfig.horizontalScale,
-                            worldZ + spongeOffsetZ,
-                            cavesConfig.spongeFractal);
-
-                        field[GridIndex(i, j, k,pointsXZ)] =  height3D;
-                    }
-                }
-            }
-
-            //Cicliamo sulle celle 2x2x2
-            for(int cellY = 0; cellY < cellsY; cellY++){
-                for(int cellZ = 0; cellZ < cellsXZ; cellZ++){
-                    for(int cellX = 0; cellX < cellsXZ; cellX++){
-                        float corners[8];
-                        float maxCorner = -2.0f;
-                        for(int c = 0 ; c < 8 ; c++){
-                            corners[c] = field[GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1), pointsXZ)];
-                            maxCorner = std::max(maxCorner, corners[c]);
-                        }
-
-                        //Se maxCorner <= soglia allora scartiamo
-                        if(maxCorner <= cavesConfig.spongeThreshold) continue;
-
-                        //Andiamo a ciclare sulla cella se > threshold
-                        //cella Step x Step x Step
-                        for(int ly = 0; ly < step; ly++){
-                            int y = minY + cellY * step + ly; // y chunk
-                            if(y >= Blocks::CHUNK_SIZE_Y) continue;
-
-                            for(int lz = 0; lz < step; lz++){
-                                for(int lx = 0; lx < step; lx++){
-                                    int localX = cellX * step + lx; //x chunk
-                                    int localZ = cellZ * step + lz; //z chunk
-
-                                    //Altezza terreno colonna
-                                    int surface = heightMap[HeightIndex(localX, localZ)];
-                                    //Ampiezza terreno scavabile
-                                    float depthRange = (float) std::max(surface - minY, 1);
-                                    //[0-1] Posizione relativa tra [Bedrock-Altezza Massima] 
-                                    float nearSurface = std::clamp((float) (y - minY) / depthRange, 0.0f, 1.0f);
-                                    //Threshold - La threshold aumenta se la superficie è più vicina
-                                    float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
-
-                                    //Interpolazione lineare tra i valori di tutti i corner
-                                    float value = Trilinear(corners, (float) lx / (float) step, (float) ly / (float) step, (float) lz / (float) step);
-                                    if(value > threshold){
-                                        mask[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        /*
             Scava le caverne campionando il Perlin 3D in coordinate MONDO (niente cuciture tra chunk).
             Si scava solo tra minY e (superficie - surfaceMargin): la crosta resta sempre intatta
         */
@@ -338,8 +352,8 @@ namespace fcg{
 
             std::vector<uint8_t> caveMask(Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Y * Blocks::CHUNK_SIZE_Z, 0);
             int maximumHeight = *std::max_element(heightMap.begin(), heightMap.end());
-            if(cavesConfig.spongeEnabled) BuildSpongeMask(chunkX, chunkZ, maximumHeight, heightMap, caveMask);
-            if(cavesConfig.wormsEnabled) BuildWormMask(chunkX, chunkZ, maximumHeight, caveMask);
+            if(cavesConfig.spongeEnabled) AddSpongeMask(chunkX, chunkZ, maximumHeight, heightMap, caveMask);
+            if(cavesConfig.wormsEnabled)  AddWormMask(chunkX, chunkZ, maximumHeight, caveMask);
 
             //Andiamo a genererare le caverne con heightMap
             for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
@@ -423,22 +437,20 @@ namespace fcg{
             //x/z partono da 1 e si fermano a CHUNK_SIZE-2: cosi' x-1, x+1, z-1, z+1 restano sempre in bounds
             for(int x = 1; x < Blocks::CHUNK_SIZE_X - 1; x++){
                 for(int z = 1; z < Blocks::CHUNK_SIZE_Z - 1; z++){
-                    //Probabilita' 1%. Uso % su rng() invece di uniform_int_distribution
-                    //perche' quest'ultima non e' riproducibile tra standard library diverse
                     if(rng() % treeRarity != 0) continue;
                     if(IsTooCloseToOtherTree(x, z, treePositions)) continue;
                     
-                    int groundY = heightMap[HeightIndex(x, z)];;
-                    if(!chunk.IsSolid(x,groundY-1,z)) continue;
+                    int surface = heightMap[HeightIndex(x, z)];;
+                    if(!chunk.IsSolid(x,surface-1,z)) continue;
                     
                     treePositions.push_back({x, z});
-                    int treeTop = groundY + treeTrunkHeight;
+                    int treeTop = surface + treeTrunkHeight;
 
-                    for(int y = groundY; y < treeTop; y++){
+                    for(int y = surface; y < treeTop; y++){
                         chunk.Set(x, y, z, Blocks::BlockType::LOGWOOD);
                     }
 
-                    for(int y = groundY + 3; y < treeTop + 1; y++){
+                    for(int y = surface + 3; y < treeTop + 1; y++){
                         for(int dx = -1; dx <= 1; dx++){
                             for(int dz = -1; dz <= 1; dz++){
                                 if(dx == 0 && dz == 0 && y != treeTop) continue; //Al centro c'e' il tronco
@@ -452,9 +464,8 @@ namespace fcg{
 
         //Piazza una foglia solo se la cella è libera: su terreno irregolare non deve scavare le colline vicine
         static void PlaceLeaf(Blocks::Chunk& chunk, int x, int y, int z){
-            if(chunk.Get(x, y, z) == Blocks::BlockType::AIR){
-                chunk.Set(x, y, z, Blocks::BlockType::LEAVES);
-            }
+            if(chunk.Get(x, y, z) != Blocks::BlockType::AIR) return;
+            chunk.Set(x, y, z, Blocks::BlockType::LEAVES);
         }
 
         //Controlla se (x,z) e' entro minTreeDistance da un tronco gia' piazzato
