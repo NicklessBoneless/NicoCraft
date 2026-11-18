@@ -59,7 +59,7 @@ FetchContent_MakeAvailable(ImGui-SFML)
 add_library(common INTERFACE)
 target_compile_features(common INTERFACE cxx_std_20)
 target_compile_options(common INTERFACE
-  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>: -Wall -DGL_SILENCE_DEPRECATION>
+  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>: -Wall>
   $<$<CXX_COMPILER_ID:MSVC>: /W4>
 )
 
@@ -75,7 +75,7 @@ if(APPLE)
 endif()
 
 ###############################
-### Sorgenti e Tappe 1-15   ###
+### Sorgenti e Tappe 13-15   ###
 ###############################
 
 # nome eseguibile, nome file
@@ -90,5 +90,3 @@ endfunction()
 foreach(tappaNumber RANGE 13 20)
     addTappa(Tappa${tappaNumber})
 endforeach()
-
-
