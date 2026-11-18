@@ -88,7 +88,7 @@ namespace fcg{
 
         void GenerateChunk(Blocks::Chunk& chunk, int chunkX, int chunkZ) const{
             //Costruiamo la heightmap per questo chunk tramite perlin2D
-            HeightMap heightMap = BuildHeightMap(chunkX, chunkZ);
+            HeightMap heightMap = GenerateHeightMapForChunkXZ(chunkX, chunkZ);
 
             //Riempo il mondo di blocchi
             FillTerrain(chunk, heightMap);
@@ -147,7 +147,7 @@ namespace fcg{
             ChunkX,Z specificano il chunk si cui si va a operare con il perlin
             servono a converitire in coordinate mondo le coordinate locali
         */
-        HeightMap BuildHeightMap(int chunkX, int chunkZ) const{
+        HeightMap GenerateHeightMapForChunkXZ(int chunkX, int chunkZ) const{
             HeightMap heightMap;
             for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
                 for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
