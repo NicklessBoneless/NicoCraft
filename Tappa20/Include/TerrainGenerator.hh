@@ -90,13 +90,13 @@ namespace fcg{
             //Costruiamo la heightmap per questo chunk tramite perlin2D
             HeightMap heightMap = GenerateHeightMapForChunkXZ(chunkX, chunkZ);
 
-            //Riempo il mondo di blocchi
+            //Riempe il chunk di blocchi
             FillTerrain(chunk, heightMap);
 
-            //Creo le caverne
+            //Crea le caverne nel chumk
             GenerateCaves(chunk, chunkX, chunkZ, heightMap); 
 
-            //Aggiungo gli alberi e altro
+            //Aggiunge gli alberi al chunk
             GenerateTrees(chunk, chunkX, chunkZ, heightMap);
         }
 
@@ -176,11 +176,11 @@ namespace fcg{
         }
 
         /*
-            Scrive nella maschera le sacche (spugna) del chunk. Il campo 3D si valuta solo sui punti
-            di una griglia (passo spongeGridStep) e poi si interpola; la soglia, che dipende da y 
-            e dalla superficie della colonna, si calcola invece esatta per ogni blocco.
+            Individua i blocchi da rimuovere e rimpiazzare con aria seguento l'algoritmo delle sacche (spugna) del chunk. 
+            Il perlin 3D si valuta solo sui punti di una griglia (spongeGridStep) e poi si interpola; 
+            la soglia, che dipende da y e dalla superficie della colonna, si calcola invece esatta per ogni blocco.
         */
-        void AddSpongeMask(int chunkX, int chunkZ, int topY, const HeightMap& heightMap, std::vector<uint8_t>& mask) const{
+        void CarveSpongeCave(int chunkX, int chunkZ, int topY, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
             const int step = spongeGridStep;
             const int minY = cavesConfig.minY;
             const int cellsY = (topY - minY + step - 1) / step;
@@ -245,7 +245,7 @@ namespace fcg{
                                     //Interpolazione lineare tra i valori di tutti i corner
                                     float value = Trilinear(corners, (float) lx / (float) step, (float) ly / (float) step, (float) lz / (float) step);
                                     if(value > threshold){
-                                        mask[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
+                                        carveMap[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
                                     }
                                 }
                             }
@@ -261,7 +261,7 @@ namespace fcg{
             frequenza e soglia insieme (sqrt perche' i tunnel per volume vanno come frequenza^2),
             cosi' la larghezza resta invariata e cambia solo la quantita'
         */
-        void AddWormMask(int chunkX, int chunkZ, int maximumHeight, std::vector<uint8_t>& mask) const{
+        void CarveWormCave(int chunkX, int chunkZ, int maximumHeight, std::vector<uint8_t>& carveMap) const{
             const int step = wormGridStep;
             const int minY = cavesConfig.minY;
             const int cellsY = (maximumHeight - minY + step - 1) / step;
@@ -333,7 +333,7 @@ namespace fcg{
                                     if(std::abs(Trilinear(cornersB, fx, fy, fz)) >= threshold) continue;
 
                                     for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < maximumHeight ; dy++){
-                                        mask[WormMaskIndex(cellX * step + lx, y + dy, cellZ * step + lz)] = 1;
+                                        carveMap[WormMaskIndex(cellX * step + lx, y + dy, cellZ * step + lz)] = 1;
                                     }
                                 }
                             }
@@ -350,10 +350,10 @@ namespace fcg{
         void GenerateCaves(Blocks::Chunk& chunk,int chunkX,int chunkZ,const HeightMap& heightMap) const{
             if(!cavesConfig.enabled) return;
 
-            std::vector<uint8_t> caveMask(Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Y * Blocks::CHUNK_SIZE_Z, 0);
+            std::vector<uint8_t> caveCarveMap(Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Y * Blocks::CHUNK_SIZE_Z, 0);
             int maximumHeight = *std::max_element(heightMap.begin(), heightMap.end());
-            if(cavesConfig.spongeEnabled) AddSpongeMask(chunkX, chunkZ, maximumHeight, heightMap, caveMask);
-            if(cavesConfig.wormsEnabled)  AddWormMask(chunkX, chunkZ, maximumHeight, caveMask);
+            if(cavesConfig.spongeEnabled) CarveSpongeCave(chunkX, chunkZ, maximumHeight, heightMap, caveCarveMap);
+            if(cavesConfig.wormsEnabled)  CarveWormCave(chunkX, chunkZ, maximumHeight, caveCarveMap);
 
             //Andiamo a genererare le caverne con heightMap
             for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
@@ -363,7 +363,7 @@ namespace fcg{
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
                         //Se è 0 allora non è caverna
-                        if(caveMask[WormMaskIndex(x, y, z)] == 0) continue;
+                        if(caveCarveMap[WormMaskIndex(x, y, z)] == 0) continue;
 
                         //Se è 1, allora dobbiamo sostituire con l'aria
                         if(chunk.Get(x,y-1,z) == Blocks::BlockType::DIRT){
