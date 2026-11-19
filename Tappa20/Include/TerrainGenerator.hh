@@ -189,20 +189,26 @@ namespace fcg{
             const int numberOfPointsXZ = numberOfCellsXZ + 1;
             const int numberOfPointsY  = numberOfCellsY  + 1;
 
-            //Riempiamo il vettore con i valori di perlin 3D
+            /*
+                Riempiamo il vettore con i valori di perlin noise 3D
+                Campioniamo (numeroPunti^2 * Height).
+                Quindi avremo (256 * Height), con la griglia 1 blocco = 1 cella
+                Invece avremo (81 * Height/2 + 1), con la griglia 1 blocco = 1/4 cella (2x2x2)
+            */
             std::vector<float> perlinNoiseValues(numberOfPointsXZ * numberOfPointsXZ * numberOfPointsY);
-            for(int j = 0; j < numberOfPointsY; j++){
-                for(int k = 0; k < numberOfPointsXZ; k++){
-                    for(int i = 0; i < numberOfPointsXZ; i++){
-                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * spongeGridSize);
-                        float worldY = (float) (minHeight + j * spongeGridSize);
-                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * spongeGridSize);
+            for(int y = 0; y < numberOfPointsY; y++){
+                for(int z = 0; z < numberOfPointsXZ; z++){
+                    for(int x = 0; x < numberOfPointsXZ; x++){
+                        //Campioniamo Perlin Noise 3D sui 9 punti del chunk  
+                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + x * spongeGridSize);
+                        float worldY = (float) (minHeight + y * spongeGridSize);
+                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + z * spongeGridSize);
                         float height3D = Fractal3D(*noise,worldX + spongeOffsetX,
                             (worldY + spongeOffsetY) * cavesConfig.horizontalScale,
                             worldZ + spongeOffsetZ,
                             cavesConfig.spongeFractal);
 
-                        perlinNoiseValues[GridIndex(i, j, k,numberOfPointsXZ)] =  height3D;
+                        perlinNoiseValues[GridIndex(x, y, z,numberOfPointsXZ)] =  height3D;
                     }
                 }
             }
@@ -218,10 +224,10 @@ namespace fcg{
                             maxCorner = std::max(maxCorner, corners[c]);
                         }
 
-                        //Se maxCorner <= soglia allora scartiamo
+                        //Se maxCorner <= soglia allora scartiamo, non si scava.
                         if(maxCorner <= cavesConfig.spongeThreshold) continue;
 
-                        //Andiamo a ciclare sulla cella se > threshold
+                        //Andiamo a ciclare sulla cella se > soglia
                         //cella Step x Step x Step
                         for(int ly = 0; ly < spongeGridSize; ly++){
                             int y = minHeight + cellY * spongeGridSize + ly; // y chunk
