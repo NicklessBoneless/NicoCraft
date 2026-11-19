@@ -37,7 +37,7 @@ namespace fcg{
         static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 4; //Quota media del terreno
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
         static constexpr int wormGridStep = 4; //Passo (blocchi) della griglia di campionamento dei worm, SEMPRE DIVISORE DI 16
-        static constexpr int spongeGridStep = 2; //Passo (blocchi) della griglia di campionamento della spugna
+        static constexpr int spongeGridSize = 2; //Passo (blocchi) della griglia di campionamento della spugna
         static constexpr int treeRarity = 400;
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
         static constexpr int treeTrunkHeight = 5;
@@ -177,45 +177,44 @@ namespace fcg{
 
         /*
             Individua i blocchi da rimuovere e rimpiazzare con aria seguento l'algoritmo delle sacche (spugna) del chunk. 
-            Il perlin 3D si valuta solo sui punti di una griglia (spongeGridStep) e poi si interpola; 
+            Il perlin 3D si valuta solo sui punti di una griglia (spongeGridSize) e poi si interpola; 
             la soglia, che dipende da y e dalla superficie della colonna, si calcola invece esatta per ogni blocco.
         */
-        void CarveSpongeCave(int chunkX, int chunkZ, int topY, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
-            const int step = spongeGridStep;
-            const int minY = cavesConfig.minY;
-            const int cellsY = (topY - minY + step - 1) / step;
-            if(cellsY <= 0) return;
+        void CarveSpongeCave(int chunkX , int chunkZ, int maximumHeight, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
+            const int minHeight = cavesConfig.minY;
+            const int numberOfCellsY = (maximumHeight - minHeight + spongeGridSize - 1) / spongeGridSize;
+            if(numberOfCellsY <= 0) return;
 
-            const int cellsXZ = Blocks::CHUNK_SIZE_X / step;
-            const int pointsXZ = cellsXZ + 1;
-            const int pointsY = cellsY + 1;
+            const int numberOfCellsXZ  = Blocks::CHUNK_SIZE_X / spongeGridSize;
+            const int numberOfPointsXZ = numberOfCellsXZ + 1;
+            const int numberOfPointsY  = numberOfCellsY  + 1;
 
-            //Riempiamo field con i valori di perlin 3D (Approssimazione)
-            std::vector<float> field(pointsXZ * pointsXZ * pointsY);
-            for(int j = 0; j < pointsY; j++){
-                for(int k = 0; k < pointsXZ; k++){
-                    for(int i = 0; i < pointsXZ; i++){
-                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * step);
-                        float worldY = (float) (minY + j * step);
-                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
+            //Riempiamo il vettore con i valori di perlin 3D
+            std::vector<float> perlinNoiseValues(numberOfPointsXZ * numberOfPointsXZ * numberOfPointsY);
+            for(int j = 0; j < numberOfPointsY; j++){
+                for(int k = 0; k < numberOfPointsXZ; k++){
+                    for(int i = 0; i < numberOfPointsXZ; i++){
+                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * spongeGridSize);
+                        float worldY = (float) (minHeight + j * spongeGridSize);
+                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * spongeGridSize);
                         float height3D = Fractal3D(*noise,worldX + spongeOffsetX,
                             (worldY + spongeOffsetY) * cavesConfig.horizontalScale,
                             worldZ + spongeOffsetZ,
                             cavesConfig.spongeFractal);
 
-                        field[GridIndex(i, j, k,pointsXZ)] =  height3D;
+                        perlinNoiseValues[GridIndex(i, j, k,numberOfPointsXZ)] =  height3D;
                     }
                 }
             }
 
             //Cicliamo sulle celle 2x2x2
-            for(int cellY = 0; cellY < cellsY; cellY++){
-                for(int cellZ = 0; cellZ < cellsXZ; cellZ++){
-                    for(int cellX = 0; cellX < cellsXZ; cellX++){
+            for(int cellY = 0; cellY < numberOfCellsY; cellY++){
+                for(int cellZ = 0; cellZ < numberOfCellsXZ; cellZ++){
+                    for(int cellX = 0; cellX < numberOfCellsXZ; cellX++){
                         float corners[8];
                         float maxCorner = -2.0f;
                         for(int c = 0 ; c < 8 ; c++){
-                            corners[c] = field[GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1), pointsXZ)];
+                            corners[c] = perlinNoiseValues[GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1), numberOfPointsXZ)];
                             maxCorner = std::max(maxCorner, corners[c]);
                         }
 
@@ -224,26 +223,26 @@ namespace fcg{
 
                         //Andiamo a ciclare sulla cella se > threshold
                         //cella Step x Step x Step
-                        for(int ly = 0; ly < step; ly++){
-                            int y = minY + cellY * step + ly; // y chunk
+                        for(int ly = 0; ly < spongeGridSize; ly++){
+                            int y = minHeight + cellY * spongeGridSize + ly; // y chunk
                             if(y >= Blocks::CHUNK_SIZE_Y) continue;
 
-                            for(int lz = 0; lz < step; lz++){
-                                for(int lx = 0; lx < step; lx++){
-                                    int localX = cellX * step + lx; //x chunk
-                                    int localZ = cellZ * step + lz; //z chunk
+                            for(int lz = 0; lz < spongeGridSize; lz++){
+                                for(int lx = 0; lx < spongeGridSize; lx++){
+                                    int localX = cellX * spongeGridSize + lx; //x chunk
+                                    int localZ = cellZ * spongeGridSize + lz; //z chunk
 
                                     //Altezza terreno colonna
                                     int surface = heightMap[HeightIndex(localX, localZ)];
                                     //Ampiezza terreno scavabile
-                                    float depthRange = (float) std::max(surface - minY, 1);
+                                    float depthRange = (float) std::max(surface - minHeight, 1);
                                     //[0-1] Posizione relativa tra [Bedrock-Altezza Massima] 
-                                    float nearSurface = std::clamp((float) (y - minY) / depthRange, 0.0f, 1.0f);
+                                    float nearSurface = std::clamp((float) (y - minHeight) / depthRange, 0.0f, 1.0f);
                                     //Threshold - La threshold aumenta se la superficie è più vicina
                                     float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
 
                                     //Interpolazione lineare tra i valori di tutti i corner
-                                    float value = Trilinear(corners, (float) lx / (float) step, (float) ly / (float) step, (float) lz / (float) step);
+                                    float value = Trilinear(corners, (float) lx / (float) spongeGridSize, (float) ly / (float) spongeGridSize, (float) lz / (float) spongeGridSize);
                                     if(value > threshold){
                                         carveMap[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
                                     }
