@@ -36,7 +36,7 @@ namespace fcg{
 
         static constexpr int baseHeight = Blocks::CHUNK_SIZE_Y / 4; //Quota media del terreno
         static constexpr int dirtDepth = 5; //Strati di terra sotto l'erba
-        static constexpr int wormGridStep = 4; //Passo (blocchi) della griglia di campionamento dei worm, SEMPRE DIVISORE DI 16
+        static constexpr int wormGridSize = 4; //Passo (blocchi) della griglia di campionamento dei worm, SEMPRE DIVISORE DI 16
         static constexpr int spongeGridSize = 2; //Passo (blocchi) della griglia di campionamento della spugna
         static constexpr int treeRarity = 400;
         static constexpr int minTreeDistance = 3; //Distanza minima (in blocchi) tra due tronchi
@@ -280,7 +280,7 @@ namespace fcg{
             if(minHeight > maximumHeightY) return;
 
             const int actualWorkingHeight = (maximumHeightY - minHeight);
-            const int numberOfCellsY = divideAndRoundUp(actualWorkingHeight,wormGridStep);
+            const int numberOfCellsY = divideAndRoundUp(actualWorkingHeight,wormGridSize);
             if(numberOfCellsY <= 0) return;
 
             float densityScale = std::sqrt(cavesConfig.wormCaveDensity);
@@ -288,7 +288,7 @@ namespace fcg{
             scaledFractal.frequency *= densityScale;
             float threshold = cavesConfig.wormThreshold * densityScale;
 
-            const int numberOfCellsXZ = Blocks::CHUNK_SIZE_X / wormGridStep;
+            const int numberOfCellsXZ = Blocks::CHUNK_SIZE_X / wormGridSize;
             const int numberOfPointsXZ = numberOfCellsXZ + 1;
             const int numberOfPointsY  = numberOfCellsY  + 1;
 
@@ -300,9 +300,9 @@ namespace fcg{
             for(int j = 0; j < numberOfPointsY; j++){
                 for(int k = 0; k < numberOfPointsXZ; k++){
                     for(int i = 0; i < numberOfPointsXZ; i++){
-                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * wormGridStep);
-                        float worldY = (float) (minHeight + j * wormGridStep);
-                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * wormGridStep);
+                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * wormGridSize);
+                        float worldY = (float) (minHeight + j * wormGridSize);
+                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * wormGridSize);
                         int index = GridIndex(i, j, k, numberOfPointsXZ);
 
                         //Perlin due volte con offset diversi
@@ -335,14 +335,14 @@ namespace fcg{
                         if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
 
                         //Andiamo a ciclare sulla cella non saltata
-                        for(int insideCellY = 0; insideCellY < wormGridStep; insideCellY++){
-                            int localChunkY = minHeight + cellY * wormGridStep + insideCellY;
+                        for(int insideCellY = 0; insideCellY < wormGridSize; insideCellY++){
+                            int localChunkY = minHeight + cellY * wormGridSize + insideCellY;
                             if(localChunkY >= Blocks::CHUNK_SIZE_Y) continue;
-                            for(int insideCellZ = 0; insideCellZ < wormGridStep; insideCellZ++){
-                                for(int insideCellX = 0; insideCellX < wormGridStep; insideCellX++){
-                                    float normalizedX = (float) insideCellX / (float) wormGridStep;
-                                    float normalizedY = (float) insideCellY / (float) wormGridStep;
-                                    float normalizedZ = (float) insideCellZ / (float) wormGridStep;
+                            for(int insideCellZ = 0; insideCellZ < wormGridSize; insideCellZ++){
+                                for(int insideCellX = 0; insideCellX < wormGridSize; insideCellX++){
+                                    float normalizedX = (float) insideCellX / (float) wormGridSize;
+                                    float normalizedY = (float) insideCellY / (float) wormGridSize;
+                                    float normalizedZ = (float) insideCellZ / (float) wormGridSize;
 
                                     //Interpolazione e Intersezione 
                                     float valueA = std::abs(Trilinear(cornersA, normalizedX, normalizedY, normalizedZ));
@@ -350,8 +350,8 @@ namespace fcg{
                                     float valueB = std::abs(Trilinear(cornersB, normalizedX, normalizedY, normalizedZ));
                                     if(valueB >= threshold) continue;
 
-                                    int localChunkX = cellX * spongeGridSize + insideCellX; //x chunk [0-15]
-                                    int localChunkZ = cellZ * spongeGridSize + insideCellZ; //z chunk [0-15]
+                                    int localChunkX = cellX * wormGridSize + insideCellX; //x chunk [0-15]
+                                    int localChunkZ = cellZ * wormGridSize + insideCellZ; //z chunk [0-15]
 
                                     for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && localChunkY + dy < maximumHeightY ; dy++){
                                         carveMap[CarveIndex(localChunkX, localChunkY + dy, localChunkZ)] = 1;
