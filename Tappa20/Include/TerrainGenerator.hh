@@ -183,7 +183,7 @@ namespace fcg{
         /*
             Individua i blocchi da rimuovere e rimpiazzare con aria seguento l'algoritmo delle sacche (spugna) del chunk. 
             Il perlin 3D si valuta solo sui punti di una griglia (spongeGridSize) e poi si interpola; 
-            la soglia, che dipende da y e dalla superficie della colonna, si calcola invece esatta per ogni blocco.
+            la soglia, che dipende da y e dalla superficie della colonna, si confronta con ogni singolo blocco.
         */
         void CarveSpongeCave(int chunkX , int chunkZ, int maximumHeightY, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
             const int minHeight = cavesConfig.minY;
@@ -270,10 +270,8 @@ namespace fcg{
         }
 
         /*
-            Costruisce la maschera dei tunnel worm del chunk: i due campi 3D si valutano solo sui
-            punti di una griglia (passo wormGridStep) e poi si interpolano. Densita' = scala di
-            frequenza e soglia insieme (sqrt perche' i tunnel per volume vanno come frequenza^2),
-            cosi' la larghezza resta invariata e cambia solo la quantita'
+            Individua i blocchi da rimuovere e rimpiazzare con aria seguento l'algoritmo dei tunnel (worm) del chunk. 
+            Il perlin 3D si valuta solo sui punti di una griglia (wormGridSize) e poi si interpola;        
         */
         void CarveWormCave(int chunkX, int chunkZ, int maximumHeightY, std::vector<uint8_t>& carveMap) const{
             const int minHeight = cavesConfig.minY;
@@ -283,8 +281,10 @@ namespace fcg{
             const int numberOfCellsY = divideAndRoundUp(actualWorkingHeight,wormGridSize);
             if(numberOfCellsY <= 0) return;
 
+            //DensityScale scala la frequenza e threshold assieme [sqrt perchè i tunnel per volume hanno come frequenza^2]
             float densityScale = std::sqrt(cavesConfig.wormCaveDensity);
             FractalParams scaledFractal = cavesConfig.wormFractal;
+
             scaledFractal.frequency *= densityScale;
             float threshold = cavesConfig.wormThreshold * densityScale;
 
@@ -292,18 +292,22 @@ namespace fcg{
             const int numberOfPointsXZ = numberOfCellsXZ + 1;
             const int numberOfPointsY  = numberOfCellsY  + 1;
 
-            //Allochiamo i due field che sarannno usati per le celle 4x4x4
+            //Allochiamo i due vettori che sarannno usati per contenere i valori di perlin noise 3D
             std::vector<float> perlinNoiseValuesA(numberOfPointsXZ * numberOfPointsXZ * numberOfPointsY);
             std::vector<float> perlinNoiseValuesB(numberOfPointsXZ * numberOfPointsXZ * numberOfPointsY);
         
-            //Riempiamo field con i valori di perlin 3D (Approssimazione)
-            for(int j = 0; j < numberOfPointsY; j++){
-                for(int k = 0; k < numberOfPointsXZ; k++){
-                    for(int i = 0; i < numberOfPointsXZ; i++){
-                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * wormGridSize);
-                        float worldY = (float) (minHeight + j * wormGridSize);
-                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * wormGridSize);
-                        int index = GridIndex(i, j, k, numberOfPointsXZ);
+            /*
+                Riempiamo i vettori con i valori di perlin noise 3D
+                Campioniamo solo per 1/4 delle volte, 
+                approssimiamo utilizzando una griglia di minore granularità (4x4x4)
+            */
+            for(int y = 0; y < numberOfPointsY; y++){
+                for(int z = 0; z < numberOfPointsXZ; z++){
+                    for(int x = 0; x < numberOfPointsXZ; x++){
+                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + x * wormGridSize);
+                        float worldY = (float) (minHeight + y * wormGridSize);
+                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + z * wormGridSize);
+                        int index = GridIndex(x, y, z, numberOfPointsXZ);
 
                         //Perlin due volte con offset diversi
                         perlinNoiseValuesA[index] = Fractal3D(*noise,
@@ -334,7 +338,7 @@ namespace fcg{
                         //Controlliamo che il valore dei Corners del cubetto 4x4x4 sia tra threshold e -threshold, se non lo è skip
                         if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
 
-                        //Andiamo a ciclare sulla cella non saltata
+                        //Andiamo a ciclare sulla cella non saltata (4x4x4)
                         for(int insideCellY = 0; insideCellY < wormGridSize; insideCellY++){
                             int localChunkY = minHeight + cellY * wormGridSize + insideCellY;
                             if(localChunkY >= Blocks::CHUNK_SIZE_Y) continue;
