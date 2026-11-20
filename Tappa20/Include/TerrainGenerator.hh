@@ -344,9 +344,11 @@ namespace fcg{
                                     float normalizedY = (float) insideCellY / (float) wormGridStep;
                                     float normalizedZ = (float) insideCellZ / (float) wormGridStep;
 
-                                    //Interpolazione 
-                                    if(std::abs(Trilinear(cornersA, normalizedX, normalizedY, normalizedZ)) >= threshold) continue;
-                                    if(std::abs(Trilinear(cornersB, normalizedX, normalizedY, normalizedZ)) >= threshold) continue;
+                                    //Interpolazione e Intersezione 
+                                    float valueA = std::abs(Trilinear(cornersA, normalizedX, normalizedY, normalizedZ));
+                                    if(valueA >= threshold) continue;
+                                    float valueB = std::abs(Trilinear(cornersB, normalizedX, normalizedY, normalizedZ));
+                                    if(valueB >= threshold) continue;
 
                                     int localChunkX = cellX * spongeGridSize + insideCellX; //x chunk [0-15]
                                     int localChunkZ = cellZ * spongeGridSize + insideCellZ; //z chunk [0-15]
