@@ -239,19 +239,19 @@ namespace fcg{
                         //Andiamo a ciclare sulla cella se > soglia
                         //cella Step x Step x Step
                         for(int insideCellY = 0; insideCellY < spongeGridSize; insideCellY++){
-                            int localChunkY = minHeight + cellY * spongeGridSize + insideCellY; // y chunk
+                            int localChunkY = minHeight + cellY * spongeGridSize + insideCellY; // y chunk [0-15]
                             if(localChunkY >= Blocks::CHUNK_SIZE_Y) continue;
 
                             for(int insideCellZ = 0; insideCellZ < spongeGridSize; insideCellZ++){
                                 for(int insideCellX = 0; insideCellX < spongeGridSize; insideCellX++){
-                                    int localChunkX = cellX * spongeGridSize + insideCellX; //x chunk
-                                    int localChunkZ = cellZ * spongeGridSize + insideCellZ; //z chunk
+                                    int localChunkX = cellX * spongeGridSize + insideCellX; //x chunk [0-15]
+                                    int localChunkZ = cellZ * spongeGridSize + insideCellZ; //z chunk [0-15]
 
-                                    //Altezza terreno colonna
+                                    //Altezza del terreno in quella colonna
                                     int surface = heightMap[HeightIndex(localChunkX, localChunkZ)];
-                                    //Ampiezza terreno scavabile
+                                    //Range del terreno scavabile
                                     float depthRange = (float) std::max(surface - minHeight, 1);
-                                    //[0-1] Posizione relativa tra [Bedrock-Altezza Massima] 
+                                    //Posizione relativa tra [Bedrock-Altezza Massima] in numero float [0.0-1.0] 
                                     float nearSurface = std::clamp((float) (localChunkY - minHeight) / depthRange, 0.0f, 1.0f);
                                     //Threshold - La threshold aumenta se la superficie è più vicina
                                     float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
@@ -275,41 +275,43 @@ namespace fcg{
             frequenza e soglia insieme (sqrt perche' i tunnel per volume vanno come frequenza^2),
             cosi' la larghezza resta invariata e cambia solo la quantita'
         */
-        void CarveWormCave(int chunkX, int chunkZ, int maximumHeight, std::vector<uint8_t>& carveMap) const{
-            const int step = wormGridStep;
-            const int minY = cavesConfig.minY;
-            const int cellsY = (maximumHeight - minY + step - 1) / step;
-            if(cellsY <= 0) return;
+        void CarveWormCave(int chunkX, int chunkZ, int maximumHeightY, std::vector<uint8_t>& carveMap) const{
+            const int minHeight = cavesConfig.minY;
+            if(minHeight > maximumHeightY) return;
+
+            const int actualWorkingHeight = (maximumHeightY - minHeight);
+            const int numberOfCellsY = divideAndRoundUp(actualWorkingHeight,wormGridStep);
+            if(numberOfCellsY <= 0) return;
 
             float densityScale = std::sqrt(cavesConfig.wormCaveDensity);
             FractalParams scaledFractal = cavesConfig.wormFractal;
             scaledFractal.frequency *= densityScale;
             float threshold = cavesConfig.wormThreshold * densityScale;
 
-            const int cellsXZ = Blocks::CHUNK_SIZE_X / step;
-            const int pointsXZ = cellsXZ + 1;
-            const int pointsY = cellsY + 1;
+            const int numberOfCellsXZ = Blocks::CHUNK_SIZE_X / wormGridStep;
+            const int numberOfPointsXZ = numberOfCellsXZ + 1;
+            const int numberOfPointsY  = numberOfCellsY  + 1;
 
             //Allochiamo i due field che sarannno usati per le celle 4x4x4
-            std::vector<float> fieldA(pointsXZ * pointsXZ * pointsY);
-            std::vector<float> fieldB(pointsXZ * pointsXZ * pointsY);
+            std::vector<float> perlinNoiseValuesA(numberOfPointsXZ * numberOfPointsXZ * numberOfPointsY);
+            std::vector<float> perlinNoiseValuesB(numberOfPointsXZ * numberOfPointsXZ * numberOfPointsY);
         
             //Riempiamo field con i valori di perlin 3D (Approssimazione)
-            for(int j = 0; j < pointsY; j++){
-                for(int k = 0; k < pointsXZ; k++){
-                    for(int i = 0; i < pointsXZ; i++){
-                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * step);
-                        float worldY = (float) (minY + j * step);
-                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * step);
-                        int index = GridIndex(i, j, k, pointsXZ);
+            for(int j = 0; j < numberOfPointsY; j++){
+                for(int k = 0; k < numberOfPointsXZ; k++){
+                    for(int i = 0; i < numberOfPointsXZ; i++){
+                        float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + i * wormGridStep);
+                        float worldY = (float) (minHeight + j * wormGridStep);
+                        float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + k * wormGridStep);
+                        int index = GridIndex(i, j, k, numberOfPointsXZ);
 
                         //Perlin due volte con offset diversi
-                        fieldA[index] = Fractal3D(*noise,
+                        perlinNoiseValuesA[index] = Fractal3D(*noise,
                             worldX + wormAOffsetX,
                             (worldY + wormAOffsetY) * cavesConfig.wormVerticalScale,
                             worldZ + wormAOffsetZ,
                             scaledFractal);
-                        fieldB[index] = Fractal3D(*noise,
+                        perlinNoiseValuesB[index] = Fractal3D(*noise,
                             worldX + wormBOffsetX,
                             (worldY + wormBOffsetY) * cavesConfig.wormVerticalScale,
                             worldZ + wormBOffsetZ,
@@ -319,35 +321,38 @@ namespace fcg{
             }
 
             //Cicliamo sulle celle 4x4x4
-            for(int cellY = 0; cellY < cellsY; cellY++){
-                for(int cellZ = 0; cellZ < cellsXZ; cellZ++){
-                    for(int cellX = 0; cellX < cellsXZ; cellX++){
+            for(int cellY = 0; cellY < numberOfCellsY; cellY++){
+                for(int cellZ = 0; cellZ < numberOfCellsXZ; cellZ++){
+                    for(int cellX = 0; cellX < numberOfCellsXZ; cellX++){
                         float cornersA[8];
                         float cornersB[8];
                         for(int c = 0; c < 8; c++){
-                            int index = GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1),pointsXZ);
-                            cornersA[c] = fieldA[index];
-                            cornersB[c] = fieldB[index];
+                            int index = GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1),numberOfPointsXZ);
+                            cornersA[c] = perlinNoiseValuesA[index];
+                            cornersB[c] = perlinNoiseValuesB[index];
                         }
                         //Controlliamo che il valore dei Corners del cubetto 4x4x4 sia tra threshold e -threshold, se non lo è skip
                         if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
 
                         //Andiamo a ciclare sulla cella non saltata
-                        for(int insideCellY = 0; insideCellY < step; insideCellY++){
-                            int y = minY + cellY * step + insideCellY;
-                            if(y >= Blocks::CHUNK_SIZE_Y) continue;
-                            for(int insideCellZ = 0; insideCellZ < step; insideCellZ++){
-                                for(int insideCellX = 0; insideCellX < step; insideCellX++){
-                                    float fx = (float) insideCellX / (float) step;
-                                    float fy = (float) insideCellY / (float) step;
-                                    float fz = (float) insideCellZ / (float) step;
+                        for(int insideCellY = 0; insideCellY < wormGridStep; insideCellY++){
+                            int localChunkY = minHeight + cellY * wormGridStep + insideCellY;
+                            if(localChunkY >= Blocks::CHUNK_SIZE_Y) continue;
+                            for(int insideCellZ = 0; insideCellZ < wormGridStep; insideCellZ++){
+                                for(int insideCellX = 0; insideCellX < wormGridStep; insideCellX++){
+                                    float normalizedX = (float) insideCellX / (float) wormGridStep;
+                                    float normalizedY = (float) insideCellY / (float) wormGridStep;
+                                    float normalizedZ = (float) insideCellZ / (float) wormGridStep;
 
                                     //Interpolazione 
-                                    if(std::abs(Trilinear(cornersA, fx, fy, fz)) >= threshold) continue;
-                                    if(std::abs(Trilinear(cornersB, fx, fy, fz)) >= threshold) continue;
+                                    if(std::abs(Trilinear(cornersA, normalizedX, normalizedY, normalizedZ)) >= threshold) continue;
+                                    if(std::abs(Trilinear(cornersB, normalizedX, normalizedY, normalizedZ)) >= threshold) continue;
 
-                                    for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < maximumHeight ; dy++){
-                                        carveMap[CarveIndex(cellX * step + insideCellX, y + dy, cellZ * step + insideCellZ)] = 1;
+                                    int localChunkX = cellX * spongeGridSize + insideCellX; //x chunk [0-15]
+                                    int localChunkZ = cellZ * spongeGridSize + insideCellZ; //z chunk [0-15]
+
+                                    for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && localChunkY + dy < maximumHeightY ; dy++){
+                                        carveMap[CarveIndex(localChunkX, localChunkY + dy, localChunkZ)] = 1;
                                     }
                                 }
                             }
