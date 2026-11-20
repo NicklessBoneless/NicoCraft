@@ -101,6 +101,11 @@ namespace fcg{
         }
 
     private:
+        //Divide e arrotonda per eccesso
+        static int divideAndRoundUp(int dividend, int divisor){
+            return (dividend + (divisor-1)) / divisor;
+        }
+
         //Calcola l'indice per la heightmap del chunk
         static int HeightIndex(int x, int z){
             return x + Blocks::CHUNK_SIZE_X * z;
@@ -180,9 +185,12 @@ namespace fcg{
             Il perlin 3D si valuta solo sui punti di una griglia (spongeGridSize) e poi si interpola; 
             la soglia, che dipende da y e dalla superficie della colonna, si calcola invece esatta per ogni blocco.
         */
-        void CarveSpongeCave(int chunkX , int chunkZ, int maximumHeight, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
+        void CarveSpongeCave(int chunkX , int chunkZ, int maximumHeightY, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
             const int minHeight = cavesConfig.minY;
-            const int numberOfCellsY = (maximumHeight - minHeight + spongeGridSize - 1) / spongeGridSize;
+            if(minHeight > maximumHeightY) return;
+
+            const int actualWorkingHeight = (maximumHeightY - minHeight);
+            const int numberOfCellsY = divideAndRoundUp(actualWorkingHeight,spongeGridSize);
             if(numberOfCellsY <= 0) return;
 
             const int numberOfCellsXZ  = Blocks::CHUNK_SIZE_X / spongeGridSize;
