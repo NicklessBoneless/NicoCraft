@@ -112,7 +112,7 @@ namespace fcg{
         }
 
         //Calcola l'indice per la maschera worm del chunk: un byte per cella (x, y, z locali)
-        static int WormMaskIndex(int x, int y, int z){
+        static int CarveIndex(int x, int y, int z){
             return (y * Blocks::CHUNK_SIZE_Z + z) * Blocks::CHUNK_SIZE_X + x;
         }
 
@@ -193,6 +193,7 @@ namespace fcg{
             const int numberOfCellsY = divideAndRoundUp(actualWorkingHeight,spongeGridSize);
             if(numberOfCellsY <= 0) return;
 
+            //Al posto di andare a calcolare 16^2 punti di perlin noise, ne calcoliamo 9^2, con spongeGridSize = 2
             const int numberOfCellsXZ  = Blocks::CHUNK_SIZE_X / spongeGridSize;
             const int numberOfPointsXZ = numberOfCellsXZ + 1;
             const int numberOfPointsY  = numberOfCellsY  + 1;
@@ -237,28 +238,28 @@ namespace fcg{
 
                         //Andiamo a ciclare sulla cella se > soglia
                         //cella Step x Step x Step
-                        for(int ly = 0; ly < spongeGridSize; ly++){
-                            int y = minHeight + cellY * spongeGridSize + ly; // y chunk
-                            if(y >= Blocks::CHUNK_SIZE_Y) continue;
+                        for(int insideCellY = 0; insideCellY < spongeGridSize; insideCellY++){
+                            int localChunkY = minHeight + cellY * spongeGridSize + insideCellY; // y chunk
+                            if(localChunkY >= Blocks::CHUNK_SIZE_Y) continue;
 
-                            for(int lz = 0; lz < spongeGridSize; lz++){
-                                for(int lx = 0; lx < spongeGridSize; lx++){
-                                    int localX = cellX * spongeGridSize + lx; //x chunk
-                                    int localZ = cellZ * spongeGridSize + lz; //z chunk
+                            for(int insideCellZ = 0; insideCellZ < spongeGridSize; insideCellZ++){
+                                for(int insideCellX = 0; insideCellX < spongeGridSize; insideCellX++){
+                                    int localChunkX = cellX * spongeGridSize + insideCellX; //x chunk
+                                    int localChunkZ = cellZ * spongeGridSize + insideCellZ; //z chunk
 
                                     //Altezza terreno colonna
-                                    int surface = heightMap[HeightIndex(localX, localZ)];
+                                    int surface = heightMap[HeightIndex(localChunkX, localChunkZ)];
                                     //Ampiezza terreno scavabile
                                     float depthRange = (float) std::max(surface - minHeight, 1);
                                     //[0-1] Posizione relativa tra [Bedrock-Altezza Massima] 
-                                    float nearSurface = std::clamp((float) (y - minHeight) / depthRange, 0.0f, 1.0f);
+                                    float nearSurface = std::clamp((float) (localChunkY - minHeight) / depthRange, 0.0f, 1.0f);
                                     //Threshold - La threshold aumenta se la superficie è più vicina
                                     float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
 
                                     //Interpolazione lineare tra i valori di tutti i corner
-                                    float value = Trilinear(corners, (float) lx / (float) spongeGridSize, (float) ly / (float) spongeGridSize, (float) lz / (float) spongeGridSize);
+                                    float value = Trilinear(corners, (float) insideCellX / (float) spongeGridSize, (float) insideCellY / (float) spongeGridSize, (float) insideCellZ / (float) spongeGridSize);
                                     if(value > threshold){
-                                        carveMap[WormMaskIndex(localX, y, localZ)] = 1; //Caverna!
+                                        carveMap[CarveIndex(localChunkX, localChunkY, localChunkZ)] = 1; //Caverna!
                                     }
                                 }
                             }
@@ -332,21 +333,21 @@ namespace fcg{
                         if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
 
                         //Andiamo a ciclare sulla cella non saltata
-                        for(int ly = 0; ly < step; ly++){
-                            int y = minY + cellY * step + ly;
+                        for(int insideCellY = 0; insideCellY < step; insideCellY++){
+                            int y = minY + cellY * step + insideCellY;
                             if(y >= Blocks::CHUNK_SIZE_Y) continue;
-                            for(int lz = 0; lz < step; lz++){
-                                for(int lx = 0; lx < step; lx++){
-                                    float fx = (float) lx / (float) step;
-                                    float fy = (float) ly / (float) step;
-                                    float fz = (float) lz / (float) step;
+                            for(int insideCellZ = 0; insideCellZ < step; insideCellZ++){
+                                for(int insideCellX = 0; insideCellX < step; insideCellX++){
+                                    float fx = (float) insideCellX / (float) step;
+                                    float fy = (float) insideCellY / (float) step;
+                                    float fz = (float) insideCellZ / (float) step;
 
                                     //Interpolazione 
                                     if(std::abs(Trilinear(cornersA, fx, fy, fz)) >= threshold) continue;
                                     if(std::abs(Trilinear(cornersB, fx, fy, fz)) >= threshold) continue;
 
                                     for(int dy = 0 ; dy < cavesConfig.minCeilingHeight && y + dy < maximumHeight ; dy++){
-                                        carveMap[WormMaskIndex(cellX * step + lx, y + dy, cellZ * step + lz)] = 1;
+                                        carveMap[CarveIndex(cellX * step + insideCellX, y + dy, cellZ * step + insideCellZ)] = 1;
                                     }
                                 }
                             }
@@ -376,7 +377,7 @@ namespace fcg{
 
                     for(int y = cavesConfig.minY; y < maxY; y++){
                         //Se è 0 allora non è caverna
-                        if(caveCarveMap[WormMaskIndex(x, y, z)] == 0) continue;
+                        if(caveCarveMap[CarveIndex(x, y, z)] == 0) continue;
 
                         //Se è 1, allora dobbiamo sostituire con l'aria
                         if(chunk.Get(x,y-1,z) == Blocks::BlockType::DIRT){
