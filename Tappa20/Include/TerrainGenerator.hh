@@ -229,7 +229,13 @@ namespace fcg{
                         float corners[8];
                         float maxCorner = -2.0f;
                         for(int c = 0 ; c < 8 ; c++){
-                            corners[c] = perlinNoiseValues[GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1), numberOfPointsXZ)];
+                            //I 3 bit di c codificano quale angolo della cella stiamo leggendo
+                            int offsetX = c & 1;        //bit 0
+                            int offsetY = (c >> 1) & 1; //bit 1
+                            int offsetZ = (c >> 2) & 1; //bit 2
+
+                            int index = GridIndex(cellX + offsetX, cellY + offsetY, cellZ + offsetZ, numberOfPointsXZ);
+                            corners[c] = perlinNoiseValues[index];
                             maxCorner = std::max(maxCorner, corners[c]);
                         }
 
@@ -257,7 +263,7 @@ namespace fcg{
                                     float threshold = cavesConfig.spongeThreshold + cavesConfig.depthBias * nearSurface;
 
                                     //Interpolazione lineare tra i valori di tutti i corner
-                                    float value = Trilinear(corners, (float) insideCellX / (float) spongeGridSize, (float) insideCellY / (float) spongeGridSize, (float) insideCellZ / (float) spongeGridSize);
+                                    float value = Trilinear(corners, (float)insideCellX / (float)spongeGridSize, (float)insideCellY / (float)spongeGridSize, (float)insideCellZ / (float)spongeGridSize);
                                     if(value > threshold){
                                         carveMap[CarveIndex(localChunkX, localChunkY, localChunkZ)] = 1; //Caverna!
                                     }
@@ -286,7 +292,7 @@ namespace fcg{
             FractalParams scaledFractal = cavesConfig.wormFractal;
 
             scaledFractal.frequency *= densityScale;
-            float threshold = cavesConfig.wormThreshold * densityScale;
+            float scaledWormThreshold = cavesConfig.wormThreshold * densityScale;
 
             const int numberOfCellsXZ = Blocks::CHUNK_SIZE_X / wormGridSize;
             const int numberOfPointsXZ = numberOfCellsXZ + 1;
@@ -299,7 +305,8 @@ namespace fcg{
             /*
                 Riempiamo i vettori con i valori di perlin noise 3D
                 Campioniamo solo per 1/4 delle volte, 
-                approssimiamo utilizzando una griglia di minore granularità (4x4x4)
+                approssimiamo utilizzando l'interpolazione trilineare 
+                e con una griglia di minore granularità (4x4x4)
             */
             for(int y = 0; y < numberOfPointsY; y++){
                 for(int z = 0; z < numberOfPointsXZ; z++){
@@ -331,12 +338,17 @@ namespace fcg{
                         float cornersA[8];
                         float cornersB[8];
                         for(int c = 0; c < 8; c++){
-                            int index = GridIndex(cellX + (c & 1), cellY + ((c >> 1) & 1), cellZ + ((c >> 2) & 1),numberOfPointsXZ);
+                            //I 3 bit di c codificano quale angolo della cella stiamo leggendo
+                            int offsetX = c        & 1; //bit 0 [0-1]
+                            int offsetY = (c >> 1) & 1; //bit 1 [0-1]
+                            int offsetZ = (c >> 2) & 1; //bit 2 [0-1]
+
+                            int index = GridIndex(cellX + offsetX, cellY + offsetY, cellZ + offsetZ, numberOfPointsXZ);
                             cornersA[c] = perlinNoiseValuesA[index];
                             cornersB[c] = perlinNoiseValuesB[index];
                         }
-                        //Controlliamo che il valore dei Corners del cubetto 4x4x4 sia tra threshold e -threshold, se non lo è skip
-                        if(AllCornersOutside(cornersA, threshold) || AllCornersOutside(cornersB, threshold)) continue;
+                        //Controlliamo se i valori dei Corners della cella 4x4x4 sono al di fuori di threshold e -threshold, se lo è skip
+                        if(AllCornersOutside(cornersA, scaledWormThreshold) || AllCornersOutside(cornersB, scaledWormThreshold)) continue;
 
                         //Andiamo a ciclare sulla cella non saltata (4x4x4)
                         for(int insideCellY = 0; insideCellY < wormGridSize; insideCellY++){
@@ -344,15 +356,15 @@ namespace fcg{
                             if(localChunkY >= Blocks::CHUNK_SIZE_Y) continue;
                             for(int insideCellZ = 0; insideCellZ < wormGridSize; insideCellZ++){
                                 for(int insideCellX = 0; insideCellX < wormGridSize; insideCellX++){
-                                    float normalizedX = (float) insideCellX / (float) wormGridSize;
-                                    float normalizedY = (float) insideCellY / (float) wormGridSize;
-                                    float normalizedZ = (float) insideCellZ / (float) wormGridSize;
+                                    float normalizedCellBlockX = (float)insideCellX / (float)wormGridSize;
+                                    float normalizedCellBlockY = (float)insideCellY / (float)wormGridSize;
+                                    float normalizedCellBlockZ = (float)insideCellZ / (float)wormGridSize;
 
                                     //Interpolazione e Intersezione 
-                                    float valueA = std::abs(Trilinear(cornersA, normalizedX, normalizedY, normalizedZ));
-                                    if(valueA >= threshold) continue;
-                                    float valueB = std::abs(Trilinear(cornersB, normalizedX, normalizedY, normalizedZ));
-                                    if(valueB >= threshold) continue;
+                                    float valueA = std::abs(Trilinear(cornersA, normalizedCellBlockX, normalizedCellBlockY, normalizedCellBlockZ));
+                                    if(valueA >= scaledWormThreshold) continue;
+                                    float valueB = std::abs(Trilinear(cornersB, normalizedCellBlockX, normalizedCellBlockY, normalizedCellBlockZ));
+                                    if(valueB >= scaledWormThreshold) continue;
 
                                     int localChunkX = cellX * wormGridSize + insideCellX; //x chunk [0-15]
                                     int localChunkZ = cellZ * wormGridSize + insideCellZ; //z chunk [0-15]
@@ -399,19 +411,19 @@ namespace fcg{
                 }
             }
 
-            GenerateSpaghetti2D(chunk, chunkX, chunkZ, heightMap);
+            CarveSpaghetti2D(chunk, chunkX, chunkZ, heightMap);
         }
 
         /*
-            Spaghetti 2D: i due campi si valutano UNA volta per colonna (non per cella).
-            Dove |path| < soglia c'e' un tunnel; elevation ne decide la quota del centro.
-            La sezione e' tondeggiante: l'altezza cala verso i bordi della larghezza
+            Spaghetti 2D, l'idea è di ridurre il problema da 3D a 2D.
+            Usiamo due texture perlin noise 2D valutati una volta per colonna (x,z)
         */
-        void GenerateSpaghetti2D(Blocks::Chunk& chunk, int chunkX, int chunkZ, const HeightMap& heightMap) const{
+        void CarveSpaghetti2D(Blocks::Chunk& chunk, int chunkX, int chunkZ, const HeightMap& heightMap) const{
             if(!cavesConfig.spaghettiEnabled) return;
+            if(cavesConfig.spaghettiMinY > cavesConfig.spaghettiMaxY) return;
 
-            float centerMid = 0.5f * (float) (cavesConfig.spaghettiMinY + cavesConfig.spaghettiMaxY);
-            float centerHalfRange = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
+            float averageHeightY   = 0.5f * (float) (cavesConfig.spaghettiMinY + cavesConfig.spaghettiMaxY);
+            float halfWidthheightY = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
             FractalParams scaledPathFractal = cavesConfig.spaghettiPathFractal;
             scaledPathFractal.frequency *= cavesConfig.spaghettiDensity;
             float scaledThreshold = cavesConfig.spaghettiThreshold * cavesConfig.spaghettiDensity;
@@ -426,7 +438,7 @@ namespace fcg{
                     if(distance >= scaledThreshold) continue;
 
                     float elevation = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
-                    float center = centerMid + elevation * centerHalfRange;
+                    float center = averageHeightY + elevation * halfWidthheightY;
 
 
                     //1 al centro del tunnel, 0 sui bordi: sezione tondeggiante
