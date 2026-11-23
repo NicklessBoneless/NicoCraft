@@ -391,6 +391,7 @@ namespace fcg{
             int maximumHeight = *std::max_element(heightMap.begin(), heightMap.end());
             if(cavesConfig.spongeEnabled) CarveSpongeCave(chunkX, chunkZ, maximumHeight, heightMap, caveCarveMap);
             if(cavesConfig.wormsEnabled)  CarveWormCave(chunkX, chunkZ, maximumHeight, caveCarveMap);
+            if(cavesConfig.spaghettiEnabled) CarveSpaghetti2D(chunkX, chunkZ, heightMap, caveCarveMap);
 
             //Andiamo a genererare le caverne con heightMap
             for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
@@ -410,52 +411,55 @@ namespace fcg{
                     }
                 }
             }
-
-            CarveSpaghetti2D(chunk, chunkX, chunkZ, heightMap);
         }
 
         /*
             Spaghetti 2D, l'idea è di ridurre il problema da 3D a 2D.
             Usiamo due texture perlin noise 2D valutati una volta per colonna (x,z)
         */
-        void CarveSpaghetti2D(Blocks::Chunk& chunk, int chunkX, int chunkZ, const HeightMap& heightMap) const{
-            if(!cavesConfig.spaghettiEnabled) return;
+        void CarveSpaghetti2D(int chunkX, int chunkZ, const HeightMap& heightMap, std::vector<uint8_t>& carveMap) const{
             if(cavesConfig.spaghettiMinY > cavesConfig.spaghettiMaxY) return;
 
+            //Altezza media Y [MinY+MaxY/2]
             float averageHeightY   = 0.5f * (float) (cavesConfig.spaghettiMinY + cavesConfig.spaghettiMaxY);
-            float halfWidthheightY = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
+
+            //SemiAmpiezza Y [MinY-MaxY/2], 
+            float halfWidthHeightY = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
+            
+            //Scala generazione delle caverne
             FractalParams scaledPathFractal = cavesConfig.spaghettiPathFractal;
             scaledPathFractal.frequency *= cavesConfig.spaghettiDensity;
             float scaledThreshold = cavesConfig.spaghettiThreshold * cavesConfig.spaghettiDensity;
 
-            for(int x = 0; x < Blocks::CHUNK_SIZE_X; x++){
-                for(int z = 0; z < Blocks::CHUNK_SIZE_Z; z++){
-                    float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + x);
-                    float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + z);
+            for(int localChunkX = 0; localChunkX < Blocks::CHUNK_SIZE_X ; localChunkX++){
+                for(int localChunkZ = 0; localChunkZ < Blocks::CHUNK_SIZE_Z ; localChunkZ++){
+                    float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + localChunkX);
+                    float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + localChunkZ);
 
-                    float path = Fractal2D(*noise, worldX + spaghettiPathOffsetX, worldZ + spaghettiPathOffsetZ, scaledPathFractal);
-                    float distance = std::abs(path);
-                    if(distance >= scaledThreshold) continue;
+                    //Campiono il perlin noise 2D per sapere se la colonna XZ è caverna 
+                    float generatedXZ = Fractal2D(*noise, worldX + spaghettiPathOffsetX, worldZ + spaghettiPathOffsetZ, scaledPathFractal);
+                    float distanceFromTunnelCenterXZ = std::abs(generatedXZ); 
+                    //Se ci allontaniamo troppo dal centro, allora LA COLONNA XZ non appartiene alla caverna
+                    if(distanceFromTunnelCenterXZ >= scaledThreshold) continue;
+                  
+                    //Campiono il perlin noise 2D per sapere a che altezza Y sarà il tunnel
+                    float generatedHeight = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
+                    float tunnelCenterHeight = averageHeightY + generatedHeight * halfWidthHeightY;
 
-                    float elevation = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
-                    float center = averageHeightY + elevation * halfWidthheightY;
+                    //1.0 al centro del tunnel, 0.0 sui bordi: sezione tondeggiante
+                    float ratio = distanceFromTunnelCenterXZ / scaledThreshold;
+                    float shape = 1.0f - (ratio*ratio);
+                    float halfTunnelHeight = 0.5f * (float) cavesConfig.spaghettiCenterTunnelHeight * shape;
 
+                    int surface = heightMap[HeightIndex(localChunkX, localChunkZ)];
 
-                    //1 al centro del tunnel, 0 sui bordi: sezione tondeggiante
-                    float ratio = distance / scaledThreshold;
-                    float roundness = std::sqrt(1.0f - ratio * ratio);
-                    float halfHeight = 0.5f * (float) cavesConfig.spaghettiHeight * roundness;
+                    int floorHeightY   = std::max((int) std::floor(tunnelCenterHeight - halfTunnelHeight), cavesConfig.minY);
+                    int ceilingHeightY = std::min((int) std::floor(tunnelCenterHeight + halfTunnelHeight), surface-cavesConfig.surfaceMargin);
 
-                    int surface = heightMap[HeightIndex(x, z)];
-                    int yStart = std::max((int) std::ceil(center - halfHeight), cavesConfig.minY);
-                    int yEnd = std::min((int) std::floor(center + halfHeight), surface - cavesConfig.surfaceMargin - 1);
-
-                    if(yStart > yEnd) continue;
-                    if(chunk.Get(x,yStart-1,z) == Blocks::BlockType::DIRT){
-                        chunk.Set(x,yStart-1, z, Blocks::BlockType::GRASS);
-                    }
-                    for(int y = yStart; y <= yEnd; y++){
-                        chunk.Set(x, y, z, Blocks::BlockType::AIR);
+                    if(floorHeightY > ceilingHeightY) continue;
+                    
+                    for(int localChunkY = floorHeightY ; localChunkY <= ceilingHeightY ; localChunkY++){
+                        carveMap[CarveIndex(localChunkX, localChunkY, localChunkZ)] = 1;
                     }
                 }
             }
