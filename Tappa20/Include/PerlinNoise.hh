@@ -85,7 +85,7 @@ namespace fcg{
             }   
         }
 
-    public: 
+    public: //Costruttore classe Perlin Noise
         explicit PerlinNoise(uint32_t seed){ 
             //Inizializza la tabella delle permutazioni
             for(uint16_t i = 0; i < (perm.max_size() >> 1) ; i++){
@@ -105,6 +105,7 @@ namespace fcg{
             }
         }
 
+        //Sample2D implementato con Perlin Noise 2D, il metodo è fornito dall'interfaccia
         float Sample2D(float x, float z) const override{
             float floorX = std::floor(x);
             float floorZ = std::floor(z);
@@ -124,7 +125,7 @@ namespace fcg{
             int topRight    = perm[perm[xIndexUnitCell + 1] + zIndexUnitCell + 1]; //bb
 
             //Gradient2D effettua il prodotto scalare 
-            float dotProductBottomLeft = Gradient2D(bottomLeft, xLocalCell, zLocalCell);
+            float dotProductBottomLeft  = Gradient2D(bottomLeft, xLocalCell, zLocalCell);
             float dotProductBottomRight = Gradient2D(bottomRight, xLocalCell - 1.0f, zLocalCell);
             
             //Rumore bordo inferiore cella, metà sotto
@@ -142,6 +143,7 @@ namespace fcg{
             return std::clamp(Lerp(wSmoothedWeight, bottomHalfBlend, topHalfBlend), -1.0f, 1.0f); 
         }
 
+        //Sample3D implementato con Perlin Noise 3D, il metodo è fornito dall'interfaccia
         float Sample3D(float x, float y, float z) const override{
             //Arrotondiamo verso il basso con floor, 
             //con cast ad (int) avremmo arrotondato verso lo zero!
