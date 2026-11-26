@@ -54,7 +54,7 @@ namespace fcg{
         FractalParams spaghettiElevationFractal = {4, 0.008f, 2.1f, 0.6f}; //oct.,freq.,lacun.,persist.
         float spaghettiDensity = 0.50f;
         float spaghettiThreshold = 0.055f; //Larghezza del tunnel in pianta
-        int spaghettiCenterTunnelHeight = 5; //Altezza massima della sezione (blocchi)
+        int spaghettiCenterMaxTunnelHeight = 5; //Altezza massima della sezione (blocchi)
         int spaghettiMinY = minY;           //Quota minima del centro del tunnel
         int spaghettiMaxY = 70;          //Quota massima del centro del tunnel
     };

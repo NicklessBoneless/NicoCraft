@@ -67,7 +67,7 @@ namespace fcg{
                     ImGui::SliderFloat("Sponge lacunarity", &config.caves.spongeFractal.frequencyMultiplier, 1.5f, 3.5f, "%.2f");
                     ImGui::SliderFloat("Sponge persistence", &config.caves.spongeFractal.amplitudeMultiplier, 0.1f, 0.9f, "%.2f");
                     ImGui::SliderFloat("Soglia spugna", &config.caves.spongeThreshold, 0.05f, 0.7f, "%.2f");
-                    ImGui::SliderFloat("Scala verticale", &config.caves.horizontalScale, 0.5f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Scala orizzontale", &config.caves.horizontalScale, 0.5f, 3.0f, "%.2f");
                     ImGui::SliderFloat("Bias profondita'", &config.caves.depthBias, 0.0f, 0.5f, "%.2f");
                 }
 
@@ -89,7 +89,7 @@ namespace fcg{
                     ImGui::SliderFloat("Spaghetti frequency", &config.caves.spaghettiPathFractal.frequency, 0.003f, 0.05f, "%.3f");
                     ImGui::SliderFloat("Spaghetti persistence", &config.caves.spaghettiPathFractal.amplitudeMultiplier, 0.1f, 0.7f, "%.2f");
                     ImGui::SliderFloat("Spessore spaghetti (Threshold)", &config.caves.spaghettiThreshold, 0.005f, 0.1f, "%.3f");
-                    ImGui::SliderInt("Altezza spaghetti", &config.caves.spaghettiCenterTunnelHeight, 2, 10);
+                    ImGui::SliderInt("Altezza spaghetti MAX", &config.caves.spaghettiCenterMaxTunnelHeight, 2, 10);
                     ImGui::SliderFloat("Densità Spaghetti", &config.caves.spaghettiDensity,0.01f,1.0f,"%.2f");
                     ImGui::SliderFloat("Elevation frequency", &config.caves.spaghettiElevationFractal.frequency, 0.002f, 0.03f, "%.3f");
                     ImGui::SliderInt("Quota min spaghetti", &config.caves.spaghettiMinY, 3, 120);

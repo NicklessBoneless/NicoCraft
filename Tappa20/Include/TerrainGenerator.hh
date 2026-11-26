@@ -389,11 +389,11 @@ namespace fcg{
 
             std::vector<uint8_t> caveCarveMap(Blocks::CHUNK_SIZE_X * Blocks::CHUNK_SIZE_Y * Blocks::CHUNK_SIZE_Z, 0);
             int maximumHeight = *std::max_element(heightMap.begin(), heightMap.end());
-            if(cavesConfig.spongeEnabled) CarveSpongeCave(chunkX, chunkZ, maximumHeight, heightMap, caveCarveMap);
-            if(cavesConfig.wormsEnabled)  CarveWormCave(chunkX, chunkZ, maximumHeight, caveCarveMap);
+            if(cavesConfig.spongeEnabled)    CarveSpongeCave(chunkX, chunkZ, maximumHeight, heightMap, caveCarveMap);
+            if(cavesConfig.wormsEnabled)     CarveWormCave(chunkX, chunkZ, maximumHeight, caveCarveMap);
             if(cavesConfig.spaghettiEnabled) CarveSpaghetti2D(chunkX, chunkZ, heightMap, caveCarveMap);
 
-            //Andiamo a genererare le caverne con heightMap
+            //Scaviamo il terreno con l'uso di caveCarveMap
             for(int x = 0; x < Blocks::CHUNK_SIZE_X ; x++){
                 for(int z = 0; z < Blocks::CHUNK_SIZE_Z ; z++){
                     int surface = heightMap[HeightIndex(x,z)];
@@ -403,8 +403,9 @@ namespace fcg{
                         //Se è 0 allora non è caverna
                         if(caveCarveMap[CarveIndex(x, y, z)] == 0) continue;
 
-                        //Se è 1, allora dobbiamo sostituire con l'aria
-                        if(chunk.Get(x,y-1,z) == Blocks::BlockType::DIRT){
+                        //Se è 1, allora dobbiamo sostituire con l'ARIA
+                        //Controllo che se viene esposta della terra all'ARIA
+                        if(chunk.Get(x, y-1, z) == Blocks::BlockType::DIRT){
                             chunk.Set(x, y-1, z, Blocks::BlockType::GRASS);
                         }
                         chunk.Set(x, y, z, Blocks::BlockType::AIR);   
@@ -423,16 +424,17 @@ namespace fcg{
             //Altezza media Y [MinY+MaxY/2]
             float averageHeightY   = 0.5f * (float) (cavesConfig.spaghettiMinY + cavesConfig.spaghettiMaxY);
 
-            //SemiAmpiezza Y [MinY-MaxY/2], 
+            //SemiAmpiezza Y [MinY-MaxY/2]
             float halfWidthHeightY = 0.5f * (float) (cavesConfig.spaghettiMaxY - cavesConfig.spaghettiMinY);
             
-            //Scala generazione delle caverne
+            //Quantità delle caverne generate scalata in base al valore scelto
             FractalParams scaledPathFractal = cavesConfig.spaghettiPathFractal;
             scaledPathFractal.frequency *= cavesConfig.spaghettiDensity;
             float scaledThreshold = cavesConfig.spaghettiThreshold * cavesConfig.spaghettiDensity;
 
             for(int localChunkX = 0; localChunkX < Blocks::CHUNK_SIZE_X ; localChunkX++){
                 for(int localChunkZ = 0; localChunkZ < Blocks::CHUNK_SIZE_Z ; localChunkZ++){
+                    //Coordinate mondo utilizzate nei perlin noise 2D
                     float worldX = (float) (chunkX * Blocks::CHUNK_SIZE_X + localChunkX);
                     float worldZ = (float) (chunkZ * Blocks::CHUNK_SIZE_Z + localChunkZ);
 
@@ -442,23 +444,34 @@ namespace fcg{
                     //Se ci allontaniamo troppo dal centro, allora LA COLONNA XZ non appartiene alla caverna
                     if(distanceFromTunnelCenterXZ >= scaledThreshold) continue;
                   
-                    //Campiono il perlin noise 2D per sapere a che altezza Y sarà il tunnel
-                    float generatedHeight = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
-                    float tunnelCenterHeight = averageHeightY + generatedHeight * halfWidthHeightY;
+                    //Campiono il perlin noise 2D per sapere a che altezza Y sarà il tunnel [-1,1]
+                    float generatedHeightY = Fractal2D(*noise, worldX + spaghettiElevationOffsetX, worldZ + spaghettiElevationOffsetZ, cavesConfig.spaghettiElevationFractal);
+                    //Scaliamolo a un valore più corretto [minY-maxY]
+                    float weightedHeightY = averageHeightY + generatedHeightY * halfWidthHeightY;
 
-                    //1.0 al centro del tunnel, 0.0 sui bordi: sezione tondeggiante
+                    //Il ratio è 0.0 al centro del tunnel, ~~1.0 sui bordi che non sono scavati
                     float ratio = distanceFromTunnelCenterXZ / scaledThreshold;
-                    float shape = 1.0f - (ratio*ratio);
-                    float halfTunnelHeight = 0.5f * (float) cavesConfig.spaghettiCenterTunnelHeight * shape;
+                    
+                    //Qui possiamo decidere la forma del tunnel usando una formula matematica 
+                    //In questo caso è f(x) = 1 - (ratio^2)
+                    float shapeFunctionOutput = 1.0f - (ratio*ratio);
 
+                    //Altezza effettiva del tunnel in quella colonna xz
+                    float tunnelHeight = (float) cavesConfig.spaghettiCenterMaxTunnelHeight * shapeFunctionOutput;
+
+                    //Altezza della surperficie in quella colonna xz
                     int surface = heightMap[HeightIndex(localChunkX, localChunkZ)];
 
-                    int floorHeightY   = std::max((int) std::floor(tunnelCenterHeight - halfTunnelHeight), cavesConfig.minY);
-                    int ceilingHeightY = std::min((int) std::floor(tunnelCenterHeight + halfTunnelHeight), surface-cavesConfig.surfaceMargin);
+                    //Altezze del pavimento e soffitto della caverna nella colonna xz
+                    //tunnelHeight viene diviso per 2, due volte, una per il pavimento, l'altra per il soffitto 
+                    int caveFloorHeightY   = std::max((int) std::floor(weightedHeightY - tunnelHeight * 0.5f), cavesConfig.minY); //[minY-surface]
+                    int caveCeilingHeightY = std::min((int) std::floor(weightedHeightY + tunnelHeight * 0.5f), surface-cavesConfig.surfaceMargin); //[minY-surface]
 
-                    if(floorHeightY > ceilingHeightY) continue;
+                    //Se il pavimento è più alto del ceiling si salta
+                    if(caveFloorHeightY > caveCeilingHeightY) continue;
                     
-                    for(int localChunkY = floorHeightY ; localChunkY <= ceilingHeightY ; localChunkY++){
+                    //Si indica che una cella è da scavare con '1'
+                    for(int localChunkY = caveFloorHeightY ; localChunkY <= caveCeilingHeightY ; localChunkY++){
                         carveMap[CarveIndex(localChunkX, localChunkY, localChunkZ)] = 1;
                     }
                 }
